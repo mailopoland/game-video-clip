@@ -1,0 +1,14 @@
+{
+  "videoId": "Iz-nC59AIWc",
+  "endScreenAtSec": 56,
+  "objects": [
+    { "id": "o1", "time": 12.0, "duration": 1400, "x": 25, "y": 35, "sprite": "circle", "hitWindowMs": 300 },
+    { "id": "o2", "time": 15.5, "duration": 1400, "x": 70, "y": 30, "sprite": "circle", "hitWindowMs": 300 },
+    { "id": "o3", "time": 19.0, "duration": 1200, "x": 50, "y": 55, "sprite": "star", "hitWindowMs": 260 },
+    { "id": "o4", "time": 23.5, "duration": 1200, "x": 20, "y": 60, "sprite": "diamond", "hitWindowMs": 260 },
+    { "id": "o5", "time": 28.0, "duration": 1100, "x": 78, "y": 58, "sprite": "circle", "hitWindowMs": 240 },
+    { "id": "o6", "time": 34.0, "duration": 1100, "x": 40, "y": 25, "sprite": "star", "hitWindowMs": 240 },
+    { "id": "o7", "time": 41.0, "duration": 1000, "x": 62, "y": 45, "sprite": "diamond", "hitWindowMs": 220 },
+    { "id": "o8", "time": 48.0, "duration": 1000, "x": 33, "y": 48, "sprite": "star", "hitWindowMs": 220 }
+  ]
+}

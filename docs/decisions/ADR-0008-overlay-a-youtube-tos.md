@@ -1,7 +1,7 @@
 # ADR-0008: Warstwa gry nad playerem a YouTube Terms of Service
 
-Status: **Zaakceptowany warunkowo — wymaga decyzji właściciela produktu**
-Data: 2026-08-06
+Status: **Zaakceptowany — Wariant A (overlay), ryzyko świadomie przyjęte**
+Data: 2026-08-06 (potwierdzone na checkpoincie Fazy 1)
 
 ## Kontekst
 
@@ -68,8 +68,8 @@ Ponieważ oba warianty różnią się **wyłącznie kontenerem pozycjonującym**
 na Wariant B to zmiana CSS + jednego elementu-rodzica, bez dotykania silnika ani
 beatmapy. Nie budujemy pod to żadnej abstrakcji ani przełącznika z góry.
 
-> ⚠️ **Ta decyzja czeka na potwierdzenie na checkpoincie Fazy 1.** Jeśli wybierzesz
-> Wariant B, ten ADR zostanie zaktualizowany przed rozpoczęciem implementacji.
+> ✅ **Potwierdzone na checkpoincie Fazy 1: Wariant A.** Ryzyko zgodności z ToS
+> zostało przedstawione i przyjęte przez właściciela produktu.
 
 ## Konsekwencje
 

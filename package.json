@@ -1,0 +1,21 @@
+{
+  "name": "game-video-clip",
+  "version": "1.0.0",
+  "description": "Gra rytmiczna click-the-target nakladana na klip YouTube",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "jsdom": "^25.0.1",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.10"
+  }
+}
