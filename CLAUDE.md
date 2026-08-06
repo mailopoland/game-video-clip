@@ -2,8 +2,7 @@
 
 Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie client-side.
 
-**Status:** Faza 1 (plan i decyzje) ukończona. Faza 2 (implementacja) nierozpoczęta —
-struktura poniżej opisuje stan docelowy v1.
+**Status:** v1 zaimplementowane. `npm test` — 34 testy, zielone.
 
 ## Stack
 
@@ -13,28 +12,34 @@ struktura poniżej opisuje stan docelowy v1.
 - **Hosting: GitHub Pages** (statyczny build Vite)
 - Zależności produkcyjne: **zero**. Dev: `vite`, `typescript`, `vitest`, `jsdom`,
   `@testing-library/dom`. **Dodanie czegokolwiek poza tą listą wymaga zapytania.**
+- `jsdom` przypięty do `^25` — wersja 27 wymaga `require(ESM)`, czyli Node ≥ 20.19.
+  Po podniesieniu Node można odpiąć.
 
 ## Struktura projektu
 
 ```
-index.html               # scena + bramka startowa
+index.html               # szkielet strony
 src/
-  main.ts                # bootstrap: player + engine + renderer
+  main.ts                # bootstrap: YouTube + montaż gry + pętla rAF
+  game.ts                # spięcie silnika z DOM (używane też przez test smoke)
   styles.css
   sprites.ts             # rejestr sprite'ów — jedyne miejsce znające assety
   data/beatmap.json      # TIMELINE — dane, nie kod
   engine/
-    types.ts             # Beatmap, GameState, Outcome, Stats
+    types.ts             # Beatmap, GameView, Outcome, Stats, TimeSource
     beatmap.ts           # validateBeatmap
-    engine.ts            # pętla, maszyna stanów, resync, punktacja
+    engine.ts            # maszyna stanów, resync, punktacja
   ui/
-    render.ts            # stan -> DOM
+    render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     youtube.ts           # IFrame API + adapter TimeSource
-tests/                   # engine.test.ts, beatmap.test.ts, smoke.test.ts
+tests/
+  fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
+  engine.test.ts  beatmap.test.ts  smoke.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
   decisions/ADR-*.md
+.github/workflows/deploy.yml
 ```
 
 ## Komendy
@@ -45,11 +50,15 @@ docs/
 | `npm run build` | statyczny build do `dist/` |
 | `npm run preview` | podgląd builda lokalnie |
 | **`npm test`** | **Vitest — jedyna komenda potrzebna do weryfikacji regresji. Musi być zielona w 100%.** |
-| deploy | ręcznie, wg `docs/DEPLOY.md` — nigdy automatycznie |
+| deploy | ręcznie, wg [`docs/DEPLOY.md`](docs/DEPLOY.md) — nigdy automatycznie |
+
+Wymaga Node ≥ 20.17.
 
 ## Zasady pracy
 
 - **Timeline to dane.** Zmiana rozgrywki = zmiana `src/data/beatmap.json`, nie kodu.
+  ⚠️ Czasy w obecnej beatmapie i `endScreenAtSec` są **wartościami roboczymi** —
+  wymagają dostrojenia do rytmu i długości realnego klipu.
 - **Silnik nie zna YouTube ani DOM.** `engine.ts` przyjmuje `TimeSource`; dzięki temu
   testy używają fake clocka i nie potrzebują sieci.
 - **Wynik jest funkcją `Map<objectId, Outcome>`**, nigdy inkrementowanym licznikiem —

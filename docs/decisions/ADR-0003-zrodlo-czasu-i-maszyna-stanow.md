@@ -61,7 +61,7 @@ active   --(t > time + hw, brak kliku)-->  miss     --> resolved
 
 `duration` = długość fazy approach w ms (obiekt pojawia się o `duration` przed
 `time`, okrąg kurczy się do 0 dokładnie w `time`). Po rozstrzygnięciu obiekt
-znika po stałej `FADE_OUT_MS = 200`.
+znika po stałej `FADE_OUT_MS = 500` (tyle trwa animacja „+1" / „X").
 
 **`resync(T)`** — jedyne miejsce obsługujące przewijanie. Wyniki trzymamy w
 `Map<objectId, 'hit' | 'miss' | 'skipped'>`:

@@ -1,0 +1,248 @@
+/* Mobile-first (ADR-0009): projekt od 375x667, cala geometria gry w procentach. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #101014;
+  color: #f2f2f5;
+  font-family: system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* Scena trzyma 16:9 razem z playerem; w orientacji poziomej ogranicza ja wysokosc. */
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: min(100vw, calc((100dvh - 3.5rem) * 16 / 9), 1280px);
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+  touch-action: manipulation; /* brak 300 ms opoznienia i double-tap-zoom */
+}
+
+.player,
+.player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+/* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny
+   (mitygacja z ADR-0008). Klikalne sa wylacznie same obiekty. */
+.overlay {
+  position: absolute;
+  inset: 0 0 3.5rem 0;
+  pointer-events: none;
+}
+
+.obj {
+  position: absolute;
+  translate: -50% -50%;
+  width: 16%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+}
+
+.obj > * {
+  grid-area: 1 / 1;
+}
+
+/* --- Placeholdery proceduralne (ADR-0005). Podmiana na WebP/GIF = zmiana
+       wpisu w src/sprites.ts, bez dotykania tego pliku. --- */
+
+.sprite {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 0.4rem rgb(0 0 0 / 0.8));
+}
+
+.sprite-circle {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #7be0ff, #1f7ea8 70%);
+}
+
+.sprite-star {
+  background: radial-gradient(circle at 35% 30%, #ffe98a, #d09b1c 70%);
+  clip-path: polygon(
+    50% 0%,
+    62% 36%,
+    100% 38%,
+    69% 60%,
+    80% 100%,
+    50% 76%,
+    20% 100%,
+    31% 60%,
+    0% 38%,
+    38% 36%
+  );
+}
+
+.sprite-diamond {
+  background: radial-gradient(circle at 35% 30%, #ffb3f0, #a3288c 70%);
+  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+}
+
+/* Approach circle — skala ustawiana imperatywnie co klatke, zeby zamarzala
+   razem z wideo (ADR-0002). */
+.approach {
+  width: 100%;
+  height: 100%;
+  border: 0.25rem solid #fff;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.feedback {
+  font-size: clamp(1rem, 4vw, 2rem);
+  font-weight: 700;
+  opacity: 0;
+  text-shadow: 0 0 0.5rem #000;
+}
+
+.obj.is-hit .approach,
+.obj.is-miss .approach {
+  opacity: 0;
+}
+
+.obj.is-hit .sprite,
+.obj.is-miss .sprite {
+  animation: pop 0.5s ease-out forwards;
+}
+
+.obj.is-hit .feedback {
+  color: #6ef58f;
+  animation: rise 0.5s ease-out forwards;
+}
+
+.obj.is-miss .feedback {
+  color: #ff6b6b;
+  animation: rise 0.5s ease-out forwards;
+}
+
+@keyframes pop {
+  to {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2rem);
+  }
+}
+
+/* --- Bramka startowa i ekran wyniku --- */
+
+.gate,
+.results {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: rgb(0 0 0 / 0.72);
+  text-align: center;
+  padding: 1rem;
+}
+
+.gate[hidden],
+.results[hidden] {
+  display: none;
+}
+
+.gate-button {
+  font: inherit;
+  font-size: clamp(1.1rem, 4vw, 1.6rem);
+  font-weight: 700;
+  padding: 0.75rem 2.5rem;
+  min-height: 3rem;
+  border: 0;
+  border-radius: 999px;
+  background: #6ef58f;
+  color: #101014;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.gate-hint {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
+.results h1 {
+  margin: 0;
+  font-size: clamp(1.2rem, 5vw, 2rem);
+}
+
+.results-score {
+  margin: 0;
+  font-size: clamp(2rem, 10vw, 4rem);
+  font-weight: 700;
+  color: #6ef58f;
+}
+
+.results-detail {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.25rem 1.5rem;
+  margin: 0;
+  font-size: clamp(0.9rem, 3.5vw, 1.1rem);
+}
+
+.results-detail dt {
+  text-align: right;
+  opacity: 0.7;
+}
+
+.results-detail dd {
+  margin: 0;
+  text-align: left;
+  font-weight: 700;
+}
+
+/* --- HUD --- */
+
+.hud {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  height: 3.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.hud-frozen {
+  font-size: 0.8rem;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.hud-frozen[hidden] {
+  display: none;
+}
