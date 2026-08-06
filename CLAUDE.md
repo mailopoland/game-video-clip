@@ -4,6 +4,33 @@ Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie clien
 
 **Status:** v1 zaimplementowane. `npm test` — 34 testy, zielone.
 
+## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
+
+**[`README.md`](README.md) jest źródłem prawdy o działaniu aplikacji.** Opisuje model
+czasu, maszynę stanów celu, semantykę przewijania, format beatmapy i strukturę DOM —
+czyli rzeczy, których nie da się bezpiecznie odgadnąć z samego kodu.
+
+1. **Przeczytaj `README.md` w całości przed wykonaniem jakiegokolwiek promptu** —
+   przed edycją kodu, przed odpowiadaniem na pytania o aplikację, przed planowaniem.
+   Nie zaczynaj od czytania plików źródłowych.
+2. **Aktualizuj `README.md` w tym samym commicie, w którym zmieniasz zachowanie,
+   które on opisuje.** README musi zawsze odzwierciedlać aktualny stan projektu.
+
+Zmiana wymaga aktualizacji README, jeśli dotyka któregokolwiek z poniższych:
+
+- model czasu, freeze, `resync`, stałe `SEEK_THRESHOLD_SEC` / `FADE_OUT_MS`
+- maszyna stanów celu, reguły trafienia/pudła, sposób liczenia punktów i celności
+- schemat `beatmap.json`, reguły `validateBeatmap`, rejestr `SPRITES`
+- struktura DOM sceny, sposób obsługi wejścia, zachowanie na mobile
+- lista zależności, komendy, konfiguracja builda lub hostingu
+- lista testów albo znanych ograniczeń / rzeczy niezweryfikowanych
+
+Jeśli zmiana jest czysto kosmetyczna (refaktor bez zmiany zachowania, literówka,
+formatowanie) — README zostaw w spokoju.
+
+Nowa **istotna decyzja** to nadal osobny ADR + link w sekcji „Decyzje architektoniczne"
+poniżej **oraz** w tabeli decyzji w README.
+
 ## Stack
 
 - **Vanilla TypeScript + Vite** (brak frameworka UI)
@@ -18,6 +45,7 @@ Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie clien
 ## Struktura projektu
 
 ```
+README.md                # ŹRÓDŁO PRAWDY o działaniu aplikacji — czytaj najpierw
 index.html               # szkielet strony
 src/
   main.ts                # bootstrap: YouTube + montaż gry + pętla rAF
@@ -66,6 +94,8 @@ Wymaga Node ≥ 20.17.
 - **Czas wideo jest jedynym źródłem prawdy.** Żadnych `setTimeout`/`setInterval`
   sterujących rozgrywką.
 - Brak backendu, kont, zapisu wyników, analityki. Brak abstrakcji „na przyszłość".
+- **`README.md` idzie w tym samym commicie co zmiana zachowania**, którą opisuje
+  (szczegóły w sekcji na górze tego pliku).
 - Małe commity z opisowymi wiadomościami. **Nigdy `git push` ani deploy bez pytania.**
 - Assety: **nie pobieramy niczego z internetu.**
 - Po ukończonym kroku: jedna linia `✅ [co zrobione]`.
