@@ -32,7 +32,7 @@ export function createUi(
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
           <button class="gate-button" id="start" type="button">Graj</button>
-          <p class="gate-hint">Klikaj obiekty, gdy okrag zetknie sie z ich krawedzia.</p>
+          <p class="gate-hint">Klikaj dlonie, gdy sie pojawia.</p>
         </div>
         <section class="results" id="results" hidden>
           <h1>Koniec</h1>
@@ -90,10 +90,6 @@ export function createUi(
     }
     element.append(spriteElement);
 
-    const approach = document.createElement('span');
-    approach.className = 'approach';
-    element.append(approach);
-
     const feedback = document.createElement('span');
     feedback.className = 'feedback';
     element.append(feedback);
@@ -124,21 +120,6 @@ export function createUi(
       element.style.width = `${(16 * visible.size) / 100}%`;
 
       const resolved = visible.outcome === 'hit' || visible.outcome === 'miss';
-      const approach = element.querySelector<HTMLElement>('.approach')!;
-      if (resolved) {
-        // Inline styl ma pierwszenstwo nad regula CSS `.is-hit/.is-miss .approach`
-        // (specyficznosc), wiec zniknienie okregu trzeba ustawic tutaj, nie liczyc
-        // na sam CSS — inaczej ostatnia klatka approach (0) zostawia opacity: 1.
-        approach.style.opacity = '0';
-      } else {
-        approach.style.transform = `scale(${1 + visible.approach * 2.2})`;
-        approach.style.opacity = `${0.35 + (1 - visible.approach) * 0.65}`;
-      }
-
-      const inHitWindow =
-        !resolved &&
-        Math.abs(view.timeSec - visible.object.time) <= visible.object.hitWindowMs / 1000;
-      element.classList.toggle('is-armed', inHitWindow);
       element.classList.toggle('is-hit', visible.outcome === 'hit');
       element.classList.toggle('is-miss', visible.outcome === 'miss');
       if (resolved) {

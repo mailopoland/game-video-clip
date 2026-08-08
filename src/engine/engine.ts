@@ -76,17 +76,15 @@ export class Engine {
     const object = this.byId.get(objectId);
     if (!object || this.results.has(objectId)) return false;
 
-    const hitWindowSec = object.hitWindowMs / 1000;
-    const spawnSec = object.time - object.duration / 1000;
+    const spawnSec = object.path[0]!.t;
     if (this.timeSec < spawnSec) return false; // obiekt jeszcze nie istnieje
 
-    const inWindow =
-      this.timeSec >= object.time - hitWindowSec && this.timeSec <= object.time + hitWindowSec;
-    this.results.set(objectId, {
-      outcome: inWindow ? 'hit' : 'miss',
-      atSec: this.timeSec,
-    });
-    return inWindow;
+    // Reka jest klikalna przez caly czas trwania sciezki (ADR-0015) — jesli
+    // obiekt istnieje i nie ma jeszcze wyniku, klik zawsze trafia. Po
+    // despawnie sweepMisses() zdazy ustawic 'miss' wczesniej (co tick), wiec
+    // results.has(objectId) jest juz true i ta galaz sie nie wykona.
+    this.results.set(objectId, { outcome: 'hit', atSec: this.timeSec });
+    return true;
   }
 
   getView(): GameView {
@@ -133,27 +131,23 @@ export class Engine {
    */
   private resync(targetSec: number): void {
     for (const object of this.beatmap.objects) {
-      if (object.time >= targetSec) {
+      const despawnSec = object.path[object.path.length - 1]!.t;
+      if (despawnSec >= targetSec) {
         this.results.delete(object.id);
-      } else if (
-        !this.results.has(object.id) &&
-        object.time + object.hitWindowMs / 1000 < targetSec
-      ) {
+      } else if (!this.results.has(object.id)) {
         this.results.set(object.id, { outcome: 'skipped', atSec: targetSec });
       }
     }
     this.timeSec = targetSec;
   }
 
-  /** Obiekt bez wyniku, ktoremu minelo okno trafienia, to pudlo. */
+  /** Obiekt bez wyniku, ktoremu minal despawn (koniec sciezki), to pudlo. */
   private sweepMisses(): void {
     for (const object of this.beatmap.objects) {
       if (this.results.has(object.id)) continue;
-      if (this.timeSec > object.time + object.hitWindowMs / 1000) {
-        this.results.set(object.id, {
-          outcome: 'miss',
-          atSec: object.time + object.hitWindowMs / 1000,
-        });
+      const despawnSec = object.path[object.path.length - 1]!.t;
+      if (this.timeSec > despawnSec) {
+        this.results.set(object.id, { outcome: 'miss', atSec: despawnSec });
       }
     }
   }
@@ -168,20 +162,14 @@ export class Engine {
         if (this.timeSec > result.atSec + FADE_OUT_MS / 1000) continue;
         if (this.timeSec < result.atSec) continue;
         const { x, y, size } = samplePath(object.path, this.timeSec);
-        visible.push({ object, approach: 0, outcome: result.outcome, x, y, size });
+        visible.push({ object, outcome: result.outcome, x, y, size });
         continue;
       }
 
-      const durationSec = object.duration / 1000;
-      const remainingSec = object.time - this.timeSec;
-      if (remainingSec > durationSec) continue; // jeszcze nie spawnowany
+      if (this.timeSec < object.path[0]!.t) continue; // jeszcze nie spawnowany
       const { x, y, size } = samplePath(object.path, this.timeSec);
-      visible.push({ object, approach: clamp(remainingSec / durationSec, 0, 1), x, y, size });
+      visible.push({ object, x, y, size });
     }
     return visible;
   }
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

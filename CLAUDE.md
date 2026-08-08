@@ -2,14 +2,14 @@
 
 Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie client-side.
 
-**Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia
-+ okrąg wyrównany do treści sprite'a, kolorowany na zielono w oknie tolerancji,
-znika po rozstrzygnięciu, głośność proporcjonalna do YouTube i podwojona.
-Obiekty beatmapy mają ścieżkę ruchu (`path`, min. 1 punkt `t/x/y/size`, interpolacja
-liniowa w silniku) zamiast statycznych `x`/`y`/`size`; pas kontrolek YouTube pod sceną
-jest wyrażony w procentach (`8%`), nie w `rem`, więc pozycja celu jest niezmiennicza
-względem rozmiaru sceny (ADR-0014).
-`npm test` — 87 testów, zielone.
+**Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia.
+Obiekty beatmapy mają wyłącznie `path` (min. 2 punkty `t/x/y/size`, interpolacja liniowa
+w silniku) — `path[0].t`/`path[ostatni].t` to spawn/despawn, bez osobnych pól czasowych.
+Reka jest klikalna przez cały czas trwania ścieżki: klik w tym oknie = trafienie, brak
+kliku do despawnu = pudło. Approach circle i `is-armed` zostały usunięte (ADR-0015).
+Pas kontrolek YouTube pod sceną jest wyrażony w procentach (`8%`), nie w `rem`, więc
+pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014).
+`npm test` — 82 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -134,3 +134,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0012 — Wyrównanie approach circle do treści sprite'a i sygnał „można trafić"](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md)
 - [ADR-0013 — Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md)
 - [ADR-0014 — Ścieżka ruchu w beatmapie i niezmiennicza geometria](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md)
+- [ADR-0015 — Usunięcie approach circle i pól czasowych obiektu na rzecz path](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md)

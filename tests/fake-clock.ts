@@ -45,11 +45,11 @@ export function obj(
 ): Beatmap['objects'][number] {
   return {
     id,
-    time,
-    duration: 1000,
     sprite: 'hand',
-    hitWindowMs: 200,
-    path: [{ t: time, x: 50, y: 50, size: 100 }],
+    path: [
+      { t: time, x: 50, y: 50, size: 100 },
+      { t: time + 1, x: 50, y: 50, size: 100 },
+    ],
     ...overrides,
   };
 }

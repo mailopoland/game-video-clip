@@ -123,7 +123,7 @@ describe('dzwiek trafienia w rozgrywce', () => {
 
   it('trafienie odtwarza dokladnie jeden klaps', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20);
     const game = mount(beatmap, clock);
 
     playTo(clock, game.frame, 10.0);
@@ -132,30 +132,30 @@ describe('dzwiek trafienia w rozgrywce', () => {
     expect(totalPlays()).toBe(1);
   });
 
-  it('pudlo nie odtwarza dzwieku', () => {
+  it('klik przed spawnem nie odtwarza dzwieku', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);
+    const beatmap = makeBeatmap([obj('o1', 10)]);
     const game = mount(beatmap, clock);
 
     playTo(clock, game.frame, 9.2);
-    tap(root.querySelector('.obj[data-id="o1"]')!);
+    expect(root.querySelector('.obj[data-id="o1"]')).toBeNull(); // jeszcze nie spawnowany
 
     expect(totalPlays()).toBe(0);
   });
 
   it('cel wygasly bez kliknięcia nie odtwarza dzwieku', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20); // despawn 11
     const game = mount(beatmap, clock);
 
-    playTo(clock, game.frame, 11.0);
+    playTo(clock, game.frame, 11.05);
 
     expect(totalPlays()).toBe(0);
   });
 
   it('drugi tap w ten sam cel nie daje drugiego dzwieku', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20);
     const game = mount(beatmap, clock);
 
     playTo(clock, game.frame, 10.0);
@@ -168,7 +168,7 @@ describe('dzwiek trafienia w rozgrywce', () => {
 
   it('seek w tyl przez trafiony cel i seek w przod nie daja dodatkowego dzwieku', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20);
     const game = mount(beatmap, clock);
 
     playTo(clock, game.frame, 10.0);
@@ -185,13 +185,7 @@ describe('dzwiek trafienia w rozgrywce', () => {
 
   it('dwa trafienia w krotkim odstepie uzywaja dwoch roznych elementow puli', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap(
-      [
-        obj('o1', 10, { duration: 1000, hitWindowMs: 300 }),
-        obj('o2', 10.5, { duration: 1000, hitWindowMs: 300 }),
-      ],
-      20,
-    );
+    const beatmap = makeBeatmap([obj('o1', 10), obj('o2', 10.5)], 20);
     const game = mount(beatmap, clock);
 
     playTo(clock, game.frame, 10.0);

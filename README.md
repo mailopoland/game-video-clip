@@ -1,8 +1,8 @@
 # Click the target — gra rytmiczna na klipie YouTube
 
-Prosta gra rytmiczna nałożona na odtwarzany klip z YouTube. W momentach zapisanych
-w beatmapie pojawiają się klikalne cele z kurczącym się okręgiem (approach circle).
-Trafienie w oknie tolerancji daje punkt, spóźnienie lub klik poza oknem — pudło.
+Prosta gra rytmiczna nałożona na odtwarzany klip z YouTube. Ścieżka ruchu w beatmapie
+wyznacza, kiedy i gdzie pojawia się klikalna dłoń — klikalna przez cały czas, w którym
+jest widoczna. Klik w tym czasie daje punkt, brak kliku do końca ścieżki — pudło.
 Na końcu klipu pokazuje się ekran wyniku.
 
 Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 87 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 82 testy, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -89,7 +89,7 @@ Cała rozgrywka jest sterowana **wyłącznie** czasem odtwarzania wideo. Nie ma 
 YouTube IFrame API ma trzy ograniczenia, wokół których zbudowany jest silnik:
 
 1. `getCurrentTime()` **nie odświeża się co klatkę** — kolejne odczyty w `rAF` potrafią
-   zwrócić tę samą wartość. Bez zaradzenia approach circle by się zacinał.
+   zwrócić tę samą wartość. Bez zaradzenia ruch obiektów po ścieżce by się zacinał.
 2. **Nie ma zdarzenia per-frame** ani odpowiednika `timeupdate`.
 3. **Nie ma zdarzenia „seek"** — przewinięcie trzeba wykryć samemu.
 
@@ -116,28 +116,33 @@ testy sterują nim ręcznie.
 ## Maszyna stanów celu
 
 ```
-pending  ──(t ≥ time − duration)──▶  active
-active   ──(klik w [time−hw, time+hw])──▶  hit
-active   ──(klik poza oknem)──▶  miss
-active   ──(t > time + hw, brak kliku)──▶  miss
+pending  ──(t ≥ path[0].t)──▶  active
+active   ──(dowolny klik)──▶  hit
+active   ──(t > path[ostatni].t, brak kliku)──▶  miss
 (seek do przodu)  ──▶  skipped
 ```
 
-- `duration` (ms) = **faza approach**: cel pojawia się w `time − duration`, a okrąg
-  kurczy się do zera dokładnie w `time`.
-- `hitWindowMs` = tolerancja ± wokół `time`.
+Od [ADR-0015](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md) `path`
+jest **jedynym** źródłem prawdy o tym, kiedy obiekt istnieje — nie ma już osobnych pól
+czasowych ani okna tolerancji:
+
+- **`path[0].t`** = spawn (obiekt staje się widoczny i klikalny).
+- **`path[ostatni].t`** = despawn — do tego momentu włącznie obiekt jest klikalny.
+- **Reka jest klikalna przez cały ten czas.** Nie ma pojęcia „poza oknem" ani spóźnienia —
+  klik w dowolnym momencie między spawnem a despawnem to zawsze trafienie. Brak kliku do
+  despawnu (włącznie) to pudło.
 - Po rozstrzygnięciu cel zostaje na ekranie jeszcze **`FADE_OUT_MS = 500`** — tyle trwa
   animacja `+1` / `✕`.
 - Przejście do `hit` dodatkowo: podmienia grafikę sprite'a na wariant `hitSrc` (jeśli
   zarejestrowany) i odtwarza dźwięk trafienia — zobacz sekcję [Sprite'y](#sprite-y).
   `miss` nie zmienia grafiki. Dźwięk leci **wyłącznie** z tej ścieżki (`onHit` w
   `src/game.ts`), nigdy z `resync`/`sweepMisses` — patrz [ADR-0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md).
-- **Klasa `is-armed`** na `.obj`: cel jest w oknie tolerancji (`|timeSec − time| ≤ hitWindowMs`)
-  i jeszcze nierozstrzygnięty. Renderer (`render.ts`) liczy to co klatkę z `GameView`,
-  silnik o tym nie wie. CSS zmienia wtedy kolor okręgu na zielony (`#6ef58f`) — sygnał
-  „ten klik trafi", zanim gracz w ogóle kliknie. Patrz [ADR-0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md).
 - Klik w cel, który jeszcze nie spawnował, jest **ignorowany** (nie tworzy pudła).
 - Drugi klik w ten sam cel nic nie zmienia.
+
+**Nie ma już approach circle.** Sam sprite dłoni jest celem, bez żadnego dodatkowego
+sygnału wizualnego „można trafić" przed kliknięciem — usunięty razem z klasą `is-armed`
+(ADR-0015; wcześniej opisane w ADR-0012/ADR-0013).
 
 Stany nie są mutowane w miejscu — są wyliczane z beatmapy i mapy wyników przy każdym
 `getView()`.
@@ -153,12 +158,14 @@ Nie ma żadnego `score++`. Dzięki temu ponowne zagranie fragmentu **nadpisuje**
 zamiast go dodawać — podwójne punktowanie jest niemożliwe konstrukcyjnie, a nie dzięki
 uważności.
 
-`resync(T)` — jedyne miejsce obsługujące przewijanie:
+`resync(T)` — jedyne miejsce obsługujące przewijanie. Pivot to `path[ostatni].t`
+(despawn) każdego obiektu — jeden spójny warunek zamiast osobnych reguł dla „w przyszłości"
+i „poza oknem" sprzed ADR-0015:
 
 | Sytuacja | Zachowanie |
 |---|---|
-| **Seek w tył** | Wyniki celów o `time ≥ T` są **usuwane** → fragment można zagrać od nowa. Wyniki celów pozostających w przeszłości zostają nietknięte. |
-| **Seek w przód** | Cele, którym całe okno minęło przed `T`, dostają `skipped` → **zero fałszywych pudeł**. |
+| **Seek w tył** | Wyniki celów, których despawn jest ≥ `T`, są **usuwane** → fragment można zagrać od nowa. Wyniki celów pozostających w przeszłości zostają nietknięte. |
+| **Seek w przód** | Cele, których despawn jest < `T` i nie mają jeszcze wyniku, dostają `skipped` → **zero fałszywych pudeł**. |
 | **Seek w trakcie pauzy** | Też resynchronizuje — ekran pokazuje prawdę, ale nic nie jest oceniane. |
 
 `skipped` **nie wchodzi do mianownika celności** i nie jest renderowany (brak „duchów").
@@ -180,9 +187,11 @@ Przewinięcie z powrotem chowa go.
   "videoId": "5OyTxEbT-fM",
   "endScreenAtSec": 56,
   "objects": [
-    { "id": "o1", "time": 12.0, "duration": 1100,
-      "sprite": "hand", "hitWindowMs": 200,
-      "path": [ { "t": 12.0, "x": 60, "y": 41, "size": 100 } ] }
+    { "id": "o1", "sprite": "hand",
+      "path": [
+        { "t": 11.5, "x": 60, "y": 41, "size": 100 },
+        { "t": 12.5, "x": 60, "y": 41, "size": 100 }
+      ] }
   ]
 }
 ```
@@ -190,35 +199,32 @@ Przewinięcie z powrotem chowa go.
 | Pole | Znaczenie |
 |---|---|
 | `id` | Unikalny, **stabilny** — to klucz wyników przy przewijaniu. Zmiana `id` = zerowanie wyniku celu. |
-| `time` | Sekunda wideo: moment idealnego trafienia. |
-| `duration` | Ms fazy approach — cel pojawia się w `time − duration`. |
 | `sprite` | Klucz w rejestrze `src/sprites.ts`. |
-| `hitWindowMs` | Tolerancja ± wokół `time`. |
-| `path` | **Wymagane, min. 1 punkt.** Ścieżka ruchu — patrz niżej. |
+| `path` | **Wymagane, min. 2 punkty** (start i koniec). Ścieżka ruchu — jedyne źródło prawdy o tym, kiedy i gdzie obiekt istnieje. Patrz niżej. |
 
-**`path` — ścieżka ruchu (ADR-0014).** Lista punktów `PathPoint`, ściśle rosnąco
-po `t`. Zastępuje dawne pola `x`/`y`/`size` na poziomie obiektu — jeden sposób
-opisu pozycji, zero niejednoznaczności "co wygrywa". Obiekt statyczny to `path`
-z jednym punktem.
+**`path` — jedyne źródło prawdy o obecności obiektu (ADR-0014, ADR-0015).** Lista
+punktów `PathPoint`, ściśle rosnąco po `t`. `path[0].t` to spawn obiektu,
+`path[ostatni].t` to despawn — **nie ma już osobnych pól `time`/`duration`/`hitWindowMs`**.
+Cały przedział `[path[0].t, path[ostatni].t]` jest jednocześnie oknem klikalności
+(patrz [Maszyna stanów celu](#maszyna-stanów-celu)). Obiekt statyczny (bez ruchu) to
+`path` z dwoma punktami o tych samych `x`/`y`/`size` i różnym `t`.
 
 | Pole punktu | Znaczenie |
 |---|---|
-| `t` | Sekunda wideo — **ta sama skala co `time` obiektu**, absolutna, nie względna. |
+| `t` | Sekunda wideo, absolutna. |
 | `x`, `y` | Procent szerokości/wysokości **warstwy gry** (środek celu). |
-| `size` | Procent bazowego rozmiaru obiektu (bazowe `width: 16%` z `styles.css`). `100` = obecny rozmiar, `50` = połowa, `200` = dwa razy większy. Musi być dodatnie, bez górnego limitu. Approach circle skaluje się razem z obiektem automatycznie (ma `width/height: 100%` względem `.obj`), bez osobnego pola. |
+| `size` | Procent bazowego rozmiaru obiektu (bazowe `width: 16%` z `styles.css`). `100` = obecny rozmiar, `50` = połowa, `200` = dwa razy większy. Musi być dodatnie, bez górnego limitu. |
 
 Pozycja i rozmiar w danej sekundzie wideo to `samplePath(path, timeSec)`
 (`src/engine/path.ts`) — czysta funkcja, czytana przez silnik, nie renderer:
 **interpolacja liniowa** między sąsiednimi punktami; poza zakresem ścieżki
-(przed pierwszym punktem, po ostatnim) — **przytrzymanie skrajnej wartości**,
-obiekt nie znika ani nie skacze. Dzięki temu ruch zamarza na pauzie i
-resynchronizuje się po przewinięciu bez żadnego dodatkowego kodu — to ten sam
-mechanizm co zamrażanie `timeSec` w silniku.
+(przed pierwszym punktem, po ostatnim) — **przytrzymanie skrajnej wartości**.
+Dzięki temu ruch zamarza na pauzie i resynchronizuje się po przewinięciu bez
+żadnego dodatkowego kodu — to ten sam mechanizm co zamrażanie `timeSec` w silniku.
 
 `validateBeatmap` (`src/engine/beatmap.ts`) rzuca czytelnym błędem przy: pustej liście,
-duplikacie `id`, celach nieposortowanych po `time`, niedodatnim `duration`/`hitWindowMs`,
-`hitWindowMs > duration` (okno otwierałoby się, zanim cel się pojawi), nieznanym `sprite`,
-pustej `path`, punkcie `path` z `t` nieskończonym/nierosnącym względem poprzedniego,
+duplikacie `id`, celach nieposortowanych po `path[0].t`, nieznanym `sprite`, `path` z mniej
+niż dwoma punktami, punkcie `path` z `t` nieskończonym/nierosnącym względem poprzedniego,
 `x`/`y` punktu poza 0–100 lub niedodatnim `size` punktu. Błąd = komunikat na stronie
 zamiast cichego pominięcia.
 
@@ -309,7 +315,7 @@ przeglądarki) działa zapasowa ścieżka `el.volume = min(1, getReferenceVolume
     <div class="overlay">     <!-- pointer-events: none -->
       <button class="obj">    <!-- pointer-events: auto -->
         <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
-        <span class="approach"><span class="feedback">
+        <span class="feedback">
     <div class="gate">…</div> <!-- bramka startowa "Graj" -->
     <section class="results">… <!-- ekran wyniku -->
   </main>
@@ -331,22 +337,9 @@ Istotne szczegóły:
   w kontenerze, `cqw` tak (ADR-0014).
 - **`.frame` istnieje wyłącznie po to, by pełny ekran obejmował scenę razem z HUD-em**
   (ADR-0010). Szerokość sceny i HUD-u pochodzi ze wspólnej zmiennej `--stage-width`.
-- **Approach circle jest skalowany imperatywnie co klatkę**
-  (`transform: scale(1 + approach × 2.2)`), a **nie** przez CSS `@keyframes` — animacja
-  CSS nie zamarłaby razem z wideo przy pauzie i nie zresynchronizowałaby się po seeku.
-  `transform` jest kompozytowany na GPU, więc nie ma reflow.
-- **Approach circle jest wycentrowany na okręgu CSS-ową właściwością `translate: 9.8% -0.9%`**
-  (`.approach` w `styles.css`), niezależną od `transform`, które JS nadpisuje co klatkę.
-  Rysunek dłoni w `hand-idle.gif` nie jest wyśrodkowany w swoim kwadratowym płótnie
-  (bbox treści zmierzony narzędziowo: 1254×1254 px płótno, treść w x 360–1140,
-  y 295–937) — bez tej korekty okrąg wizualnie otaczał puste miejsce obok dłoni,
-  nie samą dłoń. Patrz [ADR-0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md).
-- **Okrąg znika natychmiast po rozstrzygnięciu (`opacity: 0` ustawiane inline
-  w `render.ts`), nie przez regułę CSS.** Wcześniej `render.ts` ustawiał
-  `approach.style.opacity` bezwarunkowo co klatkę, także dla rozstrzygniętych
-  obiektów — inline styl zawsze wygrywa ze specyficznością reguły w arkuszu, więc
-  `.obj.is-hit .approach { opacity: 0 }` nigdy realnie nie działała. Naprawione
-  w [ADR-0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md).
+- **Nie ma już approach circle** (usunięty w ADR-0015; historia w ADR-0012/ADR-0013).
+  `.obj` renderuje tylko `.sprite` i `.feedback` — sam sprite dłoni jest celem, klikalny
+  przez cały czas trwania jego `path`.
 - Cała geometria w **procentach**, więc skalowanie 375 px ↔ 1440 px jest darmowe.
 
 ---
@@ -406,18 +399,18 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ## Testy
 
-`npm test` — **87 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **82 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
-| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). Fabryka `obj()` tworzy domyślnie jednopunktową `path` (`t` = `time`). |
+| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). Fabryka `obj()` tworzy domyślnie dwupunktową `path` (spawn `t = time`, despawn `t = time + 1`). |
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
-| `tests/engine.test.ts` | 33 testy logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
-| `tests/beatmap.test.ts` | Walidacja (w tym pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma niepustą `path`. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka jednopunktowa trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
+| `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
-| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
+| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -512,3 +505,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md) | Wyrównanie approach circle do treści sprite'a i sygnał „można trafić" |
 | [0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md) | Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube |
 | [0014](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md) | Ścieżka ruchu w beatmapie i niezmiennicza geometria |
+| [0015](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md) | Usunięcie approach circle i pól czasowych obiektu na rzecz `path` |

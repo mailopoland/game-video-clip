@@ -26,7 +26,7 @@ describe('smoke: render i wejscie dotykowe', () => {
 
   it('startuje z bramka, renderuje obiekt i zalicza tap na nim', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20); // spawn 10, despawn 11
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
     // Bramka startowa jest widoczna do pierwszego gestu (ADR-0009).
@@ -36,10 +36,11 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(gate.hidden).toBe(true);
 
     playTo(clock, game.frame, 9.5);
-    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]');
-    expect(target).not.toBeNull();
+    expect(root.querySelector('.obj[data-id="o1"]')).toBeNull(); // jeszcze nie spawnowany
 
     playTo(clock, game.frame, 10.0);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]');
+    expect(target).not.toBeNull();
     tap(target!);
 
     expect(target!.classList.contains('is-hit')).toBe(true);
@@ -49,10 +50,10 @@ describe('smoke: render i wejscie dotykowe', () => {
 
   it('renderuje sprite obrazkowy jako <img> ze zrodlem z rejestru', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, sprite: 'hand' })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10, { sprite: 'hand' })], 20);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
-    playTo(clock, game.frame, 9.5);
+    playTo(clock, game.frame, 10.0);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
     const img = target.querySelector<HTMLImageElement>('img.sprite');
 
@@ -63,7 +64,7 @@ describe('smoke: render i wejscie dotykowe', () => {
 
   it('trafienie podmienia grafike sprite-a na wariant "hit"', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)], 20);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
     playTo(clock, game.frame, 10.0);
@@ -75,81 +76,28 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(img.src.endsWith(expectedHitSrc)).toBe(true);
   });
 
-  it('okrag znika natychmiast po trafieniu', () => {
+  it('pudlo nie podmienia grafiki sprite-a — zostaje wariant idle, gdy despawn minie bez kliku', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10)]); // despawn 11
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
-    playTo(clock, game.frame, 10.0);
+    playTo(clock, game.frame, 10.5);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-    tap(target);
-
-    const approach = target.querySelector<HTMLElement>('.approach')!;
-    expect(approach.style.opacity).toBe('0');
-  });
-
-  it('okrag znika, gdy okno trafienia minie bez kliku (za pozno)', () => {
-    const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);
-    const game = mountGame(root, beatmap, clock, { now: clock.now });
-
-    playTo(clock, game.frame, 10.25);
-    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-
-    const approach = target.querySelector<HTMLElement>('.approach')!;
-    expect(approach.style.opacity).toBe('0');
-  });
-
-  it('okrag jest "uzbrojony" (mozna trafic) tylko w oknie tolerancji', () => {
-    const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);
-    const game = mountGame(root, beatmap, clock, { now: clock.now });
-
-    playTo(clock, game.frame, 9.5);
-    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-    expect(target.classList.contains('is-armed')).toBe(false);
-
-    playTo(clock, game.frame, 9.85);
-    expect(target.classList.contains('is-armed')).toBe(true);
-
-    playTo(clock, game.frame, 10.25);
-    expect(target.classList.contains('is-armed')).toBe(false);
-  });
-
-  it('trafienie wylacza "uzbrojenie" okregu', () => {
-    const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
-    const game = mountGame(root, beatmap, clock, { now: clock.now });
-
-    playTo(clock, game.frame, 10.0);
-    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-    tap(target);
-
-    expect(target.classList.contains('is-armed')).toBe(false);
-  });
-
-  it('pudlo nie podmienia grafiki sprite-a — zostaje wariant idle', () => {
-    const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);
-    const game = mountGame(root, beatmap, clock, { now: clock.now });
-
-    playTo(clock, game.frame, 9.2);
-    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-    tap(target);
+    playTo(clock, game.frame, 11.05); // despawn bez kliku
 
     const img = target.querySelector<HTMLImageElement>('img.sprite')!;
     const expectedSrc = (SPRITES.hand as { kind: 'image'; src: string }).src;
     expect(img.src.endsWith(expectedSrc)).toBe(true);
   });
 
-  it('tap poza oknem tolerancji pokazuje X i nie daje punktu', () => {
+  it('brak kliku do despawnu pokazuje X i nie daje punktu', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);
+    const beatmap = makeBeatmap([obj('o1', 10)]); // despawn 11
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
-    playTo(clock, game.frame, 9.2);
+    playTo(clock, game.frame, 10.5);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
-    tap(target);
+    playTo(clock, game.frame, 11.05);
 
     expect(target.classList.contains('is-miss')).toBe(true);
     expect(target.querySelector('.feedback')!.textContent).toBe('✕');
@@ -158,7 +106,7 @@ describe('smoke: render i wejscie dotykowe', () => {
 
   it('pauza wideo zatrzymuje spawnowanie obiektow', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000 })]);
+    const beatmap = makeBeatmap([obj('o1', 10)]);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
     playTo(clock, game.frame, 8.5);
@@ -208,12 +156,19 @@ describe('smoke: render i wejscie dotykowe', () => {
   it('size z punktu sciezki skaluje szerokosc obiektu wzgledem bazowych 16%', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap(
-      [obj('o1', 10, { duration: 1000, path: [{ t: 10, x: 50, y: 50, size: 50 }] })],
+      [
+        obj('o1', 10, {
+          path: [
+            { t: 10, x: 50, y: 50, size: 50 },
+            { t: 11, x: 50, y: 50, size: 50 },
+          ],
+        }),
+      ],
       20,
     );
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
-    playTo(clock, game.frame, 9.5);
+    playTo(clock, game.frame, 10.0);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
 
     expect(target.style.width).toBe('8%');
@@ -224,7 +179,6 @@ describe('smoke: render i wejscie dotykowe', () => {
     const beatmap = makeBeatmap(
       [
         obj('o1', 10, {
-          duration: 1000,
           path: [
             { t: 9, x: 0, y: 0, size: 50 },
             { t: 10, x: 100, y: 100, size: 150 },
@@ -247,20 +201,27 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(target.style.width).toBe('16%');
   });
 
-  it('sciezka jednopunktowa trzyma pozycje mimo uplywu czasu', () => {
+  it('sciezka statyczna (dwa punkty w tym samym miejscu) trzyma pozycje mimo uplywu czasu', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap(
-      [obj('o1', 10, { duration: 1000, path: [{ t: 10, x: 33, y: 66, size: 100 }] })],
+      [
+        obj('o1', 10, {
+          path: [
+            { t: 10, x: 33, y: 66, size: 100 },
+            { t: 11, x: 33, y: 66, size: 100 },
+          ],
+        }),
+      ],
       20,
     );
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
-    playTo(clock, game.frame, 9.2);
+    playTo(clock, game.frame, 10.2);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
     expect(target.style.left).toBe('33%');
     expect(target.style.top).toBe('66%');
 
-    playTo(clock, game.frame, 9.9);
+    playTo(clock, game.frame, 10.9);
     expect(target.style.left).toBe('33%');
     expect(target.style.top).toBe('66%');
   });

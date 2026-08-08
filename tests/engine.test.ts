@@ -17,60 +17,55 @@ function playTo(clock: FakeClock, engine: Engine, targetSec: number, stepSec = 0
   }
 }
 
+const spawnAt9DespawnAt10 = [
+  { t: 9, x: 50, y: 50, size: 100 },
+  { t: 10, x: 50, y: 50, size: 100 },
+];
+
 describe('spawn obiektu', () => {
-  it('nie pokazuje obiektu przed czasem time - duration', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000 })]);
+  it('nie pokazuje obiektu przed path[0].t (spawn)', () => {
+    const { clock, engine } = setup([obj('o1', 10, { path: spawnAt9DespawnAt10 })]);
     playTo(clock, engine, 8.9);
     expect(engine.getView().visible).toHaveLength(0);
   });
 
-  it('pokazuje obiekt dokladnie od time - duration, z approach malejacym do 0', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000 })]);
+  it('pokazuje obiekt dokladnie od path[0].t', () => {
+    const { clock, engine } = setup([obj('o1', 10, { path: spawnAt9DespawnAt10 })]);
     playTo(clock, engine, 9.0);
     const spawned = engine.getView().visible;
     expect(spawned).toHaveLength(1);
     expect(spawned[0]!.object.id).toBe('o1');
-    expect(spawned[0]!.approach).toBeCloseTo(1, 1);
-
-    playTo(clock, engine, 9.5);
-    expect(engine.getView().visible[0]!.approach).toBeCloseTo(0.5, 1);
-
-    playTo(clock, engine, 10.0);
-    expect(engine.getView().visible[0]!.approach).toBeCloseTo(0, 1);
   });
 });
 
-describe('ocena trafienia', () => {
-  it('klik w oknie tolerancji to trafienie i +1 punkt', () => {
-    const { clock, engine } = setup([obj('o1', 10, { hitWindowMs: 200 })]);
-    playTo(clock, engine, 10.05);
+describe('ocena trafienia — reka klikalna przez caly czas trwania sciezki', () => {
+  it('klik zaraz po spawnie to trafienie i +1 punkt', () => {
+    const { clock, engine } = setup([obj('o1', 10)]); // spawn 10, despawn 11
+    playTo(clock, engine, 10.0);
 
     expect(engine.hit('o1')).toBe(true);
     expect(engine.getOutcome('o1')?.outcome).toBe('hit');
     expect(engine.getStats()).toMatchObject({ score: 1, hits: 1, misses: 0, accuracy: 100 });
   });
 
-  it('liczy trafienie takze na skraju okna tolerancji', () => {
-    const { clock, engine } = setup([obj('o1', 10, { hitWindowMs: 200, duration: 1000 })]);
-    playTo(clock, engine, 9.81);
+  it('klik w polowie okna aktywnosci to trafienie', () => {
+    const { clock, engine } = setup([obj('o1', 10)]);
+    playTo(clock, engine, 10.5);
     expect(engine.hit('o1')).toBe(true);
   });
 
-  it('klik przed oknem tolerancji to pudlo, bez punktu', () => {
-    const { clock, engine } = setup([obj('o1', 10, { hitWindowMs: 200, duration: 1000 })]);
-    playTo(clock, engine, 9.3); // obiekt widoczny, ale okno jeszcze zamkniete
-
-    expect(engine.hit('o1')).toBe(false);
-    expect(engine.getOutcome('o1')?.outcome).toBe('miss');
-    expect(engine.getStats()).toMatchObject({ score: 0, hits: 0, misses: 1, accuracy: 0 });
+  it('klik tuz przed despawnem to trafienie', () => {
+    const { clock, engine } = setup([obj('o1', 10)]);
+    playTo(clock, engine, 10.99);
+    expect(engine.hit('o1')).toBe(true);
   });
 
-  it('brak kliku po uplywie okna to pudlo', () => {
-    const { clock, engine } = setup([obj('o1', 10, { hitWindowMs: 200 })]);
-    playTo(clock, engine, 10.15);
+  it('brak kliku do konca sciezki (despawn) to pudlo', () => {
+    const { clock, engine } = setup([obj('o1', 10)]); // despawn 11
+    playTo(clock, engine, 10.9);
     expect(engine.getOutcome('o1')).toBeUndefined();
 
-    playTo(clock, engine, 10.35);
+    playTo(clock, engine, 11.05);
     expect(engine.getOutcome('o1')?.outcome).toBe('miss');
     expect(engine.getStats()).toMatchObject({ score: 0, misses: 1 });
   });
@@ -85,7 +80,7 @@ describe('ocena trafienia', () => {
   });
 
   it('klik w obiekt, ktory jeszcze nie spawnowal, jest ignorowany', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000 })]);
+    const { clock, engine } = setup([obj('o1', 10)]);
     playTo(clock, engine, 5);
 
     expect(engine.hit('o1')).toBe(false);
@@ -95,7 +90,7 @@ describe('ocena trafienia', () => {
 
 describe('pauza i buffering zamrazaja gre', () => {
   it('nie posuwa czasu gry, nie spawnuje i nie ocenia mimo uplywu zegara sciennego', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000 })]);
+    const { clock, engine } = setup([obj('o1', 10)]);
     playTo(clock, engine, 8.5);
     const frozenAt = engine.getView().timeSec;
 
@@ -124,7 +119,7 @@ describe('pauza i buffering zamrazaja gre', () => {
   });
 
   it('wznowienie po pauzie nie generuje falszywego przewiniecia ani pudel', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000 })]);
+    const { clock, engine } = setup([obj('o1', 10)]);
     playTo(clock, engine, 9.5);
 
     clock.playing = false;
@@ -137,7 +132,7 @@ describe('pauza i buffering zamrazaja gre', () => {
 
     expect(engine.getView().timeSec).toBeCloseTo(9.5, 1);
     expect(engine.getStats()).toMatchObject({ hits: 0, misses: 0 });
-    expect(engine.hit('o1')).toBe(false); // wciaz przed oknem, ale gra dziala
+    expect(engine.hit('o1')).toBe(false); // wciaz przed spawnem, ale gra dziala
   });
 });
 
@@ -192,7 +187,7 @@ describe('przewijanie', () => {
     clock.seekTo(30);
     engine.tick();
 
-    playTo(clock, engine, 40.0);
+    playTo(clock, engine, 40.05);
     expect(engine.hit('o3')).toBe(true);
 
     expect(engine.getStats()).toMatchObject({ score: 1, hits: 1, misses: 0, accuracy: 100 });
@@ -223,7 +218,7 @@ describe('punktacja i ekran wyniku', () => {
     engine.hit('o2');
     playTo(clock, engine, 14.0);
     engine.hit('o3');
-    playTo(clock, engine, 17.0); // o4 przepuszczone
+    playTo(clock, engine, 17.05); // o4 (spawn 16, despawn 17) przepuszczone
 
     expect(engine.getStats()).toMatchObject({ score: 3, hits: 3, misses: 1 });
     expect(engine.getStats().accuracy).toBeCloseTo(75, 5);
@@ -257,7 +252,7 @@ describe('sciezka ruchu', () => {
   ];
 
   it('getView() zwraca zinterpolowana pozycje w polowie segmentu', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    const { clock, engine } = setup([obj('o1', 10, { path: movingPath })]);
     playTo(clock, engine, 9.5);
 
     const visible = engine.getView().visible[0]!;
@@ -267,7 +262,7 @@ describe('sciezka ruchu', () => {
   });
 
   it('pauza: advanceWallOnly nie rusza pozycji', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    const { clock, engine } = setup([obj('o1', 10, { path: movingPath })]);
     playTo(clock, engine, 9.5);
     const before = engine.getView().visible[0]!;
 
@@ -282,7 +277,7 @@ describe('sciezka ruchu', () => {
   });
 
   it('seek w tyl: pozycja odpowiada nowemu czasowi, bez dryfu', () => {
-    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    const { clock, engine } = setup([obj('o1', 10, { path: movingPath })]);
     playTo(clock, engine, 9.8);
 
     clock.seekTo(9.2);
@@ -302,7 +297,7 @@ describe('interpolacja czasu', () => {
     engine.tick();
 
     // getCurrentTime stoi w miejscu, ale zegar scienny idzie do przodu:
-    // czas gry ma plynac dalej, zeby approach circle sie nie zacinal.
+    // czas gry ma plynac dalej, zeby pozycja na sciezce sie nie zacinala.
     clock.wallMs += 100;
     engine.tick();
 

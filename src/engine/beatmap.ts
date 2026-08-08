@@ -9,28 +9,25 @@ export function validateBeatmap(beatmap: Beatmap, spriteKeys: readonly string[])
   if (beatmap.objects.length === 0) throw new Error('Beatmapa: pusta lista obiektow.');
 
   const seen = new Set<string>();
-  let previousTime = -Infinity;
+  let previousSpawn = -Infinity;
 
   for (const o of beatmap.objects) {
     const where = `Obiekt "${o.id}"`;
     if (seen.has(o.id)) throw new Error(`${where}: zduplikowane id.`);
     seen.add(o.id);
 
-    if (o.time < previousTime) throw new Error(`${where}: obiekty musza byc posortowane po time.`);
-    previousTime = o.time;
-
-    if (o.duration <= 0) throw new Error(`${where}: duration musi byc dodatnie.`);
-    if (o.hitWindowMs <= 0) throw new Error(`${where}: hitWindowMs musi byc dodatnie.`);
-    if (o.hitWindowMs > o.duration) {
-      throw new Error(`${where}: hitWindowMs > duration — okno trafienia otwiera sie, zanim obiekt sie pojawi.`);
-    }
     if (!spriteKeys.includes(o.sprite)) {
       throw new Error(`${where}: nieznany sprite "${o.sprite}".`);
     }
 
-    if (!Array.isArray(o.path) || o.path.length === 0) {
-      throw new Error(`${where}: path musi miec co najmniej jeden punkt.`);
+    if (!Array.isArray(o.path) || o.path.length < 2) {
+      throw new Error(`${where}: path musi miec co najmniej dwa punkty (start i koniec).`);
     }
+
+    if (o.path[0]!.t < previousSpawn) {
+      throw new Error(`${where}: obiekty musza byc posortowane po path[0].t.`);
+    }
+    previousSpawn = o.path[0]!.t;
 
     let previousPointTime = -Infinity;
     o.path.forEach((point, index) => {

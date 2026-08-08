@@ -1,7 +1,7 @@
 /** Model danych beatmapy i stanu gry — patrz ADR-0003 i ADR-0004. */
 
 export interface PathPoint {
-  /** Sekunda wideo — ta sama skala co BeatmapObject.time. */
+  /** Sekunda wideo, absolutna. */
   t: number;
   /** Procent szerokosci warstwy gry (srodek obiektu). */
   x: number;
@@ -14,16 +14,11 @@ export interface PathPoint {
 export interface BeatmapObject {
   /** Unikalny, stabilny identyfikator — klucz wynikow przy przewijaniu. */
   id: string;
-  /** Sekundy odtwarzania wideo: moment idealnego trafienia. */
-  time: number;
-  /** Milisekundy fazy approach — obiekt pojawia sie w `time - duration`. */
-  duration: number;
   /** Klucz w rejestrze SPRITES. */
   sprite: string;
-  /** Tolerancja trafienia: +/- wokol `time`, w milisekundach. */
-  hitWindowMs: number;
-  /** Sciezka ruchu — min. 1 punkt, scisle rosnaco po `t`.
-      Poza zakresem: przytrzymanie skrajnego punktu. */
+  /** Sciezka ruchu — min. 2 punkty (start i koniec), scisle rosnaco po `t`.
+      `path[0].t` to spawn obiektu, `path[ostatni].t` to despawn — caly ten
+      przedzial jest jednoczesnie oknem klikalnosci (ADR-0015). */
   path: PathPoint[];
 }
 
@@ -65,8 +60,6 @@ export interface Stats {
 
 export interface VisibleObject {
   object: BeatmapObject;
-  /** 1 = moment pojawienia sie, 0 = moment trafienia. Steruje approach circle. */
-  approach: number;
   /** Ustawione dopiero po rozstrzygnieciu — steruje animacja "+1" / "X". */
   outcome?: Outcome;
   /** Zinterpolowana pozycja i rozmiar dla `GameView.timeSec`. */

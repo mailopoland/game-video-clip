@@ -16,32 +16,39 @@ describe('validateBeatmap', () => {
     expect(() => check(makeBeatmap([obj('o1', 1), obj('o1', 2)]))).toThrow(/zduplikowane id/);
   });
 
-  it('odrzuca obiekty nieposortowane po czasie', () => {
+  it('odrzuca obiekty nieposortowane po path[0].t', () => {
     expect(() => check(makeBeatmap([obj('o1', 5), obj('o2', 2)]))).toThrow(/posortowane/);
   });
 
   it('odrzuca pozycje poza zakresem 0–100 w punkcie sciezki', () => {
     expect(() =>
-      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 120, y: 50, size: 100 }] })])),
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 120, y: 50, size: 100 },
+              { t: 2, x: 50, y: 50, size: 100 },
+            ],
+          }),
+        ]),
+      ),
     ).toThrow(/x poza zakresem/);
     expect(() =>
-      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: -5, size: 100 }] })])),
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 50, y: -5, size: 100 },
+              { t: 2, x: 50, y: 50, size: 100 },
+            ],
+          }),
+        ]),
+      ),
     ).toThrow(/y poza zakresem/);
   });
 
   it('odrzuca nieznany sprite', () => {
     expect(() => check(makeBeatmap([obj('o1', 1, { sprite: 'brak' })]))).toThrow(/nieznany sprite/);
-  });
-
-  it('odrzuca niedodatnie duration i hitWindowMs', () => {
-    expect(() => check(makeBeatmap([obj('o1', 1, { duration: 0 })]))).toThrow(/duration/);
-    expect(() => check(makeBeatmap([obj('o1', 1, { hitWindowMs: 0 })]))).toThrow(/hitWindowMs/);
-  });
-
-  it('odrzuca okno trafienia szersze niz faza approach', () => {
-    expect(() => check(makeBeatmap([obj('o1', 1, { duration: 200, hitWindowMs: 500 })]))).toThrow(
-      /zanim obiekt sie pojawi/,
-    );
   });
 
   it('odrzuca pusta beatmape', () => {
@@ -50,23 +57,47 @@ describe('validateBeatmap', () => {
 
   it('odrzuca niedodatni size w punkcie sciezki', () => {
     expect(() =>
-      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: 50, size: 0 }] })])),
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 50, y: 50, size: 0 },
+              { t: 2, x: 50, y: 50, size: 100 },
+            ],
+          }),
+        ]),
+      ),
     ).toThrow(/size/);
     expect(() =>
-      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: 50, size: -10 }] })])),
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 50, y: 50, size: -10 },
+              { t: 2, x: 50, y: 50, size: 100 },
+            ],
+          }),
+        ]),
+      ),
     ).toThrow(/size/);
   });
 
   it('odrzuca brak path', () => {
     expect(() =>
       check(makeBeatmap([obj('o1', 1, { path: undefined as never })])),
-    ).toThrow(/path musi miec co najmniej jeden punkt/);
+    ).toThrow(/path musi miec co najmniej dwa punkty/);
   });
 
   it('odrzuca pusta path', () => {
     expect(() => check(makeBeatmap([obj('o1', 1, { path: [] })]))).toThrow(
-      /path musi miec co najmniej jeden punkt/,
+      /path musi miec co najmniej dwa punkty/,
     );
+  });
+
+  it('odrzuca path z jednym punktem (wymagany start i koniec)', () => {
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: 50, size: 100 }] })])),
+    ).toThrow(/path musi miec co najmniej dwa punkty/);
   });
 
   it('odrzuca t nierosnace w punktach path', () => {
@@ -101,7 +132,16 @@ describe('validateBeatmap', () => {
 
   it('odrzuca t = NaN w punkcie path', () => {
     expect(() =>
-      check(makeBeatmap([obj('o1', 1, { path: [{ t: NaN, x: 50, y: 50, size: 100 }] })])),
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: NaN, x: 50, y: 50, size: 100 },
+              { t: 2, x: 50, y: 50, size: 100 },
+            ],
+          }),
+        ]),
+      ),
     ).toThrow(/t musi byc skonczona liczba/);
   });
 });
@@ -126,9 +166,9 @@ describe('beatmapa produkcyjna', () => {
     expect(used).not.toContain('girl');
   });
 
-  it('kazdy obiekt ma niepusta path', () => {
+  it('kazdy obiekt ma path z co najmniej dwoma punktami', () => {
     for (const o of (beatmapJson as Beatmap).objects) {
-      expect(o.path.length).toBeGreaterThan(0);
+      expect(o.path.length).toBeGreaterThanOrEqual(2);
     }
   });
 });
