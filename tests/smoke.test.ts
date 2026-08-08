@@ -75,6 +75,34 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(img.src.endsWith(expectedHitSrc)).toBe(true);
   });
 
+  it('okrag jest "uzbrojony" (mozna trafic) tylko w oknie tolerancji', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.5);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    expect(target.classList.contains('is-armed')).toBe(false);
+
+    playTo(clock, game.frame, 9.85);
+    expect(target.classList.contains('is-armed')).toBe(true);
+
+    playTo(clock, game.frame, 10.25);
+    expect(target.classList.contains('is-armed')).toBe(false);
+  });
+
+  it('trafienie wylacza "uzbrojenie" okregu', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 10.0);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    tap(target);
+
+    expect(target.classList.contains('is-armed')).toBe(false);
+  });
+
   it('pudlo nie podmienia grafiki sprite-a — zostaje wariant idle', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);

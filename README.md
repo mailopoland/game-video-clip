@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 60 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 62 testy, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -132,6 +132,10 @@ active   ──(t > time + hw, brak kliku)──▶  miss
   zarejestrowany) i odtwarza dźwięk trafienia — zobacz sekcję [Sprite'y](#sprite-y).
   `miss` nie zmienia grafiki. Dźwięk leci **wyłącznie** z tej ścieżki (`onHit` w
   `src/game.ts`), nigdy z `resync`/`sweepMisses` — patrz [ADR-0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md).
+- **Klasa `is-armed`** na `.obj`: cel jest w oknie tolerancji (`|timeSec − time| ≤ hitWindowMs`)
+  i jeszcze nierozstrzygnięty. Renderer (`render.ts`) liczy to co klatkę z `GameView`,
+  silnik o tym nie wie. CSS zmienia wtedy kolor okręgu na zielony (`#6ef58f`) — sygnał
+  „ten klik trafi", zanim gracz w ogóle kliknie. Patrz [ADR-0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md).
 - Klik w cel, który jeszcze nie spawnował, jest **ignorowany** (nie tworzy pudła).
 - Drugi klik w ten sam cel nic nie zmienia.
 
@@ -242,16 +246,24 @@ przez `currentTime = 0` ucinałby poprzedni klaps przy dwóch szybkich trafienia
 Wszystkie mają `preload = 'auto'`, więc plik jest w cache przed pierwszym trafieniem.
 
 - **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu „Graj":
-  na każdym elemencie puli wyciszony `play()` → `pause()` → `currentTime = 0`. iOS/WebKit
-  odblokowuje *konkretny element* `<audio>`, na którym padł `play()` w obrębie gestu —
-  nie „stronę" — stąd pula jest odblokowywana cała naraz, a nie klonowana później.
+  na każdym elemencie puli wyciszony `play()`, a **dopiero po ustabilizowaniu się
+  jego `Promise`** — `pause()` → `currentTime = 0` → zdjęcie wyciszenia. Wywołanie
+  `pause()` synchronicznie zaraz po `play()`, zanim przeglądarka faktycznie ruszyła
+  odtwarzanie, przerywa `play()` błędem, który na części przeglądarek (Safari) liczy
+  się jako niedokończone odblokowanie elementu — stąd `.then()`, nie kolejna linijka.
+  iOS/WebKit odblokowuje *konkretny element* `<audio>`, na którym padł `play()`
+  w obrębie gestu — nie „stronę" — stąd pula jest odblokowywana cała naraz, a nie
+  klonowana później.
 - **`play()`** — wywoływane wyłącznie w `onHit`, gdy `engine.hit(id)` zwróci `true`.
   Ponieważ `resync()`/`sweepMisses()` nie przechodzą przez tę ścieżkę, przewinięcie
   (w tył czy w przód) **konstrukcyjnie** nie ma jak wywołać dźwięku — tak samo jak wynik
   jest funkcją mapy, a nie licznikiem. Drugi klik w rozstrzygnięty cel nie daje drugiego
-  dźwięku, bo `engine.hit()` zwraca `false` przy `results.has(id)`.
+  dźwięku, bo `engine.hit()` zwraca `false` przy `results.has(id)`. Każdy element puli
+  ma `volume = 1` (głośno, bez przycinania).
 - Błędy `play()`/`pause()` (odrzucona `Promise`, środowisko bez pełnej implementacji
-  `HTMLMediaElement`) są połykane — brak dźwięku nie może wywrócić rozgrywki.
+  `HTMLMediaElement`) są połykane, żeby brak dźwięku nie mógł wywrócić rozgrywki —
+  ale nieudane trafienie loguje `console.warn` z przyczyną, żeby dało się to
+  zdiagnozować w devtoolsach zamiast zgadywać.
 
 ---
 
@@ -283,6 +295,12 @@ Istotne szczegóły:
   (`transform: scale(1 + approach × 2.2)`), a **nie** przez CSS `@keyframes` — animacja
   CSS nie zamarłaby razem z wideo przy pauzie i nie zresynchronizowałaby się po seeku.
   `transform` jest kompozytowany na GPU, więc nie ma reflow.
+- **Approach circle jest wycentrowany na okręgu CSS-ową właściwością `translate: 9.8% -0.9%`**
+  (`.approach` w `styles.css`), niezależną od `transform`, które JS nadpisuje co klatkę.
+  Rysunek dłoni w `hand-idle.gif` nie jest wyśrodkowany w swoim kwadratowym płótnie
+  (bbox treści zmierzony narzędziowo: 1254×1254 px płótno, treść w x 360–1140,
+  y 295–937) — bez tej korekty okrąg wizualnie otaczał puste miejsce obok dłoni,
+  nie samą dłoń. Patrz [ADR-0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md).
 - Cała geometria w **procentach**, więc skalowanie 375 px ↔ 1440 px jest darmowe.
 
 ---
@@ -342,7 +360,7 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ## Testy
 
-`npm test` — **60 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **62 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -350,7 +368,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
 | `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
 | `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli. |
 
@@ -434,3 +452,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0009](docs/decisions/ADR-0009-start-gate-i-mobile-first.md) | Bramka startowa i mobile-first |
 | [0010](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md) | Pełny ekran obejmuje ramkę gry, nie odtwarzacz |
 | [0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md) | Dwuwariantowy sprite i dźwięk trafienia w warstwie UI |
+| [0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md) | Wyrównanie approach circle do treści sprite'a i sygnał „można trafić" |

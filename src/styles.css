@@ -109,13 +109,22 @@ html.has-pseudo-fullscreen body {
 }
 
 /* Approach circle — skala ustawiana imperatywnie co klatke, zeby zamarzala
-   razem z wideo (ADR-0002). */
+   razem z wideo (ADR-0002). `translate` (wlasciwosc niezalezna od `transform`,
+   ktory JS nadpisuje co klatke) centruje okrag na faktycznej tresci grafiki
+   "hand-idle.gif" — rysunek dloni nie jest wysrodkowany w kwadratowym plotnie
+   pliku (bbox tresci: x 360-1140, y 295-937 na kanwie 1254x1254). */
 .approach {
   width: 100%;
   height: 100%;
   border: 0.25rem solid #fff;
   border-radius: 50%;
+  translate: 9.8% -0.9%;
   will-change: transform;
+}
+
+/* Cel mozna trafic — okrag informuje o tym kolorem, zanim gracz kliknie. */
+.obj.is-armed .approach {
+  border-color: #6ef58f;
 }
 
 .feedback {

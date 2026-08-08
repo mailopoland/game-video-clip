@@ -20,6 +20,7 @@ export function createHitSound(
   for (let i = 0; i < size; i++) {
     const el = make(src);
     el.preload = 'auto';
+    el.volume = 1;
     pool.push(el);
   }
 
@@ -30,13 +31,23 @@ export function createHitSound(
       for (const el of pool) {
         el.muted = true;
         try {
-          el.play()?.catch(() => {});
+          // pause()/currentTime dopiero po ustabilizowaniu play() — wywolanie
+          // pause() zanim przegladarka zdazyla faktycznie ruszyc odtwarzanie
+          // przerywa `play()` bledem, ktory na czesci przegladarek (Safari)
+          // liczy sie jako niedokonczone odblokowanie elementu.
+          el.play()
+            ?.then(() => {
+              el.pause();
+              el.currentTime = 0;
+              el.muted = false;
+            })
+            .catch(() => {
+              el.muted = false;
+            });
         } catch {
           // Srodowiska bez pelnej implementacji HTMLMediaElement (np. testy) nie maja play().
+          el.muted = false;
         }
-        el.pause();
-        el.currentTime = 0;
-        el.muted = false;
       }
     },
     play(): void {
@@ -44,9 +55,11 @@ export function createHitSound(
       next = (next + 1) % pool.length;
       el.currentTime = 0;
       try {
-        el.play()?.catch(() => {});
-      } catch {
-        // j.w. — brak dzwieku nie moze wywrocic rozgrywki.
+        el.play()?.catch((error: unknown) => {
+          console.warn('Dzwiek trafienia nie odtworzyl sie.', error);
+        });
+      } catch (error) {
+        console.warn('Dzwiek trafienia nie odtworzyl sie.', error);
       }
     },
   };

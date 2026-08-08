@@ -124,6 +124,10 @@ export function createUi(
       approach.style.opacity = `${0.35 + (1 - visible.approach) * 0.65}`;
 
       const resolved = visible.outcome === 'hit' || visible.outcome === 'miss';
+      const inHitWindow =
+        !resolved &&
+        Math.abs(view.timeSec - visible.object.time) <= visible.object.hitWindowMs / 1000;
+      element.classList.toggle('is-armed', inHitWindow);
       element.classList.toggle('is-hit', visible.outcome === 'hit');
       element.classList.toggle('is-miss', visible.outcome === 'miss');
       if (resolved) {
