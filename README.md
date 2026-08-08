@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 67 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 69 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -181,7 +181,7 @@ Przewinięcie z powrotem chowa go.
   "endScreenAtSec": 56,
   "objects": [
     { "id": "o1", "time": 12.0, "duration": 1100, "x": 60, "y": 41,
-      "sprite": "hand", "hitWindowMs": 200 }
+      "sprite": "hand", "hitWindowMs": 200, "size": 100 }
   ]
 }
 ```
@@ -194,11 +194,13 @@ Przewinięcie z powrotem chowa go.
 | `x`, `y` | Procent szerokości/wysokości **warstwy gry** (środek celu). |
 | `sprite` | Klucz w rejestrze `src/sprites.ts`. |
 | `hitWindowMs` | Tolerancja ± wokół `time`. |
+| `size` | **Wymagane.** Procent bazowego rozmiaru obiektu (bazowe `width: 16%` z `styles.css`). `100` = obecny rozmiar, `50` = połowa, `200` = dwa razy większy. Musi być dodatnie, bez górnego limitu. Approach circle skaluje się razem z obiektem automatycznie (ma `width/height: 100%` względem `.obj`), bez osobnego pola. |
 
 `validateBeatmap` (`src/engine/beatmap.ts`) rzuca czytelnym błędem przy: pustej liście,
 duplikacie `id`, celach nieposortowanych po `time`, `x`/`y` poza 0–100, niedodatnim
-`duration`/`hitWindowMs`, `hitWindowMs > duration` (okno otwierałoby się, zanim cel się
-pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego pominięcia.
+`duration`/`hitWindowMs`/`size`, `hitWindowMs > duration` (okno otwierałoby się, zanim
+cel się pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego
+pominięcia.
 
 > ⚠️ **Obecne czasy i `endScreenAtSec` to wartości robocze** — nie były strojone do
 > realnego rytmu ani długości klipu `5OyTxEbT-fM`. Jeśli klip jest krótszy niż ~54 s,
@@ -377,15 +379,15 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ## Testy
 
-`npm test` — **67 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **69 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
 | `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
-| `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/beatmap.test.ts` | Walidacja (w tym niedodatni `size`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, `size` z beatmapy skaluje `width` obiektu względem bazowych 16%, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
 
@@ -442,7 +444,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 
 | Chcę… | Plik |
 |---|---|
-| zmienić momenty/pozycje celów | `src/data/beatmap.json` |
+| zmienić momenty/pozycje/rozmiar celów | `src/data/beatmap.json` |
 | podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ plik w `public/sprites/`) |
 | podmienić dźwięk trafienia | `src/sprites.ts` (`HIT_SOUND_SRC`) + plik w `public/sounds/` |
 | zmienić rozmiar puli / logikę odtwarzania dźwięku | `src/ui/sound.ts` |

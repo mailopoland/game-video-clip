@@ -3,31 +3,44 @@
   "endScreenAtSec": 56,
   "objects": [
     {
-      "id": "o1",
-      "time": 12.0,
-      "duration": 1100,
-      "x": 60,
-      "y": 41,
+      "id": "o0",
+      "time": 4.0,
+      "duration": 1000,
+      "x": 70,
+      "y": 50,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 500,
+      "size": 100
+    },
+    {
+      "id": "o1",
+      "time": 6.5,
+      "duration": 500,
+      "x": 57,
+      "y": 40,
+      "sprite": "hand",
+      "hitWindowMs": 500,
+      "size": 50
     },
     {
       "id": "o2",
-      "time": 13.71,
-      "duration": 1000,
-      "x": 36,
-      "y": 83,
+      "time": 11.0,
+      "duration": 900,
+      "x": 74,
+      "y": 43,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o3",
-      "time": 14.9,
-      "duration": 1100,
-      "x": 74,
-      "y": 63,
+      "time": 13.71,
+      "duration": 1000,
+      "x": 80,
+      "y": 43,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o4",
@@ -36,7 +49,8 @@
       "x": 56,
       "y": 22,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o5",
@@ -45,7 +59,8 @@
       "x": 55,
       "y": 66,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o6",
@@ -54,7 +69,8 @@
       "x": 42,
       "y": 55,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o7",
@@ -63,7 +79,8 @@
       "x": 65,
       "y": 73,
       "sprite": "hand",
-      "hitWindowMs": 240
+      "hitWindowMs": 240,
+      "size": 100
     },
     {
       "id": "o8",
@@ -72,7 +89,8 @@
       "x": 32,
       "y": 46,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o9",
@@ -81,7 +99,8 @@
       "x": 66,
       "y": 61,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o10",
@@ -90,7 +109,8 @@
       "x": 80,
       "y": 78,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o11",
@@ -99,7 +119,8 @@
       "x": 29,
       "y": 34,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o12",
@@ -108,7 +129,8 @@
       "x": 23,
       "y": 64,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o13",
@@ -117,7 +139,8 @@
       "x": 82,
       "y": 47,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o14",
@@ -126,7 +149,8 @@
       "x": 58,
       "y": 29,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o15",
@@ -135,7 +159,8 @@
       "x": 35,
       "y": 73,
       "sprite": "hand",
-      "hitWindowMs": 240
+      "hitWindowMs": 240,
+      "size": 100
     },
     {
       "id": "o16",
@@ -144,7 +169,8 @@
       "x": 79,
       "y": 37,
       "sprite": "hand",
-      "hitWindowMs": 240
+      "hitWindowMs": 240,
+      "size": 100
     },
     {
       "id": "o17",
@@ -153,7 +179,8 @@
       "x": 34,
       "y": 62,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o18",
@@ -162,7 +189,8 @@
       "x": 56,
       "y": 77,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o19",
@@ -171,7 +199,8 @@
       "x": 61,
       "y": 54,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o20",
@@ -180,7 +209,8 @@
       "x": 45,
       "y": 25,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o21",
@@ -189,7 +219,8 @@
       "x": 23,
       "y": 83,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o22",
@@ -198,7 +229,8 @@
       "x": 75,
       "y": 85,
       "sprite": "hand",
-      "hitWindowMs": 240
+      "hitWindowMs": 240,
+      "size": 100
     },
     {
       "id": "o23",
@@ -207,7 +239,8 @@
       "x": 82,
       "y": 69,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o24",
@@ -216,7 +249,8 @@
       "x": 54,
       "y": 66,
       "sprite": "hand",
-      "hitWindowMs": 260
+      "hitWindowMs": 260,
+      "size": 100
     },
     {
       "id": "o25",
@@ -225,7 +259,8 @@
       "x": 81,
       "y": 72,
       "sprite": "hand",
-      "hitWindowMs": 220
+      "hitWindowMs": 220,
+      "size": 100
     },
     {
       "id": "o26",
@@ -234,7 +269,8 @@
       "x": 43,
       "y": 23,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     },
     {
       "id": "o27",
@@ -243,7 +279,8 @@
       "x": 85,
       "y": 44,
       "sprite": "hand",
-      "hitWindowMs": 200
+      "hitWindowMs": 200,
+      "size": 100
     }
   ]
 }

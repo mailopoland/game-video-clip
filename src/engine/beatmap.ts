@@ -23,6 +23,7 @@ export function validateBeatmap(beatmap: Beatmap, spriteKeys: readonly string[])
     if (o.y < 0 || o.y > 100) throw new Error(`${where}: y poza zakresem 0–100.`);
     if (o.duration <= 0) throw new Error(`${where}: duration musi byc dodatnie.`);
     if (o.hitWindowMs <= 0) throw new Error(`${where}: hitWindowMs musi byc dodatnie.`);
+    if (o.size <= 0) throw new Error(`${where}: size musi byc dodatnie.`);
     if (o.hitWindowMs > o.duration) {
       throw new Error(`${where}: hitWindowMs > duration — okno trafienia otwiera sie, zanim obiekt sie pojawi.`);
     }

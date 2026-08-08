@@ -43,6 +43,11 @@ describe('validateBeatmap', () => {
   it('odrzuca pusta beatmape', () => {
     expect(() => check(makeBeatmap([]))).toThrow(/pusta/);
   });
+
+  it('odrzuca niedodatni size', () => {
+    expect(() => check(makeBeatmap([obj('o1', 1, { size: 0 })]))).toThrow(/size/);
+    expect(() => check(makeBeatmap([obj('o1', 1, { size: -10 })]))).toThrow(/size/);
+  });
 });
 
 describe('beatmapa produkcyjna', () => {

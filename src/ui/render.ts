@@ -78,6 +78,8 @@ export function createUi(
     element.setAttribute('aria-label', 'Cel');
     element.style.left = `${object.x}%`;
     element.style.top = `${object.y}%`;
+    // Bazowy rozmiar w styles.css to 16% — `size` skaluje od tej wartosci.
+    element.style.width = `${(16 * object.size) / 100}%`;
 
     const sprite = SPRITES[object.sprite]!;
     const spriteElement =

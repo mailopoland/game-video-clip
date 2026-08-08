@@ -5,7 +5,8 @@ Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie clien
 **Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia
 + okrąg wyrównany do treści sprite'a, kolorowany na zielono w oknie tolerancji,
 znika po rozstrzygnięciu, głośność proporcjonalna do YouTube i podwojona.
-`npm test` — 67 testów, zielone.
+Rozmiar obiektu (`size`, procent bazowych 16%) jest polem wymaganym w beatmapie.
+`npm test` — 69 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

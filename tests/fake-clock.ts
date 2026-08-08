@@ -51,6 +51,7 @@ export function obj(
     y: 50,
     sprite: 'hand',
     hitWindowMs: 200,
+    size: 100,
     ...overrides,
   };
 }

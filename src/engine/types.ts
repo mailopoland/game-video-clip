@@ -15,6 +15,8 @@ export interface BeatmapObject {
   sprite: string;
   /** Tolerancja trafienia: +/- wokol `time`, w milisekundach. */
   hitWindowMs: number;
+  /** Procent bazowego rozmiaru obiektu (100 = domyslny rozmiar z CSS). */
+  size: number;
 }
 
 export interface Beatmap {

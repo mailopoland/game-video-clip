@@ -205,6 +205,17 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(button.textContent).toContain('Zamknij');
   });
 
+  it('size z beatmapy skaluje szerokosc obiektu wzgledem bazowych 16%', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, size: 50 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.5);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+
+    expect(target.style.width).toBe('8%');
+  });
+
   it('na koncu klipu pokazuje ekran wyniku z liczbami', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10), obj('o2', 12)], 15);
