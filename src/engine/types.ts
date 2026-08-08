@@ -1,5 +1,16 @@
 /** Model danych beatmapy i stanu gry — patrz ADR-0003 i ADR-0004. */
 
+export interface PathPoint {
+  /** Sekunda wideo — ta sama skala co BeatmapObject.time. */
+  t: number;
+  /** Procent szerokosci warstwy gry (srodek obiektu). */
+  x: number;
+  /** Procent wysokosci warstwy gry (srodek obiektu). */
+  y: number;
+  /** Procent bazowego rozmiaru obiektu (100 = domyslny rozmiar z CSS). */
+  size: number;
+}
+
 export interface BeatmapObject {
   /** Unikalny, stabilny identyfikator — klucz wynikow przy przewijaniu. */
   id: string;
@@ -7,16 +18,13 @@ export interface BeatmapObject {
   time: number;
   /** Milisekundy fazy approach — obiekt pojawia sie w `time - duration`. */
   duration: number;
-  /** Procent szerokosci sceny (srodek obiektu). */
-  x: number;
-  /** Procent wysokosci sceny (srodek obiektu). */
-  y: number;
   /** Klucz w rejestrze SPRITES. */
   sprite: string;
   /** Tolerancja trafienia: +/- wokol `time`, w milisekundach. */
   hitWindowMs: number;
-  /** Procent bazowego rozmiaru obiektu (100 = domyslny rozmiar z CSS). */
-  size: number;
+  /** Sciezka ruchu — min. 1 punkt, scisle rosnaco po `t`.
+      Poza zakresem: przytrzymanie skrajnego punktu. */
+  path: PathPoint[];
 }
 
 export interface Beatmap {
@@ -61,6 +69,10 @@ export interface VisibleObject {
   approach: number;
   /** Ustawione dopiero po rozstrzygnieciu — steruje animacja "+1" / "X". */
   outcome?: Outcome;
+  /** Zinterpolowana pozycja i rozmiar dla `GameView.timeSec`. */
+  x: number;
+  y: number;
+  size: number;
 }
 
 export interface GameView {

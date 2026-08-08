@@ -4,283 +4,423 @@
   "objects": [
     {
       "id": "o0",
-      "time": 4.0,
+      "time": 4,
       "duration": 1000,
-      "x": 70,
-      "y": 50,
       "sprite": "hand",
       "hitWindowMs": 500,
-      "size": 100
+      "path": [
+        {
+          "t": 4,
+          "x": 70,
+          "y": 50,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o1",
       "time": 6.5,
       "duration": 500,
-      "x": 57,
-      "y": 40,
       "sprite": "hand",
       "hitWindowMs": 500,
-      "size": 50
+      "path": [
+        {
+          "t": 6.5,
+          "x": 57,
+          "y": 40,
+          "size": 50
+        }
+      ]
     },
     {
       "id": "o2",
-      "time": 11.0,
+      "time": 11,
       "duration": 900,
-      "x": 74,
-      "y": 43,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 11,
+          "x": 74,
+          "y": 43,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o3",
       "time": 13.71,
       "duration": 1000,
-      "x": 80,
-      "y": 43,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 13.71,
+          "x": 80,
+          "y": 43,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o4",
       "time": 16.69,
       "duration": 1000,
-      "x": 56,
-      "y": 22,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 16.69,
+          "x": 56,
+          "y": 22,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o5",
       "time": 18.27,
       "duration": 1100,
-      "x": 55,
-      "y": 66,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 18.27,
+          "x": 55,
+          "y": 66,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o6",
       "time": 20.24,
       "duration": 1000,
-      "x": 42,
-      "y": 55,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 20.24,
+          "x": 42,
+          "y": 55,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o7",
       "time": 21.82,
       "duration": 1000,
-      "x": 65,
-      "y": 73,
       "sprite": "hand",
       "hitWindowMs": 240,
-      "size": 100
+      "path": [
+        {
+          "t": 21.82,
+          "x": 65,
+          "y": 73,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o8",
       "time": 23.58,
       "duration": 1100,
-      "x": 32,
-      "y": 46,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 23.58,
+          "x": 32,
+          "y": 46,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o9",
       "time": 24.63,
       "duration": 1000,
-      "x": 66,
-      "y": 61,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 24.63,
+          "x": 66,
+          "y": 61,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o10",
       "time": 26.48,
       "duration": 900,
-      "x": 80,
-      "y": 78,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 26.48,
+          "x": 80,
+          "y": 78,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o11",
       "time": 27.82,
       "duration": 1000,
-      "x": 29,
-      "y": 34,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 27.82,
+          "x": 29,
+          "y": 34,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o12",
       "time": 29.57,
       "duration": 1200,
-      "x": 23,
-      "y": 64,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 29.57,
+          "x": 23,
+          "y": 64,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o13",
       "time": 31.39,
       "duration": 900,
-      "x": 82,
-      "y": 47,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 31.39,
+          "x": 82,
+          "y": 47,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o14",
       "time": 32.67,
       "duration": 1100,
-      "x": 58,
-      "y": 29,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 32.67,
+          "x": 58,
+          "y": 29,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o15",
       "time": 34.4,
       "duration": 900,
-      "x": 35,
-      "y": 73,
       "sprite": "hand",
       "hitWindowMs": 240,
-      "size": 100
+      "path": [
+        {
+          "t": 34.4,
+          "x": 35,
+          "y": 73,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o16",
       "time": 36.34,
       "duration": 900,
-      "x": 79,
-      "y": 37,
       "sprite": "hand",
       "hitWindowMs": 240,
-      "size": 100
+      "path": [
+        {
+          "t": 36.34,
+          "x": 79,
+          "y": 37,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o17",
       "time": 37.88,
       "duration": 1000,
-      "x": 34,
-      "y": 62,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 37.88,
+          "x": 34,
+          "y": 62,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o18",
       "time": 39.27,
       "duration": 900,
-      "x": 56,
-      "y": 77,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 39.27,
+          "x": 56,
+          "y": 77,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o19",
       "time": 41.14,
       "duration": 1000,
-      "x": 61,
-      "y": 54,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 41.14,
+          "x": 61,
+          "y": 54,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o20",
       "time": 42.91,
       "duration": 900,
-      "x": 45,
-      "y": 25,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 42.91,
+          "x": 45,
+          "y": 25,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o21",
       "time": 43.96,
       "duration": 1000,
-      "x": 23,
-      "y": 83,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 43.96,
+          "x": 23,
+          "y": 83,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o22",
       "time": 46.14,
       "duration": 1000,
-      "x": 75,
-      "y": 85,
       "sprite": "hand",
       "hitWindowMs": 240,
-      "size": 100
+      "path": [
+        {
+          "t": 46.14,
+          "x": 75,
+          "y": 85,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o23",
       "time": 47.68,
       "duration": 1000,
-      "x": 82,
-      "y": 69,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 47.68,
+          "x": 82,
+          "y": 69,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o24",
       "time": 49.04,
       "duration": 1100,
-      "x": 54,
-      "y": 66,
       "sprite": "hand",
       "hitWindowMs": 260,
-      "size": 100
+      "path": [
+        {
+          "t": 49.04,
+          "x": 54,
+          "y": 66,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o25",
       "time": 50.53,
       "duration": 900,
-      "x": 81,
-      "y": 72,
       "sprite": "hand",
       "hitWindowMs": 220,
-      "size": 100
+      "path": [
+        {
+          "t": 50.53,
+          "x": 81,
+          "y": 72,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o26",
       "time": 52.7,
       "duration": 1100,
-      "x": 43,
-      "y": 23,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 52.7,
+          "x": 43,
+          "y": 23,
+          "size": 100
+        }
+      ]
     },
     {
       "id": "o27",
       "time": 53.89,
       "duration": 1000,
-      "x": 85,
-      "y": 44,
       "sprite": "hand",
       "hitWindowMs": 200,
-      "size": 100
+      "path": [
+        {
+          "t": 53.89,
+          "x": 85,
+          "y": 44,
+          "size": 100
+        }
+      ]
     }
   ]
 }

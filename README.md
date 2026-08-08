@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 69 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 87 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -180,8 +180,9 @@ Przewinięcie z powrotem chowa go.
   "videoId": "5OyTxEbT-fM",
   "endScreenAtSec": 56,
   "objects": [
-    { "id": "o1", "time": 12.0, "duration": 1100, "x": 60, "y": 41,
-      "sprite": "hand", "hitWindowMs": 200, "size": 100 }
+    { "id": "o1", "time": 12.0, "duration": 1100,
+      "sprite": "hand", "hitWindowMs": 200,
+      "path": [ { "t": 12.0, "x": 60, "y": 41, "size": 100 } ] }
   ]
 }
 ```
@@ -191,16 +192,35 @@ Przewinięcie z powrotem chowa go.
 | `id` | Unikalny, **stabilny** — to klucz wyników przy przewijaniu. Zmiana `id` = zerowanie wyniku celu. |
 | `time` | Sekunda wideo: moment idealnego trafienia. |
 | `duration` | Ms fazy approach — cel pojawia się w `time − duration`. |
-| `x`, `y` | Procent szerokości/wysokości **warstwy gry** (środek celu). |
 | `sprite` | Klucz w rejestrze `src/sprites.ts`. |
 | `hitWindowMs` | Tolerancja ± wokół `time`. |
-| `size` | **Wymagane.** Procent bazowego rozmiaru obiektu (bazowe `width: 16%` z `styles.css`). `100` = obecny rozmiar, `50` = połowa, `200` = dwa razy większy. Musi być dodatnie, bez górnego limitu. Approach circle skaluje się razem z obiektem automatycznie (ma `width/height: 100%` względem `.obj`), bez osobnego pola. |
+| `path` | **Wymagane, min. 1 punkt.** Ścieżka ruchu — patrz niżej. |
+
+**`path` — ścieżka ruchu (ADR-0014).** Lista punktów `PathPoint`, ściśle rosnąco
+po `t`. Zastępuje dawne pola `x`/`y`/`size` na poziomie obiektu — jeden sposób
+opisu pozycji, zero niejednoznaczności "co wygrywa". Obiekt statyczny to `path`
+z jednym punktem.
+
+| Pole punktu | Znaczenie |
+|---|---|
+| `t` | Sekunda wideo — **ta sama skala co `time` obiektu**, absolutna, nie względna. |
+| `x`, `y` | Procent szerokości/wysokości **warstwy gry** (środek celu). |
+| `size` | Procent bazowego rozmiaru obiektu (bazowe `width: 16%` z `styles.css`). `100` = obecny rozmiar, `50` = połowa, `200` = dwa razy większy. Musi być dodatnie, bez górnego limitu. Approach circle skaluje się razem z obiektem automatycznie (ma `width/height: 100%` względem `.obj`), bez osobnego pola. |
+
+Pozycja i rozmiar w danej sekundzie wideo to `samplePath(path, timeSec)`
+(`src/engine/path.ts`) — czysta funkcja, czytana przez silnik, nie renderer:
+**interpolacja liniowa** między sąsiednimi punktami; poza zakresem ścieżki
+(przed pierwszym punktem, po ostatnim) — **przytrzymanie skrajnej wartości**,
+obiekt nie znika ani nie skacze. Dzięki temu ruch zamarza na pauzie i
+resynchronizuje się po przewinięciu bez żadnego dodatkowego kodu — to ten sam
+mechanizm co zamrażanie `timeSec` w silniku.
 
 `validateBeatmap` (`src/engine/beatmap.ts`) rzuca czytelnym błędem przy: pustej liście,
-duplikacie `id`, celach nieposortowanych po `time`, `x`/`y` poza 0–100, niedodatnim
-`duration`/`hitWindowMs`/`size`, `hitWindowMs > duration` (okno otwierałoby się, zanim
-cel się pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego
-pominięcia.
+duplikacie `id`, celach nieposortowanych po `time`, niedodatnim `duration`/`hitWindowMs`,
+`hitWindowMs > duration` (okno otwierałoby się, zanim cel się pojawi), nieznanym `sprite`,
+pustej `path`, punkcie `path` z `t` nieskończonym/nierosnącym względem poprzedniego,
+`x`/`y` punktu poza 0–100 lub niedodatnim `size` punktu. Błąd = komunikat na stronie
+zamiast cichego pominięcia.
 
 > ⚠️ **Obecne czasy i `endScreenAtSec` to wartości robocze** — nie były strojone do
 > realnego rytmu ani długości klipu `5OyTxEbT-fM`. Jeśli klip jest krótszy niż ~54 s,
@@ -299,9 +319,16 @@ przeglądarki) działa zapasowa ścieżka `el.volume = min(1, getReferenceVolume
 
 Istotne szczegóły:
 
-- **`.overlay` kończy się 3,5 rem nad dołem sceny**, żeby pasek kontrolek YouTube
+- **`.overlay` kończy się 8% wysokości sceny nad dołem**, żeby pasek kontrolek YouTube
   pozostał widoczny i klikalny (mitygacja z ADR-0008). W konsekwencji `y%` z beatmapy
-  jest liczone względem **warstwy gry**, nie całej sceny.
+  jest liczone względem **warstwy gry**, nie całej sceny. Wartość jest w **procentach**,
+  nie w `rem` — poprzednia stała `3,5rem` dawała inny udział wysokości sceny na
+  telefonie (27%) niż w pełnym ekranie (5%), więc ten sam `y` z beatmapy lądował
+  w innym miejscu kadru (ADR-0014).
+- **Grubość obwódki okręgu, cień sprite'a i rozmiar fontu feedbacku są w jednostkach
+  `cqw`** (`container-type: inline-size` na `.stage`, 1cqw = 1% szerokości sceny) —
+  z tego samego powodu co wyżej: `rem`/`vw` nie skalują się razem z rozmiarem sceny
+  w kontenerze, `cqw` tak (ADR-0014).
 - **`.frame` istnieje wyłącznie po to, by pełny ekran obejmował scenę razem z HUD-em**
   (ADR-0010). Szerokość sceny i HUD-u pochodzi ze wspólnej zmiennej `--stage-width`.
 - **Approach circle jest skalowany imperatywnie co klatkę**
@@ -379,15 +406,16 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ## Testy
 
-`npm test` — **69 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **87 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
-| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
-| `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
-| `tests/beatmap.test.ts` | Walidacja (w tym niedodatni `size`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, `size` z beatmapy skaluje `width` obiektu względem bazowych 16%, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). Fabryka `obj()` tworzy domyślnie jednopunktową `path` (`t` = `time`). |
+| `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
+| `tests/engine.test.ts` | 33 testy logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
+| `tests/beatmap.test.ts` | Walidacja (w tym pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma niepustą `path`. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka jednopunktowa trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
 
@@ -395,7 +423,8 @@ Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`)
 z podstawionym `TimeSource`.
 
 Domyślne środowisko Vitest to `node`; jsdom włącza wyłącznie `smoke.test.ts` przez
-docblock `@vitest-environment jsdom`.
+docblock `@vitest-environment jsdom` — `path.test.ts` też jest `node`, bo `samplePath`
+nie dotyka DOM.
 
 ---
 
@@ -437,6 +466,11 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   testy pokrywają wyłącznie ścieżkę zapasową bez `GainNode` (proporcja do
   `getReferenceVolume()`, bez podwojenia). Wymaga jednego ręcznego sprawdzenia
   w `npm run dev`: zmień głośność playera YouTube i porównaj głośność klapsu.
+- **Jednostki `cqw` i `container-type: inline-size` (ADR-0014) nie są pokryte
+  testami** — `jsdom` nie liczy layoutu, więc niezmienniczość pozycji celu
+  względem rozmiaru sceny wymaga jednego ręcznego sprawdzenia w `npm run dev`:
+  ten sam cel na telefonie i w pełnym ekranie musi lądować w tym samym miejscu
+  kadru.
 
 ---
 
@@ -444,7 +478,8 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 
 | Chcę… | Plik |
 |---|---|
-| zmienić momenty/pozycje/rozmiar celów | `src/data/beatmap.json` |
+| zmienić momenty/ścieżkę/rozmiar celów | `src/data/beatmap.json` |
+| zmienić sposób interpolacji ścieżki (np. Catmull-Rom) | `src/engine/path.ts` |
 | podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ plik w `public/sprites/`) |
 | podmienić dźwięk trafienia | `src/sprites.ts` (`HIT_SOUND_SRC`) + plik w `public/sounds/` |
 | zmienić rozmiar puli / logikę odtwarzania dźwięku | `src/ui/sound.ts` |
@@ -476,3 +511,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md) | Dwuwariantowy sprite i dźwięk trafienia w warstwie UI |
 | [0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md) | Wyrównanie approach circle do treści sprite'a i sygnał „można trafić" |
 | [0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md) | Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube |
+| [0014](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md) | Ścieżka ruchu w beatmapie i niezmiennicza geometria |

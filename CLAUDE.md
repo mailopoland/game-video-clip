@@ -5,8 +5,11 @@ Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie clien
 **Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia
 + okrąg wyrównany do treści sprite'a, kolorowany na zielono w oknie tolerancji,
 znika po rozstrzygnięciu, głośność proporcjonalna do YouTube i podwojona.
-Rozmiar obiektu (`size`, procent bazowych 16%) jest polem wymaganym w beatmapie.
-`npm test` — 69 testów, zielone.
+Obiekty beatmapy mają ścieżkę ruchu (`path`, min. 1 punkt `t/x/y/size`, interpolacja
+liniowa w silniku) zamiast statycznych `x`/`y`/`size`; pas kontrolek YouTube pod sceną
+jest wyrażony w procentach (`8%`), nie w `rem`, więc pozycja celu jest niezmiennicza
+względem rozmiaru sceny (ADR-0014).
+`npm test` — 87 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -58,9 +61,10 @@ src/
   sprites.ts             # rejestr sprite'ów — jedyne miejsce znające assety
   data/beatmap.json      # TIMELINE — dane, nie kod
   engine/
-    types.ts             # Beatmap, GameView, Outcome, Stats, TimeSource
+    types.ts             # Beatmap, PathPoint, GameView, Outcome, Stats, TimeSource
     beatmap.ts           # validateBeatmap
     engine.ts            # maszyna stanów, resync, punktacja
+    path.ts              # samplePath — interpolacja pozycji/rozmiaru wzdluz path
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     youtube.ts           # IFrame API + adapter TimeSource
@@ -68,7 +72,7 @@ src/
     sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
 tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
-  engine.test.ts  beatmap.test.ts  smoke.test.ts  fullscreen.test.ts  sound.test.ts
+  engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  fullscreen.test.ts  sound.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
@@ -129,3 +133,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0011 — Dwuwariantowy sprite i dźwięk trafienia w warstwie UI](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md)
 - [ADR-0012 — Wyrównanie approach circle do treści sprite'a i sygnał „można trafić"](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md)
 - [ADR-0013 — Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md)
+- [ADR-0014 — Ścieżka ruchu w beatmapie i niezmiennicza geometria](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md)

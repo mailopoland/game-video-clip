@@ -1,3 +1,4 @@
+import { samplePath } from './path.js';
 import type {
   Beatmap,
   BeatmapObject,
@@ -166,14 +167,16 @@ export class Engine {
       if (result) {
         if (this.timeSec > result.atSec + FADE_OUT_MS / 1000) continue;
         if (this.timeSec < result.atSec) continue;
-        visible.push({ object, approach: 0, outcome: result.outcome });
+        const { x, y, size } = samplePath(object.path, this.timeSec);
+        visible.push({ object, approach: 0, outcome: result.outcome, x, y, size });
         continue;
       }
 
       const durationSec = object.duration / 1000;
       const remainingSec = object.time - this.timeSec;
       if (remainingSec > durationSec) continue; // jeszcze nie spawnowany
-      visible.push({ object, approach: clamp(remainingSec / durationSec, 0, 1) });
+      const { x, y, size } = samplePath(object.path, this.timeSec);
+      visible.push({ object, approach: clamp(remainingSec / durationSec, 0, 1), x, y, size });
     }
     return visible;
   }

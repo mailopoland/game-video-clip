@@ -205,15 +205,64 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(button.textContent).toContain('Zamknij');
   });
 
-  it('size z beatmapy skaluje szerokosc obiektu wzgledem bazowych 16%', () => {
+  it('size z punktu sciezki skaluje szerokosc obiektu wzgledem bazowych 16%', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, size: 50 })], 20);
+    const beatmap = makeBeatmap(
+      [obj('o1', 10, { duration: 1000, path: [{ t: 10, x: 50, y: 50, size: 50 }] })],
+      20,
+    );
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
     playTo(clock, game.frame, 9.5);
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
 
     expect(target.style.width).toBe('8%');
+  });
+
+  it('left/top/width zmieniaja sie miedzy klatkami wraz z uplywem czasu wideo', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap(
+      [
+        obj('o1', 10, {
+          duration: 1000,
+          path: [
+            { t: 9, x: 0, y: 0, size: 50 },
+            { t: 10, x: 100, y: 100, size: 150 },
+          ],
+        }),
+      ],
+      20,
+    );
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.0);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    expect(target.style.left).toBe('0%');
+    expect(target.style.top).toBe('0%');
+    expect(target.style.width).toBe('8%');
+
+    playTo(clock, game.frame, 9.5);
+    expect(target.style.left).toBe('50%');
+    expect(target.style.top).toBe('50%');
+    expect(target.style.width).toBe('16%');
+  });
+
+  it('sciezka jednopunktowa trzyma pozycje mimo uplywu czasu', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap(
+      [obj('o1', 10, { duration: 1000, path: [{ t: 10, x: 33, y: 66, size: 100 }] })],
+      20,
+    );
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.2);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    expect(target.style.left).toBe('33%');
+    expect(target.style.top).toBe('66%');
+
+    playTo(clock, game.frame, 9.9);
+    expect(target.style.left).toBe('33%');
+    expect(target.style.top).toBe('66%');
   });
 
   it('na koncu klipu pokazuje ekran wyniku z liczbami', () => {

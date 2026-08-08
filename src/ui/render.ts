@@ -76,10 +76,6 @@ export function createUi(
     element.className = 'obj';
     element.dataset.id = object.id;
     element.setAttribute('aria-label', 'Cel');
-    element.style.left = `${object.x}%`;
-    element.style.top = `${object.y}%`;
-    // Bazowy rozmiar w styles.css to 16% — `size` skaluje od tej wartosci.
-    element.style.width = `${(16 * object.size) / 100}%`;
 
     const sprite = SPRITES[object.sprite]!;
     const spriteElement =
@@ -120,6 +116,12 @@ export function createUi(
       seen.add(visible.object.id);
       const element = elements.get(visible.object.id) ?? createObjectElement(visible);
       elements.set(visible.object.id, element);
+
+      // Pozycja i rozmiar sa funkcja czasu wideo (ADR-0014) — zapisujemy je
+      // bezwarunkowo co klatke, tak samo jak skale approach circle.
+      element.style.left = `${visible.x}%`;
+      element.style.top = `${visible.y}%`;
+      element.style.width = `${(16 * visible.size) / 100}%`;
 
       const resolved = visible.outcome === 'hit' || visible.outcome === 'miss';
       const approach = element.querySelector<HTMLElement>('.approach')!;

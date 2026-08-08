@@ -250,6 +250,51 @@ describe('punktacja i ekran wyniku', () => {
   });
 });
 
+describe('sciezka ruchu', () => {
+  const movingPath = [
+    { t: 9, x: 0, y: 0, size: 50 },
+    { t: 10, x: 100, y: 100, size: 150 },
+  ];
+
+  it('getView() zwraca zinterpolowana pozycje w polowie segmentu', () => {
+    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    playTo(clock, engine, 9.5);
+
+    const visible = engine.getView().visible[0]!;
+    expect(visible.x).toBeCloseTo(50, 5);
+    expect(visible.y).toBeCloseTo(50, 5);
+    expect(visible.size).toBeCloseTo(100, 5);
+  });
+
+  it('pauza: advanceWallOnly nie rusza pozycji', () => {
+    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    playTo(clock, engine, 9.5);
+    const before = engine.getView().visible[0]!;
+
+    clock.playing = false;
+    clock.advanceWallOnly(10);
+    engine.tick();
+
+    const after = engine.getView().visible[0]!;
+    expect(after.x).toBeCloseTo(before.x, 5);
+    expect(after.y).toBeCloseTo(before.y, 5);
+    expect(after.size).toBeCloseTo(before.size, 5);
+  });
+
+  it('seek w tyl: pozycja odpowiada nowemu czasowi, bez dryfu', () => {
+    const { clock, engine } = setup([obj('o1', 10, { duration: 1000, path: movingPath })]);
+    playTo(clock, engine, 9.8);
+
+    clock.seekTo(9.2);
+    engine.tick();
+
+    const visible = engine.getView().visible[0]!;
+    expect(visible.x).toBeCloseTo(20, 5);
+    expect(visible.y).toBeCloseTo(20, 5);
+    expect(visible.size).toBeCloseTo(70, 5);
+  });
+});
+
 describe('interpolacja czasu', () => {
   it('wygladza ziarnistosc getCurrentTime miedzy odczytami', () => {
     const clock = new FakeClock();

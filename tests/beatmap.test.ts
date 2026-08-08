@@ -20,9 +20,13 @@ describe('validateBeatmap', () => {
     expect(() => check(makeBeatmap([obj('o1', 5), obj('o2', 2)]))).toThrow(/posortowane/);
   });
 
-  it('odrzuca pozycje poza zakresem 0–100', () => {
-    expect(() => check(makeBeatmap([obj('o1', 1, { x: 120 })]))).toThrow(/x poza zakresem/);
-    expect(() => check(makeBeatmap([obj('o1', 1, { y: -5 })]))).toThrow(/y poza zakresem/);
+  it('odrzuca pozycje poza zakresem 0–100 w punkcie sciezki', () => {
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 120, y: 50, size: 100 }] })])),
+    ).toThrow(/x poza zakresem/);
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: -5, size: 100 }] })])),
+    ).toThrow(/y poza zakresem/);
   });
 
   it('odrzuca nieznany sprite', () => {
@@ -44,9 +48,61 @@ describe('validateBeatmap', () => {
     expect(() => check(makeBeatmap([]))).toThrow(/pusta/);
   });
 
-  it('odrzuca niedodatni size', () => {
-    expect(() => check(makeBeatmap([obj('o1', 1, { size: 0 })]))).toThrow(/size/);
-    expect(() => check(makeBeatmap([obj('o1', 1, { size: -10 })]))).toThrow(/size/);
+  it('odrzuca niedodatni size w punkcie sciezki', () => {
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: 50, size: 0 }] })])),
+    ).toThrow(/size/);
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: 1, x: 50, y: 50, size: -10 }] })])),
+    ).toThrow(/size/);
+  });
+
+  it('odrzuca brak path', () => {
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: undefined as never })])),
+    ).toThrow(/path musi miec co najmniej jeden punkt/);
+  });
+
+  it('odrzuca pusta path', () => {
+    expect(() => check(makeBeatmap([obj('o1', 1, { path: [] })]))).toThrow(
+      /path musi miec co najmniej jeden punkt/,
+    );
+  });
+
+  it('odrzuca t nierosnace w punktach path', () => {
+    expect(() =>
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 50, y: 50, size: 100 },
+              { t: 0.5, x: 60, y: 60, size: 100 },
+            ],
+          }),
+        ]),
+      ),
+    ).toThrow(/scisle rosnace po t/);
+  });
+
+  it('odrzuca zduplikowane t w punktach path', () => {
+    expect(() =>
+      check(
+        makeBeatmap([
+          obj('o1', 1, {
+            path: [
+              { t: 1, x: 50, y: 50, size: 100 },
+              { t: 1, x: 60, y: 60, size: 100 },
+            ],
+          }),
+        ]),
+      ),
+    ).toThrow(/scisle rosnace po t/);
+  });
+
+  it('odrzuca t = NaN w punkcie path', () => {
+    expect(() =>
+      check(makeBeatmap([obj('o1', 1, { path: [{ t: NaN, x: 50, y: 50, size: 100 }] })])),
+    ).toThrow(/t musi byc skonczona liczba/);
   });
 });
 
@@ -68,5 +124,11 @@ describe('beatmapa produkcyjna', () => {
     const used = (beatmapJson as Beatmap).objects.map((o) => o.sprite);
     expect(used).not.toContain('guy');
     expect(used).not.toContain('girl');
+  });
+
+  it('kazdy obiekt ma niepusta path', () => {
+    for (const o of (beatmapJson as Beatmap).objects) {
+      expect(o.path.length).toBeGreaterThan(0);
+    }
   });
 });

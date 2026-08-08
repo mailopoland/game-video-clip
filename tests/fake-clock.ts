@@ -47,11 +47,9 @@ export function obj(
     id,
     time,
     duration: 1000,
-    x: 50,
-    y: 50,
     sprite: 'hand',
     hitWindowMs: 200,
-    size: 100,
+    path: [{ t: time, x: 50, y: 50, size: 100 }],
     ...overrides,
   };
 }
