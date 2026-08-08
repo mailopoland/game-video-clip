@@ -7,6 +7,8 @@ const ENDED = 0;
 interface YtPlayer {
   getCurrentTime(): number;
   getPlayerState(): number;
+  getVolume(): number;
+  isMuted(): boolean;
   playVideo(): void;
   pauseVideo(): void;
 }
@@ -46,6 +48,8 @@ export interface PlayerHandle extends TimeSource {
   play(): void;
   /** Awaryjne zatrzymanie: pauza zamraza silnik, wiec nic nie jest oceniane. */
   pause(): void;
+  /** Aktualna glosnosc playera, 0–1. 0, gdy wyciszony (ADR-0013). */
+  getVolume(): number;
 }
 
 /**
@@ -69,6 +73,7 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
   return {
     play: () => player.playVideo(),
     pause: () => player.pauseVideo(),
+    getVolume: () => (player.isMuted() ? 0 : player.getVolume() / 100),
     sample: (): TimeSample => {
       const state = player.getPlayerState();
       return {

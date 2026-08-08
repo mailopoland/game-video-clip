@@ -21,6 +21,7 @@ class FakeAudio {
   preload = '';
   muted = false;
   currentTime = 0;
+  volume = 1;
   playCount = 0;
 
   play(): Promise<void> {
@@ -38,12 +39,17 @@ describe('createHitSound', () => {
     elements = [];
   });
 
-  function makeSound(size = 4) {
-    return createHitSound('clap.mp3', size, () => {
-      const el = new FakeAudio();
-      elements.push(el);
-      return el as unknown as HTMLAudioElement;
-    });
+  function makeSound(size = 4, getReferenceVolume?: () => number) {
+    return createHitSound(
+      'clap.mp3',
+      size,
+      () => {
+        const el = new FakeAudio();
+        elements.push(el);
+        return el as unknown as HTMLAudioElement;
+      },
+      getReferenceVolume,
+    );
   }
 
   it('unlock() dotyka kazdego elementu puli', () => {
@@ -66,6 +72,28 @@ describe('createHitSound', () => {
     sound.play();
     const played = elements.filter((el) => el.playCount > 0);
     expect(played).toHaveLength(2);
+  });
+
+  // jsdom nie implementuje Web Audio API, wiec GainNode (podwojenie glosnosci
+  // ponad 1.0, ADR-0013) nigdy sie nie podlacza w testach — tu sprawdzana jest
+  // wylacznie proporcjonalnosc do referencyjnej glosnosci przez zapasowa sciezke
+  // `el.volume`, ograniczona do 1.0. Realny x2 wymaga recznej weryfikacji w przegladarce.
+  it('glosnosc jest proporcjonalna do referencyjnej glosnosci (fallback bez Web Audio)', () => {
+    const sound = makeSound(4, () => 0.5);
+    sound.play();
+    expect(elements[0]!.volume).toBe(0.5);
+  });
+
+  it('referencyjna glosnosc powyzej 1 jest przycinana do 1 w fallbacku', () => {
+    const sound = makeSound(4, () => 2);
+    sound.play();
+    expect(elements[0]!.volume).toBe(1);
+  });
+
+  it('domyslna referencyjna glosnosc to pelna (1) gdy nie podano', () => {
+    const sound = makeSound(4);
+    sound.play();
+    expect(elements[0]!.volume).toBe(1);
   });
 });
 

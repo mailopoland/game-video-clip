@@ -119,11 +119,18 @@ export function createUi(
       const element = elements.get(visible.object.id) ?? createObjectElement(visible);
       elements.set(visible.object.id, element);
 
-      const approach = element.querySelector<HTMLElement>('.approach')!;
-      approach.style.transform = `scale(${1 + visible.approach * 2.2})`;
-      approach.style.opacity = `${0.35 + (1 - visible.approach) * 0.65}`;
-
       const resolved = visible.outcome === 'hit' || visible.outcome === 'miss';
+      const approach = element.querySelector<HTMLElement>('.approach')!;
+      if (resolved) {
+        // Inline styl ma pierwszenstwo nad regula CSS `.is-hit/.is-miss .approach`
+        // (specyficznosc), wiec zniknienie okregu trzeba ustawic tutaj, nie liczyc
+        // na sam CSS — inaczej ostatnia klatka approach (0) zostawia opacity: 1.
+        approach.style.opacity = '0';
+      } else {
+        approach.style.transform = `scale(${1 + visible.approach * 2.2})`;
+        approach.style.opacity = `${0.35 + (1 - visible.approach) * 0.65}`;
+      }
+
       const inHitWindow =
         !resolved &&
         Math.abs(view.timeSec - visible.object.time) <= visible.object.hitWindowMs / 1000;

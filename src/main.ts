@@ -18,7 +18,10 @@ async function bootstrap(): Promise<void> {
     sample: () => player?.sample() ?? { timeSec: 0, playing: false, ended: false },
   };
 
-  const game = mountGame(root, beatmap, timeSource, { onStart: () => player?.play() });
+  const game = mountGame(root, beatmap, timeSource, {
+    onStart: () => player?.play(),
+    getReferenceVolume: () => player?.getVolume() ?? 1,
+  });
   game.ui.setStartEnabled(false);
 
   // Pelny ekran bierze cala ramke gry, nie iframe (ADR-0010). Gdyby YouTube

@@ -19,10 +19,17 @@ export function mountGame(
   root: HTMLElement,
   beatmap: Beatmap,
   timeSource: TimeSource,
-  options: { onStart?: () => void; now?: () => number; sound?: HitSound } = {},
+  options: {
+    onStart?: () => void;
+    now?: () => number;
+    sound?: HitSound;
+    /** Aktualna glosnosc playera, 0–1 — skaluje dzwiek trafienia (ADR-0013). */
+    getReferenceVolume?: () => number;
+  } = {},
 ): GameHandle {
   const engine = new Engine(beatmap, timeSource, options.now);
-  const sound = options.sound ?? createHitSound(HIT_SOUND_SRC);
+  const sound =
+    options.sound ?? createHitSound(HIT_SOUND_SRC, undefined, undefined, options.getReferenceVolume);
   const ui = createUi(root, {
     onStart: () => {
       // Wewnatrz gestu uzytkownika: iOS/WebKit odblokowuje konkretny element

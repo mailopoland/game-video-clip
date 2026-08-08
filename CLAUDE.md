@@ -3,8 +3,9 @@
 Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie client-side.
 
 **Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia
-+ okrąg wyrównany do treści sprite'a i kolorowany na zielono w oknie tolerancji.
-`npm test` — 62 testy, zielone.
++ okrąg wyrównany do treści sprite'a, kolorowany na zielono w oknie tolerancji,
+znika po rozstrzygnięciu, głośność proporcjonalna do YouTube i podwojona.
+`npm test` — 67 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -126,3 +127,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0010 — Pełny ekran obejmuje ramkę gry, nie odtwarzacz](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md)
 - [ADR-0011 — Dwuwariantowy sprite i dźwięk trafienia w warstwie UI](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md)
 - [ADR-0012 — Wyrównanie approach circle do treści sprite'a i sygnał „można trafić"](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md)
+- [ADR-0013 — Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md)

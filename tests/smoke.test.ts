@@ -75,6 +75,31 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(img.src.endsWith(expectedHitSrc)).toBe(true);
   });
 
+  it('okrag znika natychmiast po trafieniu', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 10.0);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    tap(target);
+
+    const approach = target.querySelector<HTMLElement>('.approach')!;
+    expect(approach.style.opacity).toBe('0');
+  });
+
+  it('okrag znika, gdy okno trafienia minie bez kliku (za pozno)', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 10.25);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+
+    const approach = target.querySelector<HTMLElement>('.approach')!;
+    expect(approach.style.opacity).toBe('0');
+  });
+
   it('okrag jest "uzbrojony" (mozna trafic) tylko w oknie tolerancji', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })], 20);

@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 62 testy, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 67 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -258,12 +258,23 @@ Wszystkie mają `preload = 'auto'`, więc plik jest w cache przed pierwszym traf
   Ponieważ `resync()`/`sweepMisses()` nie przechodzą przez tę ścieżkę, przewinięcie
   (w tył czy w przód) **konstrukcyjnie** nie ma jak wywołać dźwięku — tak samo jak wynik
   jest funkcją mapy, a nie licznikiem. Drugi klik w rozstrzygnięty cel nie daje drugiego
-  dźwięku, bo `engine.hit()` zwraca `false` przy `results.has(id)`. Każdy element puli
-  ma `volume = 1` (głośno, bez przycinania).
+  dźwięku, bo `engine.hit()` zwraca `false` przy `results.has(id)`.
 - Błędy `play()`/`pause()` (odrzucona `Promise`, środowisko bez pełnej implementacji
   `HTMLMediaElement`) są połykane, żeby brak dźwięku nie mógł wywrócić rozgrywki —
   ale nieudane trafienie loguje `console.warn` z przyczyną, żeby dało się to
   zdiagnozować w devtoolsach zamiast zgadywać.
+
+**Głośność jest proporcjonalna do aktualnej głośności YouTube i podwojona
+(ADR-0013):** `play()` liczy `gain = getReferenceVolume() * 2` tuż przed każdym
+odtworzeniem (`getReferenceVolume` domyślnie `() => 1`, w produkcji
+`PlayerHandle.getVolume()` z `src/ui/youtube.ts` — `isMuted() ? 0 :
+getVolume() / 100`). `HTMLAudioElement.volume` fizycznie nie może przekroczyć
+`1.0`, więc podwojenie wymaga **Web Audio API**: `createHitSound` łączy każdy
+element puli przez `MediaElementAudioSourceNode` w jeden `GainNode`
+(`ensureAudioGraph()`, budowany raz w `unlock()` — `AudioContext` startuje
+`suspended` i wymaga gestu użytkownika, żeby ruszyć). Bez Web Audio (starsze
+przeglądarki) działa zapasowa ścieżka `el.volume = min(1, getReferenceVolume())`
+— proporcja do YouTube zostaje, ale bez podwojenia ponad naturalny poziom pliku.
 
 ---
 
@@ -301,6 +312,12 @@ Istotne szczegóły:
   (bbox treści zmierzony narzędziowo: 1254×1254 px płótno, treść w x 360–1140,
   y 295–937) — bez tej korekty okrąg wizualnie otaczał puste miejsce obok dłoni,
   nie samą dłoń. Patrz [ADR-0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md).
+- **Okrąg znika natychmiast po rozstrzygnięciu (`opacity: 0` ustawiane inline
+  w `render.ts`), nie przez regułę CSS.** Wcześniej `render.ts` ustawiał
+  `approach.style.opacity` bezwarunkowo co klatkę, także dla rozstrzygniętych
+  obiektów — inline styl zawsze wygrywa ze specyficznością reguły w arkuszu, więc
+  `.obj.is-hit .approach { opacity: 0 }` nigdy realnie nie działała. Naprawione
+  w [ADR-0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md).
 - Cała geometria w **procentach**, więc skalowanie 375 px ↔ 1440 px jest darmowe.
 
 ---
@@ -360,7 +377,7 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ## Testy
 
-`npm test` — **62 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **67 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -368,9 +385,9 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
 | `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
 | `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, okrąg znika (`opacity: 0`) natychmiast po trafieniu i po przegapieniu okna, `is-armed` włącza się tylko w oknie tolerancji i gaśnie po trafieniu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
-| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli. |
+| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -413,8 +430,11 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 - **Obwódka GIF-a na krawędziach dłoni** — 1-bitowa przezroczystość `hand-idle.gif` /
   `hand-hit.gif` może dać widoczną krawędź na tle konkretnego wideo. Niezweryfikowane
   wizualnie.
-- **Głośność klapsa** względem ścieżki wideo nie jest regulowana — brak `el.volume`
-  w `src/ui/sound.ts`. Do dodania jedną linią, jeśli w praktyce okaże się za głośny.
+- **Podwojenie głośności klapsa przez `GainNode` (ADR-0013) jest niezweryfikowane
+  w prawdziwej przeglądarce.** `jsdom` nie implementuje Web Audio API, więc unit
+  testy pokrywają wyłącznie ścieżkę zapasową bez `GainNode` (proporcja do
+  `getReferenceVolume()`, bez podwojenia). Wymaga jednego ręcznego sprawdzenia
+  w `npm run dev`: zmień głośność playera YouTube i porównaj głośność klapsu.
 
 ---
 
@@ -453,3 +473,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0010](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md) | Pełny ekran obejmuje ramkę gry, nie odtwarzacz |
 | [0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md) | Dwuwariantowy sprite i dźwięk trafienia w warstwie UI |
 | [0012](docs/decisions/ADR-0012-wyrownanie-okregu-i-sygnal-uzbrojenia.md) | Wyrównanie approach circle do treści sprite'a i sygnał „można trafić" |
+| [0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md) | Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube |

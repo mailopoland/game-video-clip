@@ -11,10 +11,18 @@ export interface HitSound {
   play(): void;
 }
 
+/**
+ * Wzmocnienie glosnosci wzgledem `getReferenceVolume() === 1` (ADR-0013).
+ * `HTMLAudioElement.volume` jest ograniczone do 1.0 — przekroczenie tego pulapu
+ * wymaga GainNode z Web Audio API.
+ */
+const LOUDNESS_BOOST = 2;
+
 export function createHitSound(
   src: string,
   size = 4,
   make: (src: string) => HTMLAudioElement = (s) => new Audio(s),
+  getReferenceVolume: () => number = () => 1,
 ): HitSound {
   const pool: HTMLAudioElement[] = [];
   for (let i = 0; i < size; i++) {
@@ -25,9 +33,34 @@ export function createHitSound(
   }
 
   let next = 0;
+  let gainNode: GainNode | null = null;
+  let audioGraphAttempted = false;
+
+  /**
+   * Podlacza pule pod Web Audio, zeby GainNode mogl wzmocnic dzwiek ponad 1.0.
+   * Wymaga gestu uzytkownika (kontekst startuje `suspended`), wiec wywolywane
+   * z `unlock()`. Bez Web Audio (starsze przegladarki, jsdom w testach) pula
+   * gra normalnie przez `el.volume`, ograniczone do 1.0.
+   */
+  function ensureAudioGraph(): void {
+    if (audioGraphAttempted) return;
+    audioGraphAttempted = true;
+    if (typeof AudioContext === 'undefined') return;
+    try {
+      const context = new AudioContext();
+      const gain = context.createGain();
+      gain.connect(context.destination);
+      for (const el of pool) context.createMediaElementSource(el).connect(gain);
+      if (context.state === 'suspended') void context.resume();
+      gainNode = gain;
+    } catch {
+      gainNode = null;
+    }
+  }
 
   return {
     unlock(): void {
+      ensureAudioGraph();
       for (const el of pool) {
         el.muted = true;
         try {
@@ -54,6 +87,16 @@ export function createHitSound(
       const el = pool[next]!;
       next = (next + 1) % pool.length;
       el.currentTime = 0;
+
+      const referenceVolume = Math.max(0, getReferenceVolume());
+      if (gainNode) {
+        gainNode.gain.value = referenceVolume * LOUDNESS_BOOST;
+      } else {
+        // Bez GainNode nie da sie przekroczyc 1.0 — proporcja wzgledem youtube
+        // dziala, ale bez podwojenia glosnosci ponad naturalny poziom pliku.
+        el.volume = Math.min(1, referenceVolume);
+      }
+
       try {
         el.play()?.catch((error: unknown) => {
           console.warn('Dzwiek trafienia nie odtworzyl sie.', error);
