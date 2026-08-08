@@ -2,8 +2,8 @@
 
 Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie client-side.
 
-**Status:** v1 zaimplementowane, sprite'y obrazkowe (guy/girl) zamiast placeholderów CSS.
-`npm test` — 46 testów, zielone.
+**Status:** v1 zaimplementowane, sprite dłoni (dwuwariantowy: idle/hit) + dźwięk trafienia.
+`npm test` — 60 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -62,9 +62,10 @@ src/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     youtube.ts           # IFrame API + adapter TimeSource
     fullscreen.ts        # pelny ekran ramki gry + straznik przejecia przez iframe
+    sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
 tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
-  engine.test.ts  beatmap.test.ts  smoke.test.ts  fullscreen.test.ts
+  engine.test.ts  beatmap.test.ts  smoke.test.ts  fullscreen.test.ts  sound.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
@@ -122,3 +123,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0008 — ⚠️ Warstwa gry nad playerem a YouTube ToS](docs/decisions/ADR-0008-overlay-a-youtube-tos.md) — **ryzyko zgodności, decyzja warunkowa**
 - [ADR-0009 — Bramka startowa i podejście mobile-first](docs/decisions/ADR-0009-start-gate-i-mobile-first.md)
 - [ADR-0010 — Pełny ekran obejmuje ramkę gry, nie odtwarzacz](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md)
+- [ADR-0011 — Dwuwariantowy sprite i dźwięk trafienia w warstwie UI](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md)

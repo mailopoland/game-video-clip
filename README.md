@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 46 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 60 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -128,6 +128,10 @@ active   ──(t > time + hw, brak kliku)──▶  miss
 - `hitWindowMs` = tolerancja ± wokół `time`.
 - Po rozstrzygnięciu cel zostaje na ekranie jeszcze **`FADE_OUT_MS = 500`** — tyle trwa
   animacja `+1` / `✕`.
+- Przejście do `hit` dodatkowo: podmienia grafikę sprite'a na wariant `hitSrc` (jeśli
+  zarejestrowany) i odtwarza dźwięk trafienia — zobacz sekcję [Sprite'y](#sprite-y).
+  `miss` nie zmienia grafiki. Dźwięk leci **wyłącznie** z tej ścieżki (`onHit` w
+  `src/game.ts`), nigdy z `resync`/`sweepMisses` — patrz [ADR-0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md).
 - Klik w cel, który jeszcze nie spawnował, jest **ignorowany** (nie tworzy pudła).
 - Drugi klik w ten sam cel nic nie zmienia.
 
@@ -169,11 +173,11 @@ Przewinięcie z powrotem chowa go.
 
 ```json
 {
-  "videoId": "Iz-nC59AIWc",
+  "videoId": "5OyTxEbT-fM",
   "endScreenAtSec": 56,
   "objects": [
     { "id": "o1", "time": 12.0, "duration": 1100, "x": 60, "y": 41,
-      "sprite": "guy", "hitWindowMs": 200 }
+      "sprite": "hand", "hitWindowMs": 200 }
   ]
 }
 ```
@@ -193,7 +197,8 @@ duplikacie `id`, celach nieposortowanych po `time`, `x`/`y` poza 0–100, niedod
 pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego pominięcia.
 
 > ⚠️ **Obecne czasy i `endScreenAtSec` to wartości robocze** — nie były strojone do
-> realnego rytmu ani długości klipu.
+> realnego rytmu ani długości klipu `5OyTxEbT-fM`. Jeśli klip jest krótszy niż ~54 s,
+> ostatnie cele nie zdążą się pojawić, zanim player wejdzie w `ENDED`.
 
 ---
 
@@ -205,20 +210,48 @@ pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego pomi
 const asset = (file: string) => `${import.meta.env.BASE_URL}sprites/${file}`;
 
 export const SPRITES: Record<string, Sprite> = {
-  guy:  { kind: 'image', src: asset('guy.webp') },
-  girl: { kind: 'image', src: asset('girl.webp') },
+  hand: { kind: 'image', src: asset('hand-idle.gif'), hitSrc: asset('hand-hit.gif') },
 };
+
+export const HIT_SOUND_SRC = `${import.meta.env.BASE_URL}sounds/clap.mp3`;
 ```
 
-Pliki leżą w `public/sprites/` (`guy.webp`, `girl.webp`) — statyczne WebP z pełną
-8-bitową alfą, przycięte do faktycznego kadru postaci (bez przezroczystych marginesów),
-480×480 px. Ścieżka liczy się od `import.meta.env.BASE_URL`, bo GitHub Pages serwuje
-spod podścieżki `/game-video-clip/` (ADR-0007) — bez tego obrazki nie ładowałyby się
-na buildzie produkcyjnym.
+Wariant `kind: 'image'` ma opcjonalne `hitSrc` — grafikę pokazywaną wyłącznie w stanie
+`outcome === 'hit'` (ADR-0011); `miss` zostawia `src` bez zmian. To jedyny dodatkowy
+stan wizualny, jakiego wymaga maszyna stanów celu, więc zamiast pełnej mapy
+`Record<Outcome, src>` jest jedno opcjonalne pole. `render.ts` podmienia `img.src` na
+`hitSrc`, gdy `visible.outcome === 'hit'` — idempotentnie, bo `render()` leci co klatkę
+przez cały `FADE_OUT_MS`. `hitSrc` jest wstępnie ładowany (`new Image().src = hitSrc`)
+przy montażu obiektu, żeby podmiana nie dała pustej klatki.
+
+Pliki leżą w `public/sprites/` (`hand-idle.gif`, `hand-hit.gif`) — animowane GIF-y,
+nie WebP: GIF ma 1-bitową przezroczystość (możliwa widoczna obwódka na krawędziach
+dłoni na tle wideo) i większy rozmiar (~200–224 kB zamiast ~20–60 kB), ale animowany
+WebP wymagałby narzędzia konwersji, którego projekt nie ma, i pobierania z internetu —
+poza ograniczeniami projektu. Świadomy kompromis, opisany w ADR-0011.
 
 Rejestr wspiera też `kind: 'css'` (czyste CSS, `clip-path` + gradient, zero plików
 binarnych) — to ścieżka z v1 (ADR-0005), obecnie nieużywana, ale renderer (`render.ts`)
 obsługuje oba warianty bez zmian. **Podmiana obrazka = jedna linia w `SPRITES`.**
+
+### Dźwięk trafienia
+
+`src/ui/sound.ts` (`createHitSound`) trzyma pulę **4 elementów `HTMLAudioElement`** na
+tym samym `src` (`HIT_SOUND_SRC`), używanych round-robin — jeden element restartowany
+przez `currentTime = 0` ucinałby poprzedni klaps przy dwóch szybkich trafieniach.
+Wszystkie mają `preload = 'auto'`, więc plik jest w cache przed pierwszym trafieniem.
+
+- **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu „Graj":
+  na każdym elemencie puli wyciszony `play()` → `pause()` → `currentTime = 0`. iOS/WebKit
+  odblokowuje *konkretny element* `<audio>`, na którym padł `play()` w obrębie gestu —
+  nie „stronę" — stąd pula jest odblokowywana cała naraz, a nie klonowana później.
+- **`play()`** — wywoływane wyłącznie w `onHit`, gdy `engine.hit(id)` zwróci `true`.
+  Ponieważ `resync()`/`sweepMisses()` nie przechodzą przez tę ścieżkę, przewinięcie
+  (w tył czy w przód) **konstrukcyjnie** nie ma jak wywołać dźwięku — tak samo jak wynik
+  jest funkcją mapy, a nie licznikiem. Drugi klik w rozstrzygnięty cel nie daje drugiego
+  dźwięku, bo `engine.hit()` zwraca `false` przy `results.has(id)`.
+- Błędy `play()`/`pause()` (odrzucona `Promise`, środowisko bez pełnej implementacji
+  `HTMLMediaElement`) są połykane — brak dźwięku nie może wywrócić rozgrywki.
 
 ---
 
@@ -230,7 +263,8 @@ obsługuje oba warianty bez zmian. **Podmiana obrazka = jedna linia w `SPRITES`.
     <div class="player">…</div> <!-- iframe wstawiany przez IFrame API -->
     <div class="overlay">     <!-- pointer-events: none -->
       <button class="obj">    <!-- pointer-events: auto -->
-        <span class="sprite …"><span class="approach"><span class="feedback">
+        <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
+        <span class="approach"><span class="feedback">
     <div class="gate">…</div> <!-- bramka startowa "Graj" -->
     <section class="results">… <!-- ekran wyniku -->
   </main>
@@ -301,21 +335,24 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
   Przycisk jest wyłączony („Ladowanie…") do `onReady` playera.
 - Gra rusza dopiero gdy player wejdzie w `PLAYING` — nie w momencie kliknięcia. Dzięki
   temu buforowanie i ewentualna reklama nie zjadają pierwszych celów.
+- Ten sam gest „Graj" odblokowuje dźwięk trafienia (`sound.unlock()` w `src/game.ts`) —
+  patrz sekcja „Dźwięk trafienia" w sekcji [Sprite'y](#sprite-y).
 
 ---
 
 ## Testy
 
-`npm test` — **46 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **60 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
 | `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
-| `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów + że produkcyjna beatmapa faktycznie używa obu sprite'ów z rejestru. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM` i że nie odwołuje się już do usuniętych kluczy `guy`/`girl`. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło zostawia wariant idle, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
+| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, pudło i wygaśnięcie bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli. |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -352,6 +389,14 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 - **`playbackRate ≠ 1` nie jest wspierany.** Przy zmianie tempa interpolacja wykryje
   rozjazd i zresynchronizuje się — gra pozostanie poprawna, ale szarpnie.
 - `jsdom` przypięty do `^25`; wersja 27 wymaga `require(ESM)`, czyli Node ≥ 20.19.
+- **Długość klipu `5OyTxEbT-fM` nie została programowo zweryfikowana** — YouTube nie
+  oddaje `lengthSeconds` przez zwykły fetch. Jeśli klip jest krótszy niż ~54 s, ostatnie
+  cele beatmapy nigdy się nie pojawią. Wymaga jednego ręcznego uruchomienia `npm run dev`.
+- **Obwódka GIF-a na krawędziach dłoni** — 1-bitowa przezroczystość `hand-idle.gif` /
+  `hand-hit.gif` może dać widoczną krawędź na tle konkretnego wideo. Niezweryfikowane
+  wizualnie.
+- **Głośność klapsa** względem ścieżki wideo nie jest regulowana — brak `el.volume`
+  w `src/ui/sound.ts`. Do dodania jedną linią, jeśli w praktyce okaże się za głośny.
 
 ---
 
@@ -360,10 +405,12 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | Chcę… | Plik |
 |---|---|
 | zmienić momenty/pozycje celów | `src/data/beatmap.json` |
-| podmienić placeholder na GIF/WebP | `src/sprites.ts` (+ plik w `public/`) |
+| podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ plik w `public/sprites/`) |
+| podmienić dźwięk trafienia | `src/sprites.ts` (`HIT_SOUND_SRC`) + plik w `public/sounds/` |
+| zmienić rozmiar puli / logikę odtwarzania dźwięku | `src/ui/sound.ts` |
 | zmienić zasady trafiania/punktacji | `src/engine/engine.ts` |
 | zmienić wygląd | `src/styles.css` |
-| zmienić układ DOM / HUD / ekran wyniku | `src/ui/render.ts` |
+| zmienić układ DOM / HUD / ekran wyniku / podmianę grafiki na trafieniu | `src/ui/render.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
 | zmienić zachowanie pełnego ekranu | `src/ui/fullscreen.ts` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
@@ -386,3 +433,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0008](docs/decisions/ADR-0008-overlay-a-youtube-tos.md) | ⚠️ Overlay a YouTube ToS |
 | [0009](docs/decisions/ADR-0009-start-gate-i-mobile-first.md) | Bramka startowa i mobile-first |
 | [0010](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md) | Pełny ekran obejmuje ramkę gry, nie odtwarzacz |
+| [0011](docs/decisions/ADR-0011-dwuwariantowy-sprite-i-dzwiek-trafienia.md) | Dwuwariantowy sprite i dźwięk trafienia w warstwie UI |

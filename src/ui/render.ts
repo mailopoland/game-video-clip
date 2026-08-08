@@ -86,6 +86,10 @@ export function createUi(
         : document.createElement('span');
     spriteElement.classList.add('sprite');
     if (sprite.kind === 'css') spriteElement.classList.add(sprite.className);
+    // Preload, zeby podmiana src przy trafieniu nie dala pustej klatki.
+    if (sprite.kind === 'image' && sprite.hitSrc && typeof Image !== 'undefined') {
+      new Image().src = sprite.hitSrc;
+    }
     element.append(spriteElement);
 
     const approach = document.createElement('span');
@@ -125,6 +129,13 @@ export function createUi(
       if (resolved) {
         element.querySelector<HTMLElement>('.feedback')!.textContent =
           visible.outcome === 'hit' ? '+1' : '✕';
+      }
+      if (visible.outcome === 'hit') {
+        const sprite = SPRITES[visible.object.sprite]!;
+        if (sprite.kind === 'image' && sprite.hitSrc) {
+          const img = element.querySelector<HTMLImageElement>('img.sprite');
+          if (img && !img.src.endsWith(sprite.hitSrc)) img.src = sprite.hitSrc;
+        }
       }
     }
 

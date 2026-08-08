@@ -1,5 +1,5 @@
 {
-  "videoId": "Iz-nC59AIWc",
+  "videoId": "5OyTxEbT-fM",
   "endScreenAtSec": 56,
   "objects": [
     {
@@ -8,7 +8,7 @@
       "duration": 1100,
       "x": 60,
       "y": 41,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -17,7 +17,7 @@
       "duration": 1000,
       "x": 36,
       "y": 83,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -26,7 +26,7 @@
       "duration": 1100,
       "x": 74,
       "y": 63,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -35,7 +35,7 @@
       "duration": 1000,
       "x": 56,
       "y": 22,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -44,7 +44,7 @@
       "duration": 1100,
       "x": 55,
       "y": 66,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -53,7 +53,7 @@
       "duration": 1000,
       "x": 42,
       "y": 55,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -62,7 +62,7 @@
       "duration": 1000,
       "x": 65,
       "y": 73,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 240
     },
     {
@@ -71,7 +71,7 @@
       "duration": 1100,
       "x": 32,
       "y": 46,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -80,7 +80,7 @@
       "duration": 1000,
       "x": 66,
       "y": 61,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -89,7 +89,7 @@
       "duration": 900,
       "x": 80,
       "y": 78,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -98,7 +98,7 @@
       "duration": 1000,
       "x": 29,
       "y": 34,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -107,7 +107,7 @@
       "duration": 1200,
       "x": 23,
       "y": 64,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -116,7 +116,7 @@
       "duration": 900,
       "x": 82,
       "y": 47,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -125,7 +125,7 @@
       "duration": 1100,
       "x": 58,
       "y": 29,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -134,7 +134,7 @@
       "duration": 900,
       "x": 35,
       "y": 73,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 240
     },
     {
@@ -143,7 +143,7 @@
       "duration": 900,
       "x": 79,
       "y": 37,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 240
     },
     {
@@ -152,7 +152,7 @@
       "duration": 1000,
       "x": 34,
       "y": 62,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -161,7 +161,7 @@
       "duration": 900,
       "x": 56,
       "y": 77,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -170,7 +170,7 @@
       "duration": 1000,
       "x": 61,
       "y": 54,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -179,7 +179,7 @@
       "duration": 900,
       "x": 45,
       "y": 25,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -188,7 +188,7 @@
       "duration": 1000,
       "x": 23,
       "y": 83,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -197,7 +197,7 @@
       "duration": 1000,
       "x": 75,
       "y": 85,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 240
     },
     {
@@ -206,7 +206,7 @@
       "duration": 1000,
       "x": 82,
       "y": 69,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -215,7 +215,7 @@
       "duration": 1100,
       "x": 54,
       "y": 66,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 260
     },
     {
@@ -224,7 +224,7 @@
       "duration": 900,
       "x": 81,
       "y": 72,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 220
     },
     {
@@ -233,7 +233,7 @@
       "duration": 1100,
       "x": 43,
       "y": 23,
-      "sprite": "guy",
+      "sprite": "hand",
       "hitWindowMs": 200
     },
     {
@@ -242,7 +242,7 @@
       "duration": 1000,
       "x": 85,
       "y": 44,
-      "sprite": "girl",
+      "sprite": "hand",
       "hitWindowMs": 200
     }
   ]

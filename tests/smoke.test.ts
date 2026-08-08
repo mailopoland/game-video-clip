@@ -49,7 +49,7 @@ describe('smoke: render i wejscie dotykowe', () => {
 
   it('renderuje sprite obrazkowy jako <img> ze zrodlem z rejestru', () => {
     const clock = new FakeClock();
-    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, sprite: 'girl' })], 20);
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, sprite: 'hand' })], 20);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
 
     playTo(clock, game.frame, 9.5);
@@ -57,8 +57,36 @@ describe('smoke: render i wejscie dotykowe', () => {
     const img = target.querySelector<HTMLImageElement>('img.sprite');
 
     expect(img).not.toBeNull();
-    const expectedSrc = (SPRITES.girl as { kind: 'image'; src: string }).src;
+    const expectedSrc = (SPRITES.hand as { kind: 'image'; src: string }).src;
     expect(img!.src.endsWith(expectedSrc)).toBe(true);
+  });
+
+  it('trafienie podmienia grafike sprite-a na wariant "hit"', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 300 })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 10.0);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    tap(target);
+
+    const img = target.querySelector<HTMLImageElement>('img.sprite')!;
+    const expectedHitSrc = (SPRITES.hand as { kind: 'image'; hitSrc?: string }).hitSrc!;
+    expect(img.src.endsWith(expectedHitSrc)).toBe(true);
+  });
+
+  it('pudlo nie podmienia grafiki sprite-a — zostaje wariant idle', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.2);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    tap(target);
+
+    const img = target.querySelector<HTMLImageElement>('img.sprite')!;
+    const expectedSrc = (SPRITES.hand as { kind: 'image'; src: string }).src;
+    expect(img.src.endsWith(expectedSrc)).toBe(true);
   });
 
   it('tap poza oknem tolerancji pokazuje X i nie daje punktu', () => {

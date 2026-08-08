@@ -5,7 +5,7 @@ import beatmapJson from '../src/data/beatmap.json';
 import type { Beatmap } from '../src/engine/types.js';
 import { makeBeatmap, obj } from './fake-clock.js';
 
-const check = (beatmap: Beatmap) => validateBeatmap(beatmap, ['guy', 'girl']);
+const check = (beatmap: Beatmap) => validateBeatmap(beatmap, ['hand']);
 
 describe('validateBeatmap', () => {
   it('przepuszcza poprawna beatmape', () => {
@@ -50,8 +50,18 @@ describe('beatmapa produkcyjna', () => {
     expect(() => validateBeatmap(beatmapJson as Beatmap, SPRITE_KEYS)).not.toThrow();
   });
 
-  it('uzywa obu sprite-ow z rejestru', () => {
+  it('uzywa kazdego sprite-a z rejestru', () => {
     const used = new Set((beatmapJson as Beatmap).objects.map((o) => o.sprite));
     expect(used).toEqual(new Set(SPRITE_KEYS));
+  });
+
+  it('wskazuje docelowy klip', () => {
+    expect((beatmapJson as Beatmap).videoId).toBe('5OyTxEbT-fM');
+  });
+
+  it('nie uzywa juz usunietych sprite-ow guy/girl', () => {
+    const used = (beatmapJson as Beatmap).objects.map((o) => o.sprite);
+    expect(used).not.toContain('guy');
+    expect(used).not.toContain('girl');
   });
 });
