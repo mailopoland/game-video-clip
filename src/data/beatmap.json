@@ -2,13 +2,248 @@
   "videoId": "Iz-nC59AIWc",
   "endScreenAtSec": 56,
   "objects": [
-    { "id": "o1", "time": 12.0, "duration": 1400, "x": 25, "y": 35, "sprite": "circle", "hitWindowMs": 300 },
-    { "id": "o2", "time": 15.5, "duration": 1400, "x": 70, "y": 30, "sprite": "circle", "hitWindowMs": 300 },
-    { "id": "o3", "time": 19.0, "duration": 1200, "x": 50, "y": 55, "sprite": "star", "hitWindowMs": 260 },
-    { "id": "o4", "time": 23.5, "duration": 1200, "x": 20, "y": 60, "sprite": "diamond", "hitWindowMs": 260 },
-    { "id": "o5", "time": 28.0, "duration": 1100, "x": 78, "y": 58, "sprite": "circle", "hitWindowMs": 240 },
-    { "id": "o6", "time": 34.0, "duration": 1100, "x": 40, "y": 25, "sprite": "star", "hitWindowMs": 240 },
-    { "id": "o7", "time": 41.0, "duration": 1000, "x": 62, "y": 45, "sprite": "diamond", "hitWindowMs": 220 },
-    { "id": "o8", "time": 48.0, "duration": 1000, "x": 33, "y": 48, "sprite": "star", "hitWindowMs": 220 }
+    {
+      "id": "o1",
+      "time": 12.0,
+      "duration": 1100,
+      "x": 60,
+      "y": 41,
+      "sprite": "guy",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o2",
+      "time": 13.71,
+      "duration": 1000,
+      "x": 36,
+      "y": 83,
+      "sprite": "girl",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o3",
+      "time": 14.9,
+      "duration": 1100,
+      "x": 74,
+      "y": 63,
+      "sprite": "guy",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o4",
+      "time": 16.69,
+      "duration": 1000,
+      "x": 56,
+      "y": 22,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o5",
+      "time": 18.27,
+      "duration": 1100,
+      "x": 55,
+      "y": 66,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o6",
+      "time": 20.24,
+      "duration": 1000,
+      "x": 42,
+      "y": 55,
+      "sprite": "girl",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o7",
+      "time": 21.82,
+      "duration": 1000,
+      "x": 65,
+      "y": 73,
+      "sprite": "guy",
+      "hitWindowMs": 240
+    },
+    {
+      "id": "o8",
+      "time": 23.58,
+      "duration": 1100,
+      "x": 32,
+      "y": 46,
+      "sprite": "girl",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o9",
+      "time": 24.63,
+      "duration": 1000,
+      "x": 66,
+      "y": 61,
+      "sprite": "guy",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o10",
+      "time": 26.48,
+      "duration": 900,
+      "x": 80,
+      "y": 78,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o11",
+      "time": 27.82,
+      "duration": 1000,
+      "x": 29,
+      "y": 34,
+      "sprite": "guy",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o12",
+      "time": 29.57,
+      "duration": 1200,
+      "x": 23,
+      "y": 64,
+      "sprite": "girl",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o13",
+      "time": 31.39,
+      "duration": 900,
+      "x": 82,
+      "y": 47,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o14",
+      "time": 32.67,
+      "duration": 1100,
+      "x": 58,
+      "y": 29,
+      "sprite": "guy",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o15",
+      "time": 34.4,
+      "duration": 900,
+      "x": 35,
+      "y": 73,
+      "sprite": "guy",
+      "hitWindowMs": 240
+    },
+    {
+      "id": "o16",
+      "time": 36.34,
+      "duration": 900,
+      "x": 79,
+      "y": 37,
+      "sprite": "guy",
+      "hitWindowMs": 240
+    },
+    {
+      "id": "o17",
+      "time": 37.88,
+      "duration": 1000,
+      "x": 34,
+      "y": 62,
+      "sprite": "guy",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o18",
+      "time": 39.27,
+      "duration": 900,
+      "x": 56,
+      "y": 77,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o19",
+      "time": 41.14,
+      "duration": 1000,
+      "x": 61,
+      "y": 54,
+      "sprite": "guy",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o20",
+      "time": 42.91,
+      "duration": 900,
+      "x": 45,
+      "y": 25,
+      "sprite": "guy",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o21",
+      "time": 43.96,
+      "duration": 1000,
+      "x": 23,
+      "y": 83,
+      "sprite": "guy",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o22",
+      "time": 46.14,
+      "duration": 1000,
+      "x": 75,
+      "y": 85,
+      "sprite": "girl",
+      "hitWindowMs": 240
+    },
+    {
+      "id": "o23",
+      "time": 47.68,
+      "duration": 1000,
+      "x": 82,
+      "y": 69,
+      "sprite": "girl",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o24",
+      "time": 49.04,
+      "duration": 1100,
+      "x": 54,
+      "y": 66,
+      "sprite": "girl",
+      "hitWindowMs": 260
+    },
+    {
+      "id": "o25",
+      "time": 50.53,
+      "duration": 900,
+      "x": 81,
+      "y": 72,
+      "sprite": "girl",
+      "hitWindowMs": 220
+    },
+    {
+      "id": "o26",
+      "time": 52.7,
+      "duration": 1100,
+      "x": 43,
+      "y": 23,
+      "sprite": "guy",
+      "hitWindowMs": 200
+    },
+    {
+      "id": "o27",
+      "time": 53.89,
+      "duration": 1000,
+      "x": 85,
+      "y": 44,
+      "sprite": "girl",
+      "hitWindowMs": 200
+    }
   ]
 }

@@ -4,10 +4,15 @@ import type { GameView, VisibleObject } from '../engine/types.js';
 export interface Ui {
   /** Element, w ktorym IFrame Player API osadza odtwarzacz. */
   playerHost: HTMLElement;
+  /** Scena + HUD — to ten element idzie na pelny ekran (ADR-0010). */
+  frame: HTMLElement;
   render(view: GameView): void;
   hideGate(): void;
   /** Przycisk "Graj" jest aktywny dopiero, gdy odtwarzacz jest gotowy. */
   setStartEnabled(enabled: boolean): void;
+  /** Pokazuje przycisk pelnego ekranu i podpina jego obsluge. */
+  enableFullscreen(toggle: () => void): void;
+  setFullscreenActive(active: boolean): void;
 }
 
 /**
@@ -18,27 +23,34 @@ export function createUi(
   root: HTMLElement,
   handlers: { onStart: () => void; onHit: (objectId: string) => void },
 ): Ui {
+  // Scena i HUD siedza we wspolnej ramce, bo to ona idzie na pelny ekran —
+  // element w top layer zasloniby wszystko, co zostaloby na zewnatrz (ADR-0010).
   root.innerHTML = `
-    <main class="stage" id="stage">
-      <div class="player" id="player"></div>
-      <div class="overlay" id="overlay"></div>
-      <div class="gate" id="gate">
-        <button class="gate-button" id="start" type="button">Graj</button>
-        <p class="gate-hint">Klikaj obiekty, gdy okrag zetknie sie z ich krawedzia.</p>
+    <div class="frame" id="frame">
+      <main class="stage" id="stage">
+        <div class="player" id="player"></div>
+        <div class="overlay" id="overlay"></div>
+        <div class="gate" id="gate">
+          <button class="gate-button" id="start" type="button">Graj</button>
+          <p class="gate-hint">Klikaj obiekty, gdy okrag zetknie sie z ich krawedzia.</p>
+        </div>
+        <section class="results" id="results" hidden>
+          <h1>Koniec</h1>
+          <p class="results-score"><span id="r-score">0</span> pkt</p>
+          <dl class="results-detail">
+            <dt>Trafienia</dt><dd id="r-hits">0</dd>
+            <dt>Pudla</dt><dd id="r-misses">0</dd>
+            <dt>Celnosc</dt><dd id="r-accuracy">0%</dd>
+          </dl>
+        </section>
+      </main>
+      <div class="hud">
+        <span class="hud-score" id="hud-score">0</span>
+        <span class="hud-frozen" id="hud-frozen" hidden>pauza</span>
+        <button class="hud-fullscreen" id="fullscreen" type="button" aria-pressed="false" hidden>
+          Pelny ekran
+        </button>
       </div>
-      <section class="results" id="results" hidden>
-        <h1>Koniec</h1>
-        <p class="results-score"><span id="r-score">0</span> pkt</p>
-        <dl class="results-detail">
-          <dt>Trafienia</dt><dd id="r-hits">0</dd>
-          <dt>Pudla</dt><dd id="r-misses">0</dd>
-          <dt>Celnosc</dt><dd id="r-accuracy">0%</dd>
-        </dl>
-      </section>
-    </main>
-    <div class="hud">
-      <span class="hud-score" id="hud-score">0</span>
-      <span class="hud-frozen" id="hud-frozen" hidden>pauza</span>
     </div>
   `;
 
@@ -134,8 +146,11 @@ export function createUi(
     }
   }
 
+  const fullscreenButton = byId<HTMLButtonElement>('fullscreen');
+
   return {
     playerHost: byId('player'),
+    frame: byId('frame'),
     render,
     hideGate: () => {
       gate.hidden = true;
@@ -143,6 +158,17 @@ export function createUi(
     setStartEnabled: (enabled) => {
       startButton.disabled = !enabled;
       startButton.textContent = enabled ? 'Graj' : 'Ladowanie…';
+    },
+    enableFullscreen: (toggle) => {
+      fullscreenButton.hidden = false;
+      // Tu celowo `click`, nie `pointerdown`: to najpewniejsze zrodlo gestu
+      // uzytkownika dla requestFullscreen we wszystkich przegladarkach, a
+      // przycisk nie jest elementem rozgrywki, wiec opoznienie nie szkodzi.
+      fullscreenButton.addEventListener('click', () => toggle());
+    },
+    setFullscreenActive: (active) => {
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+      fullscreenButton.textContent = active ? 'Zamknij pelny ekran' : 'Pelny ekran';
     },
   };
 }

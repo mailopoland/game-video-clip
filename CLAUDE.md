@@ -2,7 +2,8 @@
 
 Gra rytmiczna „click-the-target" nakładana na klip YouTube. Wyłącznie client-side.
 
-**Status:** v1 zaimplementowane. `npm test` — 34 testy, zielone.
+**Status:** v1 zaimplementowane, sprite'y obrazkowe (guy/girl) zamiast placeholderów CSS.
+`npm test` — 46 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -60,9 +61,10 @@ src/
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     youtube.ts           # IFrame API + adapter TimeSource
+    fullscreen.ts        # pelny ekran ramki gry + straznik przejecia przez iframe
 tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
-  engine.test.ts  beatmap.test.ts  smoke.test.ts
+  engine.test.ts  beatmap.test.ts  smoke.test.ts  fullscreen.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
@@ -98,6 +100,12 @@ Wymaga Node ≥ 20.17.
   (szczegóły w sekcji na górze tego pliku).
 - Małe commity z opisowymi wiadomościami. **Nigdy `git push` ani deploy bez pytania.**
 - Assety: **nie pobieramy niczego z internetu.**
+- **Nowa funkcjonalność albo zmiana zachowania = pokrycie testami.** Jeśli logika
+  daje się przetestować bez przeglądarki, testuj jak `engine.test.ts`/`beatmap.test.ts`;
+  jeśli dotyczy DOM, testuj jak `smoke.test.ts`/`fullscreen.test.ts`.
+- **Po każdej implementacji uruchom `npm test` i potwierdź 100% zielone** przed
+  zgłoszeniem zadania jako ukończone — również gdy zmiana wydaje się niezwiązana
+  z istniejącymi testami.
 - Po ukończonym kroku: jedna linia `✅ [co zrobione]`.
 
 ## Decyzje architektoniczne
@@ -113,3 +121,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0007 — Hosting statyczny: GitHub Pages](docs/decisions/ADR-0007-hosting-github-pages.md)
 - [ADR-0008 — ⚠️ Warstwa gry nad playerem a YouTube ToS](docs/decisions/ADR-0008-overlay-a-youtube-tos.md) — **ryzyko zgodności, decyzja warunkowa**
 - [ADR-0009 — Bramka startowa i podejście mobile-first](docs/decisions/ADR-0009-start-gate-i-mobile-first.md)
+- [ADR-0010 — Pełny ekran obejmuje ramkę gry, nie odtwarzacz](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md)

@@ -18,11 +18,27 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 34 testy, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 46 testów, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
 Wymaga Node ≥ 20.17.
+
+### Test na telefonie w tej samej sieci
+
+```bash
+npm run dev -- --host
+```
+
+⚠️ **Wejdź przez nazwę hosta, nie przez `http://192.168.x.y:5173`.** YouTube odmawia
+osadzenia, gdy `Referer` jest gołym adresem IP — player pokazuje wtedy „Film
+niedostępny", mimo że na `localhost` ten sam klip działa. Sprawdzone: `127.0.0.1`
+i adresy LAN są blokowane (także po https), a `localhost`, `<host>.local` oraz
+`<ip-z-myślnikami>.nip.io` przechodzą.
+
+Działające warianty: `http://<nazwa-komputera>.local:5173/` (mDNS, iOS obsługuje
+natywnie) albo `http://192-168-0-94.nip.io:5173/`. Oba hosty są dopuszczone
+w `server.allowedHosts` w `vite.config.ts` — Vite od 6.0.9 odrzuca nieznany `Host`.
 
 ---
 
@@ -156,8 +172,8 @@ Przewinięcie z powrotem chowa go.
   "videoId": "Iz-nC59AIWc",
   "endScreenAtSec": 56,
   "objects": [
-    { "id": "o1", "time": 12.0, "duration": 1400, "x": 25, "y": 35,
-      "sprite": "circle", "hitWindowMs": 300 }
+    { "id": "o1", "time": 12.0, "duration": 1100, "x": 60, "y": 41,
+      "sprite": "guy", "hitWindowMs": 200 }
   ]
 }
 ```
@@ -186,37 +202,40 @@ pojawi) i nieznanym `sprite`. Błąd = komunikat na stronie zamiast cichego pomi
 `src/sprites.ts` to **jedyne miejsce w kodzie znające assety**:
 
 ```ts
+const asset = (file: string) => `${import.meta.env.BASE_URL}sprites/${file}`;
+
 export const SPRITES: Record<string, Sprite> = {
-  circle: { kind: 'css', className: 'sprite-circle' },
-  star:   { kind: 'css', className: 'sprite-star' },
-  diamond:{ kind: 'css', className: 'sprite-diamond' },
+  guy:  { kind: 'image', src: asset('guy.webp') },
+  girl: { kind: 'image', src: asset('girl.webp') },
 };
 ```
 
-W v1 to **placeholdery proceduralne** — czyste CSS (`clip-path` + gradient), zero plików
-binarnych, nic nie pobierane z internetu.
+Pliki leżą w `public/sprites/` (`guy.webp`, `girl.webp`) — statyczne WebP z pełną
+8-bitową alfą, przycięte do faktycznego kadru postaci (bez przezroczystych marginesów),
+480×480 px. Ścieżka liczy się od `import.meta.env.BASE_URL`, bo GitHub Pages serwuje
+spod podścieżki `/game-video-clip/` (ADR-0007) — bez tego obrazki nie ładowałyby się
+na buildzie produkcyjnym.
 
-**Podmiana na prawdziwy asset = jedna linia:**
-`star: { kind: 'image', src: '/sprites/star.webp' }`. Renderer nie wymaga zmian —
-`<img>` renderuje animowany WebP, APNG i GIF tak samo.
-
-Rekomendowany format docelowy to **animowany WebP**: pełna 8-bitowa alfa (GIF ma
-1-bitową, więc na tle wideo widać obwódkę) i mniejsza waga.
+Rejestr wspiera też `kind: 'css'` (czyste CSS, `clip-path` + gradient, zero plików
+binarnych) — to ścieżka z v1 (ADR-0005), obecnie nieużywana, ale renderer (`render.ts`)
+obsługuje oba warianty bez zmian. **Podmiana obrazka = jedna linia w `SPRITES`.**
 
 ---
 
 ## Warstwa gry i DOM
 
 ```html
-<main class="stage">          <!-- aspect-ratio: 16/9, wspólne dla playera i gry -->
-  <div class="player">…</div> <!-- iframe wstawiany przez IFrame API -->
-  <div class="overlay">       <!-- pointer-events: none -->
-    <button class="obj">      <!-- pointer-events: auto -->
-      <span class="sprite …"><span class="approach"><span class="feedback">
-  <div class="gate">…</div>   <!-- bramka startowa "Graj" -->
-  <section class="results">…  <!-- ekran wyniku -->
-</main>
-<div class="hud">…</div>      <!-- licznik + wskaźnik "pauza" -->
+<div class="frame">           <!-- cel requestFullscreen: scena + HUD razem -->
+  <main class="stage">        <!-- aspect-ratio: 16/9, wspólne dla playera i gry -->
+    <div class="player">…</div> <!-- iframe wstawiany przez IFrame API -->
+    <div class="overlay">     <!-- pointer-events: none -->
+      <button class="obj">    <!-- pointer-events: auto -->
+        <span class="sprite …"><span class="approach"><span class="feedback">
+    <div class="gate">…</div> <!-- bramka startowa "Graj" -->
+    <section class="results">… <!-- ekran wyniku -->
+  </main>
+  <div class="hud">…</div>    <!-- licznik + "pauza" + przycisk pełnego ekranu -->
+</div>
 ```
 
 Istotne szczegóły:
@@ -224,11 +243,51 @@ Istotne szczegóły:
 - **`.overlay` kończy się 3,5 rem nad dołem sceny**, żeby pasek kontrolek YouTube
   pozostał widoczny i klikalny (mitygacja z ADR-0008). W konsekwencji `y%` z beatmapy
   jest liczone względem **warstwy gry**, nie całej sceny.
+- **`.frame` istnieje wyłącznie po to, by pełny ekran obejmował scenę razem z HUD-em**
+  (ADR-0010). Szerokość sceny i HUD-u pochodzi ze wspólnej zmiennej `--stage-width`.
 - **Approach circle jest skalowany imperatywnie co klatkę**
   (`transform: scale(1 + approach × 2.2)`), a **nie** przez CSS `@keyframes` — animacja
   CSS nie zamarłaby razem z wideo przy pauzie i nie zresynchronizowałaby się po seeku.
   `transform` jest kompozytowany na GPU, więc nie ma reflow.
 - Cała geometria w **procentach**, więc skalowanie 375 px ↔ 1440 px jest darmowe.
+
+---
+
+## Pełny ekran
+
+Przycisk pełnego ekranu YouTube rozszerza **sam element `<iframe>`**, a ten trafia do
+*top layer* przeglądarki — ponad wszystkie konteksty układania, poza zasięgiem
+`z-index`. Warstwa gry, bramka, ekran wyniku i HUD są jego rodzeństwem, więc znikały
+pod wideo, przestawały być klikalne, a gra tykała dalej i zamieniała niewidoczne cele
+w pudła. Stąd (ADR-0010):
+
+- **`fs: 0`** w `playerVars` — przycisk YouTube jest wyłączony.
+- **Pełny ekran bierze `.frame`** (scena + HUD), nie iframe. Geometria w procentach,
+  więc skalowanie jest darmowe; w pełnym ekranie `100dvh` odnosi się do ekranu, więc
+  `--stage-width` sam dobiera rozmiar sceny.
+- **Własny przycisk w HUD** — zawsze widoczny, w dwóch trybach (`FullscreenMode`).
+- **Strażnik przejęcia** (`src/ui/fullscreen.ts`): jeśli element pełnoekranowy znajdzie
+  się mimo wszystko wewnątrz `.player` (klawisz `f`, dwuklik), wychodzimy i żądamy
+  pełnego ekranu dla `.frame`.
+- **Gdy odzyskanie się nie uda → pauza wideo.** Silnik zamarza poza stanem `PLAYING`,
+  więc gra czeka zamiast naliczać pudła w ciemno.
+
+### iPhone — trzy poziomy, bo Fullscreen API tam nie istnieje
+
+`Element.requestFullscreen` nie ma na iPhonie w żadnej przeglądarce (wszystkie
+używają WebKitu). Zweryfikowane na urządzeniu: detekcja zwraca `false`. Stąd:
+
+| Tryb | Kiedy | Efekt |
+|---|---|---|
+| `native` | desktop, Android | prawdziwy pełny ekran przez Fullscreen API |
+| `css` | iPhone | `.frame` dostaje `position: fixed; inset: 0` — znika reszta strony, **paski przeglądarki zostają** |
+| PWA | iPhone, „Dodaj do ekranu początkowego" | **prawdziwy** pełny ekran, bez pasków |
+
+Tryb `css` nie jest emulacją pełnego ekranu i nie udaje, że nią jest — po prostu
+oddaje grze cały viewport. Pełny ekran na iPhonie daje wyłącznie uruchomienie
+z ekranu początkowego: `public/manifest.webmanifest` (`display: fullscreen`)
+plus `apple-mobile-web-app-capable` w `index.html`. Manifest **nie ma ikon** —
+iOS użyje wtedy zrzutu strony zamiast ikony.
 
 ---
 
@@ -247,15 +306,16 @@ Istotne szczegóły:
 
 ## Testy
 
-`npm test` — **34 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **46 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). |
 | `tests/engine.test.ts` | 30 testów logiki: spawn, okno tolerancji i jego skraj, klik przed oknem, brak kliku, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja, odporność na szum odczytu. |
-| `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, pauza → zero celów w DOM, ekran wyniku z liczbami. |
+| `tests/beatmap.test.ts` | Walidacja + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów + że produkcyjna beatmapa faktycznie używa obu sprite'ów z rejestru. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, tap poza oknem → `✕`, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -305,6 +365,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić wygląd | `src/styles.css` |
 | zmienić układ DOM / HUD / ekran wyniku | `src/ui/render.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
+| zmienić zachowanie pełnego ekranu | `src/ui/fullscreen.ts` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
 
 ---
@@ -324,3 +385,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0007](docs/decisions/ADR-0007-hosting-github-pages.md) | Hosting: GitHub Pages |
 | [0008](docs/decisions/ADR-0008-overlay-a-youtube-tos.md) | ⚠️ Overlay a YouTube ToS |
 | [0009](docs/decisions/ADR-0009-start-gate-i-mobile-first.md) | Bramka startowa i mobile-first |
+| [0010](docs/decisions/ADR-0010-pelny-ekran-ramki-gry.md) | Pełny ekran obejmuje ramkę gry, nie odtwarzacz |

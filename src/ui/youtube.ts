@@ -8,6 +8,7 @@ interface YtPlayer {
   getCurrentTime(): number;
   getPlayerState(): number;
   playVideo(): void;
+  pauseVideo(): void;
 }
 
 interface YtNamespace {
@@ -43,6 +44,8 @@ function loadApi(): Promise<YtNamespace> {
 export interface PlayerHandle extends TimeSource {
   /** Musi byc wolane z gestu uzytkownika — autoplay z dzwiekiem jest blokowany. */
   play(): void;
+  /** Awaryjne zatrzymanie: pauza zamraza silnik, wiec nic nie jest oceniane. */
+  pause(): void;
 }
 
 /**
@@ -55,13 +58,17 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
   const player = await new Promise<YtPlayer>((resolve) => {
     const instance = new YT.Player(host, {
       videoId,
-      playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
+      // fs: 0 usuwa przycisk pelnego ekranu YouTube. Rozszerzalby sam iframe,
+      // ktory w top layer zaslonilby cala warstwe gry (ADR-0010) — pelny ekran
+      // obsluguje wlasny przycisk w HUD.
+      playerVars: { playsinline: 1, rel: 0, modestbranding: 1, fs: 0 },
       events: { onReady: () => resolve(instance) },
     });
   });
 
   return {
     play: () => player.playVideo(),
+    pause: () => player.pauseVideo(),
     sample: (): TimeSample => {
       const state = player.getPlayerState();
       return {

@@ -2,6 +2,7 @@ import beatmapJson from './data/beatmap.json';
 import { validateBeatmap } from './engine/beatmap.js';
 import { mountGame } from './game.js';
 import { SPRITE_KEYS } from './sprites.js';
+import { createFullscreenController } from './ui/fullscreen.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
 
@@ -19,6 +20,18 @@ async function bootstrap(): Promise<void> {
 
   const game = mountGame(root, beatmap, timeSource, { onStart: () => player?.play() });
   game.ui.setStartEnabled(false);
+
+  // Pelny ekran bierze cala ramke gry, nie iframe (ADR-0010). Gdyby YouTube
+  // mimo wszystko przejal go dla siebie i nie dalo sie odzyskac — pauzujemy,
+  // bo silnik zamarza tylko poza stanem PLAYING i inaczej naliczalby pudla.
+  const fullscreen = createFullscreenController({
+    target: game.ui.frame,
+    playerHost: game.ui.playerHost,
+    onChange: (active) => game.ui.setFullscreenActive(active),
+    onLost: () => player?.pause(),
+  });
+  game.ui.enableFullscreen(() => void fullscreen.toggle());
+  game.ui.setFullscreenActive(fullscreen.isActive());
 
   const loop = (): void => {
     game.frame();

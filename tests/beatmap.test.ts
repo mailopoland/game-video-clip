@@ -5,7 +5,7 @@ import beatmapJson from '../src/data/beatmap.json';
 import type { Beatmap } from '../src/engine/types.js';
 import { makeBeatmap, obj } from './fake-clock.js';
 
-const check = (beatmap: Beatmap) => validateBeatmap(beatmap, ['circle', 'star']);
+const check = (beatmap: Beatmap) => validateBeatmap(beatmap, ['guy', 'girl']);
 
 describe('validateBeatmap', () => {
   it('przepuszcza poprawna beatmape', () => {
@@ -48,5 +48,10 @@ describe('validateBeatmap', () => {
 describe('beatmapa produkcyjna', () => {
   it('jest poprawna wzgledem rejestru sprite-ow', () => {
     expect(() => validateBeatmap(beatmapJson as Beatmap, SPRITE_KEYS)).not.toThrow();
+  });
+
+  it('uzywa obu sprite-ow z rejestru', () => {
+    const used = new Set((beatmapJson as Beatmap).objects.map((o) => o.sprite));
+    expect(used).toEqual(new Set(SPRITE_KEYS));
   });
 });

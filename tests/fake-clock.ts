@@ -49,7 +49,7 @@ export function obj(
     duration: 1000,
     x: 50,
     y: 50,
-    sprite: 'circle',
+    sprite: 'guy',
     hitWindowMs: 200,
     ...overrides,
   };

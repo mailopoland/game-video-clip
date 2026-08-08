@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountGame } from '../src/game.js';
+import { SPRITES } from '../src/sprites.js';
 import { FakeClock, makeBeatmap, obj } from './fake-clock.js';
 
 /** jsdom nie implementuje PointerEvent — gra i tak slucha tylko `pointerdown`. */
@@ -46,6 +47,20 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(root.querySelector('#hud-score')!.textContent).toBe('1');
   });
 
+  it('renderuje sprite obrazkowy jako <img> ze zrodlem z rejestru', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, sprite: 'girl' })], 20);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    playTo(clock, game.frame, 9.5);
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    const img = target.querySelector<HTMLImageElement>('img.sprite');
+
+    expect(img).not.toBeNull();
+    const expectedSrc = (SPRITES.girl as { kind: 'image'; src: string }).src;
+    expect(img!.src.endsWith(expectedSrc)).toBe(true);
+  });
+
   it('tap poza oknem tolerancji pokazuje X i nie daje punktu', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10, { duration: 1000, hitWindowMs: 200 })]);
@@ -74,6 +89,39 @@ describe('smoke: render i wejscie dotykowe', () => {
 
     expect(root.querySelectorAll('.obj')).toHaveLength(0);
     expect(root.querySelector<HTMLElement>('#hud-frozen')!.hidden).toBe(false);
+  });
+
+  it('ramka pelnego ekranu obejmuje scene razem z HUD-em', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+
+    // Element idacy na pelny ekran musi zawierac wszystko, co ma byc widoczne —
+    // to, co zostanie na zewnatrz, zaslania element w top layer (ADR-0010).
+    const frame = game.ui.frame;
+    expect(frame.contains(root.querySelector('#stage'))).toBe(true);
+    expect(frame.contains(root.querySelector('#overlay'))).toBe(true);
+    expect(frame.contains(root.querySelector('#gate'))).toBe(true);
+    expect(frame.contains(root.querySelector('#results'))).toBe(true);
+    expect(frame.contains(root.querySelector('.hud'))).toBe(true);
+    expect(frame.contains(game.ui.playerHost)).toBe(true);
+  });
+
+  it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const button = root.querySelector<HTMLButtonElement>('#fullscreen')!;
+    expect(button.hidden).toBe(true);
+
+    const toggle = vi.fn();
+    game.ui.enableFullscreen(toggle);
+    expect(button.hidden).toBe(false);
+
+    button.click();
+    expect(toggle).toHaveBeenCalledTimes(1);
+
+    game.ui.setFullscreenActive(true);
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(button.textContent).toContain('Zamknij');
   });
 
   it('na koncu klipu pokazuje ekran wyniku z liczbami', () => {

@@ -7,6 +7,13 @@
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
     <title>Click the target</title>
+    <!-- iPhone nie ma Fullscreen API. Jedyny prawdziwy pelny ekran na iOS to
+         uruchomienie z ekranu poczatkowego — daja go te dwie linie (ADR-0010).
+         Sciezki wzgledne, bo build na GitHub Pages siedzi w podsciezce. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#101014" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>

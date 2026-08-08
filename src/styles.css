@@ -18,11 +18,46 @@ body {
     env(safe-area-inset-left);
 }
 
+/* Ramka = scena + HUD. To ona idzie na pelny ekran, zeby warstwa gry i HUD
+   trafily tam razem z odtwarzaczem (ADR-0010). */
+.frame {
+  /* Jedno zrodlo szerokosci dla sceny i HUD-u — HUD ma konczyc sie rowno
+     z krawedzia wideo, takze po wejsciu w pelny ekran. */
+  --stage-width: min(100vw, calc((100dvh - 3.5rem) * 16 / 9), 1280px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.frame:fullscreen {
+  justify-content: center;
+  height: 100%;
+  background: #101014;
+}
+
+/* Tryb zastepczy dla iPhone'a — brak Fullscreen API, wiec ramka rozpycha sie
+   na caly viewport. Paski przegladarki zostaja; prawdziwy pelny ekran na iOS
+   daje dopiero uruchomienie z ekranu poczatkowego (ADR-0010). */
+.frame.is-pseudo-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  justify-content: center;
+  height: 100dvh;
+  background: #101014;
+}
+
+html.has-pseudo-fullscreen,
+html.has-pseudo-fullscreen body {
+  overflow: hidden;
+}
+
 /* Scena trzyma 16:9 razem z playerem; w orientacji poziomej ogranicza ja wysokosc. */
 .stage {
   position: relative;
   width: 100%;
-  max-width: min(100vw, calc((100dvh - 3.5rem) * 16 / 9), 1280px);
+  max-width: var(--stage-width);
   aspect-ratio: 16 / 9;
   background: #000;
   overflow: hidden;
@@ -63,39 +98,14 @@ body {
   grid-area: 1 / 1;
 }
 
-/* --- Placeholdery proceduralne (ADR-0005). Podmiana na WebP/GIF = zmiana
-       wpisu w src/sprites.ts, bez dotykania tego pliku. --- */
+/* --- Rejestr assetow: src/sprites.ts (ADR-0005). Podmiana obrazka = zmiana
+       wpisu tam, bez dotykania tego pliku. --- */
 
 .sprite {
   width: 100%;
   height: 100%;
+  object-fit: contain;
   filter: drop-shadow(0 0 0.4rem rgb(0 0 0 / 0.8));
-}
-
-.sprite-circle {
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #7be0ff, #1f7ea8 70%);
-}
-
-.sprite-star {
-  background: radial-gradient(circle at 35% 30%, #ffe98a, #d09b1c 70%);
-  clip-path: polygon(
-    50% 0%,
-    62% 36%,
-    100% 38%,
-    69% 60%,
-    80% 100%,
-    50% 76%,
-    20% 100%,
-    31% 60%,
-    0% 38%,
-    38% 36%
-  );
-}
-
-.sprite-diamond {
-  background: radial-gradient(circle at 35% 30%, #ffb3f0, #a3288c 70%);
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
 
 /* Approach circle — skala ustawiana imperatywnie co klatke, zeby zamarzala
@@ -230,9 +240,12 @@ body {
 
 .hud {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.75rem;
+  width: 100%;
+  max-width: var(--stage-width);
   height: 3.5rem;
+  padding: 0 0.75rem;
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -244,5 +257,24 @@ body {
 }
 
 .hud-frozen[hidden] {
+  display: none;
+}
+
+.hud-fullscreen {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-left: auto;
+  padding: 0.4rem 0.9rem;
+  min-height: 2.25rem;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.hud-fullscreen[hidden] {
   display: none;
 }
