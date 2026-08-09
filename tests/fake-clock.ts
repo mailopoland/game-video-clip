@@ -9,9 +9,11 @@ export class FakeClock implements TimeSource {
   playing = true;
   ended = false;
   wallMs = 0;
+  /** Tempo odtwarzania wystawiane przez sample() (ADR-0016). */
+  rate = 1;
 
   sample(): TimeSample {
-    return { timeSec: this.timeSec, playing: this.playing, ended: this.ended };
+    return { timeSec: this.timeSec, playing: this.playing, ended: this.ended, rate: this.rate };
   }
 
   now = (): number => this.wallMs;
@@ -20,6 +22,14 @@ export class FakeClock implements TimeSource {
   advance(sec: number): void {
     this.timeSec += sec;
     this.wallMs += sec * 1000;
+  }
+
+  /** Odtwarzanie przy zadanym tempie: `sec` to sekundy WIDEO, zegar scienny
+      plynie proporcjonalnie wolniej/szybciej (ADR-0016). */
+  advanceAtRate(sec: number, rate: number): void {
+    this.rate = rate;
+    this.timeSec += sec;
+    this.wallMs += (sec / rate) * 1000;
   }
 
   /** Tylko zegar scienny — tak wyglada pauza i buffering z punktu widzenia gry. */

@@ -53,7 +53,9 @@ export class Engine {
       this.frozen = false;
       this.adopt(sample.timeSec);
     } else {
-      const predictedSec = this.timeSec + (wallMs - this.lastWallMs) / 1000;
+      const sampleRate = sample.rate;
+      const rate = sampleRate !== undefined && Number.isFinite(sampleRate) && sampleRate > 0 ? sampleRate : 1;
+      const predictedSec = this.timeSec + ((wallMs - this.lastWallMs) / 1000) * rate;
       if (Math.abs(sample.timeSec - predictedSec) > SEEK_THRESHOLD_SEC) {
         this.resync(sample.timeSec);
       } else {
@@ -116,6 +118,27 @@ export class Engine {
   /** Widoczne tylko dla testow/diagnostyki. */
   getOutcome(objectId: string): Result | undefined {
     return this.results.get(objectId);
+  }
+
+  /**
+   * Podmienia liste obiektow bez restartu gry — dla trybu deweloperskiego
+   * nagrywania sciezki (ADR-0016). Przebudowuje `byId`, kasuje wyniki
+   * obiektow, ktorych juz nie ma, i resynchronizuje stan w biezacej chwili:
+   * nowo dodany obiekt z despawnem w przeszlosci dostaje `skipped` zamiast
+   * blysnac `X` z `sweepMisses`, a obiekty juz rozstrzygniete zostaja bez zmian.
+   */
+  setObjects(objects: BeatmapObject[]): void {
+    this.beatmap.objects = objects;
+
+    this.byId.clear();
+    for (const o of objects) this.byId.set(o.id, o);
+
+    const stillPresent = new Set(objects.map((o) => o.id));
+    for (const id of this.results.keys()) {
+      if (!stillPresent.has(id)) this.results.delete(id);
+    }
+
+    this.resync(this.timeSec);
   }
 
   private adopt(timeSec: number): void {

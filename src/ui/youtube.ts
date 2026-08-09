@@ -11,6 +11,9 @@ interface YtPlayer {
   isMuted(): boolean;
   playVideo(): void;
   pauseVideo(): void;
+  getPlaybackRate(): number;
+  setPlaybackRate(rate: number): void;
+  getAvailablePlaybackRates(): number[];
 }
 
 interface YtNamespace {
@@ -50,6 +53,10 @@ export interface PlayerHandle extends TimeSource {
   pause(): void;
   /** Aktualna glosnosc playera, 0–1. 0, gdy wyciszony (ADR-0013). */
   getVolume(): number;
+  /** Trybu deweloperskiego: zmiana tempa odtwarzania (ADR-0016). */
+  setPlaybackRate(rate: number): void;
+  /** Trybu deweloperskiego: lista temp dostepnych dla biezacego wideo. */
+  getAvailablePlaybackRates(): number[];
 }
 
 /**
@@ -74,6 +81,8 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
     play: () => player.playVideo(),
     pause: () => player.pauseVideo(),
     getVolume: () => (player.isMuted() ? 0 : player.getVolume() / 100),
+    setPlaybackRate: (rate) => player.setPlaybackRate(rate),
+    getAvailablePlaybackRates: () => player.getAvailablePlaybackRates(),
     sample: (): TimeSample => {
       const state = player.getPlayerState();
       return {
@@ -82,6 +91,9 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
         // cued i ended zamrazaja gre (wymaganie #5).
         playing: state === PLAYING,
         ended: state === ENDED,
+        // Odczytywane co klatke (bez cache'a), zeby reset tempa po reklamie
+        // czy zmianie z menu playera byl widoczny natychmiast (ADR-0016).
+        rate: player.getPlaybackRate(),
       };
     },
   };

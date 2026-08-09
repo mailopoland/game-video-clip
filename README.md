@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 82 testy, ~1 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 115 testow, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -103,13 +103,22 @@ Każda klatka pobiera `TimeSource.sample()` → `{ timeSec, playing, ended }` i:
 - **wznowienie po freeze** → adoptujemy odczyt bez przewidywania (brak wiarygodnego
   punktu odniesienia dla zegara ściennego), z resyncem jeśli w międzyczasie ktoś przewinął.
 - **normalne odtwarzanie** → porównujemy odczyt z przewidywaniem
-  `timeSec + Δ(performance.now())`:
+  `timeSec + Δ(performance.now()) * rate`:
   - rozjazd > **`SEEK_THRESHOLD_SEC = 0.35`** → to przewinięcie → `resync()`;
   - inaczej `timeSec = max(odczyt, przewidywanie)` — interpolacja wygładza ziarnistość
     `getCurrentTime()` i nigdy nie cofa czasu o szum odczytu.
 
 Zegar ścienny wchodzi przez wstrzykiwany `now()` (domyślnie `performance.now()`), więc
 testy sterują nim ręcznie.
+
+**Tempo odtwarzania (`playbackRate`) skaluje predykcję (ADR-0016).**
+`TimeSample.rate?: number` — opcjonalne, brak/niedodatnie/nieskończone traktowane jak `1`
+(zachowuje zgodność wsteczną z `FakeClock` i testami, które go nie ustawiają).
+`src/ui/youtube.ts` odczytuje `player.getPlaybackRate()` **w każdym `sample()`**, bez
+cache'a — reset tempa po reklamie czy zmianie z menu ⚙ playera jest widoczny w następnej
+klatce, bez cichego rozjazdu. Dzięki temu 0,25×/2× nie wywołują fałszywych `resync()`
+(wcześniej defekt: predykcja przy 0,25× uciekała 4× szybciej niż realny czas wideo i
+przekraczała `SEEK_THRESHOLD_SEC` po ~0,12 s zegara ściennego).
 
 ---
 
@@ -394,23 +403,74 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
   temu buforowanie i ewentualna reklama nie zjadają pierwszych celów.
 - Ten sam gest „Graj" odblokowuje dźwięk trafienia (`sound.unlock()` w `src/game.ts`) —
   patrz sekcja „Dźwięk trafienia" w sekcji [Sprite'y](#sprite-y).
+- **Prawy przycisk myszy nigdy nie liczy się jako trafienie** (`event.button !== 0` w
+  `src/ui/render.ts` przerywa obsługę `onHit` przed `preventDefault()`) — prawy przycisk
+  jest zarezerwowany dla trybu deweloperskiego (patrz niżej).
+
+---
+
+## Tryb deweloperski — nagrywanie ścieżki ręki
+
+**Wyłącznie w `npm run dev`, wycięte z buildu produkcyjnego** przez
+`import.meta.env.DEV` (`src/main.ts` importuje `src/dev/*` dynamicznie, tylko pod tym
+warunkiem — Rollup eliminuje całą gałąź razem z importem przy `vite build`).
+`vite.config.ts` dodatkowo wymusza `process.env.NODE_ENV` zgodny z komendą (`build` →
+`production`), bo Vite domyślnie **nie nadpisuje** już ustawionego `NODE_ENV` — ambientowe
+`NODE_ENV=development` w powłoce dewelopera inaczej przetrwałoby `vite build` i wpuściło
+kod dev (razem z endpointem zapisu) do bundla produkcyjnego. Szczegóły:
+[ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md).
+
+**Jak używać:** `npm run dev`, kliknij „Graj", zaznacz checkbox „Developer: edycja
+grafiki na osi czasu" pod HUD-em — tempo wideo spada automatycznie do najniższego
+dostępnego (`player.getAvailablePlaybackRates()`, fallback `1`). Przeciągnij **prawym
+przyciskiem myszy** po scenie — dłoń podąża za kursorem (podgląd, `pointer-events: none`),
+menu kontekstowe przeglądarki nie pojawia się. Puść przycisk — ścieżka trafia do
+**beatmapy w pamięci silnika natychmiast** (`Engine.setObjects`, bez restartu gry ani
+przeładowania strony) i jest zapisywana na dysk w tle (`POST /__beatmap`, dev-only
+endpoint w `vite.config.ts`). Możesz od razu przewinąć wideo, żeby obejrzeć efekt.
+Prawy klik **w istniejącą rękę** usuwa ten obiekt (z pamięci i z pliku) zamiast
+rozpoczynać nagranie. Odznaczenie checkboxa wraca do tempa 1× i przerywa trwające
+nagranie bez zapisu.
+
+Źródłem prawdy jest **beatmapa w pamięci**, nie plik na dysku — zapis jest efektem
+ubocznym. Reload przez Vite HMR jest zablokowany dla `beatmap.json`
+(`handleHotUpdate` zwraca `[]`), więc edycja nie zeruje stanu gry.
+
+Szczegóły projektowe (metryka RDP, format `id`, limity zapisu, brak `@types/node`,
+znane ograniczenia jak `FADE_OUT_MS` przy tempie ≠ 1) — w
+[ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md).
+
+| Plik | Rola |
+|---|---|
+| `src/dev/rdp.ts` | `simplifyPath` — uproszczenie nagranej ścieżki, metryka odchylenia od interpolacji **po czasie** (nie klasyczna odległość do prostej), tolerancja 1,0. |
+| `src/dev/record.ts` | Czyste funkcje: `toOverlayPercent` (px → % względem `.overlay`), `pushSample`, `buildPath` (RDP + dosyntetyzowanie 2. punktu dla gestów krótszych niż 0,25 s), `nextObjectId`, `insertObject`, `removeObject`. |
+| `src/dev/recorder.ts` | `mountDevRecorder` — spina nasłuchy DOM, `onFrame()` (próbkowanie z czasu gry, wołane z pętli `rAF`), zapis przez `fetch`. |
+| `src/dev/beatmap-write-plugin.ts` | Plugin Vite (`apply: 'serve'`) — `POST /__beatmap`, walidacja strukturalna (bez rejestru sprite'ów — patrz ADR-0016), zapis atomowy `.tmp` → `renameSync`. |
+| `src/dev/node-shims.d.ts` | Minimalny `declare module 'node:fs'` — projekt celowo nie ma `@types/node`. |
+
+**Poza zakresem (świadomie):** undo/redo, edycja/przeciąganie istniejących punktów
+ścieżki, timeline, wybór sprite'a inny niż `hand`, zmiana `size` w trybie dev.
 
 ---
 
 ## Testy
 
-`npm test` — **82 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **115 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
 |---|---|
-| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie). Fabryka `obj()` tworzy domyślnie dwupunktową `path` (spawn `t = time`, despawn `t = time + 1`). |
+| `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie), `advanceAtRate(sec, rate)` (odtwarzanie przy zadanym tempie — `sec` to sekundy wideo, zegar ścienny płynie proporcjonalnie). Fabryka `obj()` tworzy domyślnie dwupunktową `path` (spawn `t = time`, despawn `t = time + 1`). |
+| `tests/playback-rate.test.ts` | 4 testy tempa odtwarzania (`node`, ADR-0016): 0,25× i 2× przez kilka sekund wideo bez fałszywego `resync`, prawdziwy seek nadal wykrywany przy 0,25×, brak pola `rate` w próbce zachowuje się jak dotychczas (domyślnie 1×). |
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
 | `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
+| `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
+| `tests/dev-record.test.ts` | `node`, ADR-0016: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk). |
+| `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie. |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -445,9 +505,16 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 - **Zachowanie w trakcie reklamy** — niezweryfikowane. API nie udostępnia zdarzeń
   reklamowych; nie wiadomo z pewnością, jak raportuje wtedy stan i czas.
 - **`SEEK_THRESHOLD_SEC = 0.35`** nie było kalibrowane na realnym urządzeniu mobilnym.
-- **`playbackRate ≠ 1` nie jest wspierany.** Przy zmianie tempa interpolacja wykryje
-  rozjazd i zresynchronizuje się — gra pozostanie poprawna, ale szarpnie.
 - `jsdom` przypięty do `^25`; wersja 27 wymaga `require(ESM)`, czyli Node ≥ 20.19.
+- **`FADE_OUT_MS` przy tempie ≠ 1 (tryb dev, ADR-0016) jest świadomie niespójny.**
+  `engine.ts` porównuje sekundy wideo ze stałą wyrażoną w ms zegara ściennego; przy
+  0,25× animacja `+1`/`✕` (0,5 s ściennej) kończy się 4× wcześniej niż obiekt zniknie
+  z DOM — pusty `.obj` wisi ~1,5 s dłużej. Dotyczy wyłącznie trybu deweloperskiego.
+- **Tolerancja RDP `1,0` (tryb dev, ADR-0016) jest dobrana analitycznie**, nie
+  z obserwacji nagrania — może wymagać strojenia po pierwszym realnym użyciu.
+- **`getAvailablePlaybackRates()`/`setPlaybackRate()` i to, czy player faktycznie
+  utrzymuje zwolnione tempo (reklama, zmiana jakości) — niezweryfikowane z prawdziwym
+  YouTube**, pokryte wyłącznie atrapami w testach.
 - **Długość klipu `5OyTxEbT-fM` nie została programowo zweryfikowana** — YouTube nie
   oddaje `lengthSeconds` przez zwykły fetch. Jeśli klip jest krótszy niż ~54 s, ostatnie
   cele beatmapy nigdy się nie pojawią. Wymaga jednego ręcznego uruchomienia `npm run dev`.
@@ -482,6 +549,8 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
 | zmienić zachowanie pełnego ekranu | `src/ui/fullscreen.ts` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
+| zmienić tryb deweloperski nagrywania ścieżki (RDP, zapis, DOM) | `src/dev/*` (patrz [ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)) |
+| zmienić endpoint zapisu beatmapy dla trybu dev | `vite.config.ts` + `src/dev/beatmap-write-plugin.ts` |
 
 ---
 
@@ -506,3 +575,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0013](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md) | Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube |
 | [0014](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md) | Ścieżka ruchu w beatmapie i niezmiennicza geometria |
 | [0015](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md) | Usunięcie approach circle i pól czasowych obiektu na rzecz `path` |
+| [0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md) | Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo |

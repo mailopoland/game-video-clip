@@ -6,6 +6,10 @@ export interface Ui {
   playerHost: HTMLElement;
   /** Scena + HUD — to ten element idzie na pelny ekran (ADR-0010). */
   frame: HTMLElement;
+  /** Cel nasluchu trybu deweloperskiego (ADR-0016) — obejmuje `.overlay`. */
+  stage: HTMLElement;
+  /** Odwrotnosc px -> % dla trybu deweloperskiego liczona wzgledem tego elementu. */
+  overlay: HTMLElement;
   render(view: GameView): void;
   hideGate(): void;
   /** Przycisk "Graj" jest aktywny dopiero, gdy odtwarzacz jest gotowy. */
@@ -13,6 +17,8 @@ export interface Ui {
   /** Pokazuje przycisk pelnego ekranu i podpina jego obsluge. */
   enableFullscreen(toggle: () => void): void;
   setFullscreenActive(active: boolean): void;
+  /** Podglad reki podczas nagrywania w trybie dev (ADR-0016); `null` usuwa go. */
+  setRecordingPreview(pos: { x: number; y: number } | null): void;
 }
 
 /**
@@ -55,6 +61,7 @@ export function createUi(
   `;
 
   const byId = <T extends HTMLElement>(id: string): T => root.querySelector<T>(`#${id}`)!;
+  const stage = byId('stage');
   const overlay = byId('overlay');
   const gate = byId('gate');
   const results = byId('results');
@@ -97,6 +104,9 @@ export function createUi(
     // pointerdown obsluguje mysz, dotyk i pioro jednym zdarzeniem i nie ma
     // 300 ms opoznienia click-a na mobile (ADR-0009).
     element.addEventListener('pointerdown', (event) => {
+      // Prawy przycisk sluzy trybowi deweloperskiemu (usuwanie obiektu,
+      // ADR-0016) i nigdy nie liczy sie jako trafienie.
+      if (event.button !== 0) return;
       event.preventDefault();
       handlers.onHit(object.id);
     });
@@ -155,10 +165,46 @@ export function createUi(
 
   const fullscreenButton = byId<HTMLButtonElement>('fullscreen');
 
+  // Podglad reki w trybie dev — zyje poza mapa `elements`, wiec render() go
+  // nie kasuje co klatke (ADR-0016). Reuzywa budowy sprite'a z createObjectElement.
+  let previewElement: HTMLElement | null = null;
+
+  function setRecordingPreview(pos: { x: number; y: number } | null): void {
+    if (!pos) {
+      previewElement?.remove();
+      previewElement = null;
+      return;
+    }
+
+    if (!previewElement) {
+      const element = document.createElement('div');
+      element.className = 'obj is-preview';
+      element.setAttribute('aria-hidden', 'true');
+
+      const sprite = SPRITES['hand']!;
+      const spriteElement =
+        sprite.kind === 'image'
+          ? Object.assign(document.createElement('img'), { src: sprite.src, alt: '' })
+          : document.createElement('span');
+      spriteElement.classList.add('sprite');
+      if (sprite.kind === 'css') spriteElement.classList.add(sprite.className);
+      element.append(spriteElement);
+
+      overlay.append(element);
+      previewElement = element;
+    }
+
+    previewElement.style.left = `${pos.x}%`;
+    previewElement.style.top = `${pos.y}%`;
+  }
+
   return {
     playerHost: byId('player'),
     frame: byId('frame'),
+    stage,
+    overlay,
     render,
+    setRecordingPreview,
     hideGate: () => {
       gate.hidden = true;
     },

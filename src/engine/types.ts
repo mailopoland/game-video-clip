@@ -43,6 +43,8 @@ export interface TimeSample {
   /** false => gra zamrozona (pauza / buffering / cued / ended). */
   playing: boolean;
   ended: boolean;
+  /** Tempo odtwarzania. Brak/niedodatnie/nieskonczone == 1 (domyslne, 1x). */
+  rate?: number;
 }
 
 /** Jedyne wejscie czasu do silnika. Testy wstrzykuja fake clock (ADR-0006). */

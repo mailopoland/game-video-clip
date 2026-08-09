@@ -36,8 +36,24 @@ async function bootstrap(): Promise<void> {
   game.ui.enableFullscreen(() => void fullscreen.toggle());
   game.ui.setFullscreenActive(fullscreen.isActive());
 
+  // Tryb nagrywania sciezki reki — wylacznie dev, wycinany z buildu produkcyjnego
+  // przez import.meta.env.DEV (ADR-0016).
+  let dev: { onFrame(): void } | undefined;
+  if (import.meta.env.DEV) {
+    const { mountDevRecorder } = await import('./dev/recorder.js');
+    dev = mountDevRecorder({
+      ui: game.ui,
+      engine: game.engine,
+      beatmap,
+      getRate: () => player?.sample().rate ?? 1,
+      setRate: (rate) => player?.setPlaybackRate(rate),
+      getAvailableRates: () => player?.getAvailablePlaybackRates() ?? [],
+    });
+  }
+
   const loop = (): void => {
     game.frame();
+    dev?.onFrame();
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);

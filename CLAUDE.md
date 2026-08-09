@@ -9,7 +9,10 @@ Reka jest klikalna przez cały czas trwania ścieżki: klik w tym oknie = trafie
 kliku do despawnu = pudło. Approach circle i `is-armed` zostały usunięte (ADR-0015).
 Pas kontrolek YouTube pod sceną jest wyrażony w procentach (`8%`), nie w `rem`, więc
 pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014).
-`npm test` — 82 testy, zielone.
+Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
+myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
+strony (ADR-0016); wycięty z buildu produkcyjnego.
+`npm test` — 115 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -70,9 +73,16 @@ src/
     youtube.ts           # IFrame API + adapter TimeSource
     fullscreen.ts        # pelny ekran ramki gry + straznik przejecia przez iframe
     sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
+  dev/                   # tryb deweloperski — wycinany z buildu produkcyjnego (ADR-0016)
+    rdp.ts                # simplifyPath — uproszczenie sciezki, metryka czasowa
+    record.ts             # czyste funkcje: px<->%, buildPath, insert/removeObject
+    recorder.ts           # mountDevRecorder — nasluchy DOM + zapis
+    beatmap-write-plugin.ts # plugin Vite (dev-only): POST /__beatmap
+    node-shims.d.ts        # minimalny declare module 'node:fs' (brak @types/node)
 tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  fullscreen.test.ts  sound.test.ts
+  playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
@@ -135,3 +145,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0013 — Zanikanie okręgu po rozstrzygnięciu i głośność względem YouTube](docs/decisions/ADR-0013-zanikanie-okregu-i-glosnosc-wzgledem-youtube.md)
 - [ADR-0014 — Ścieżka ruchu w beatmapie i niezmiennicza geometria](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md)
 - [ADR-0015 — Usunięcie approach circle i pól czasowych obiektu na rzecz path](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md)
+- [ADR-0016 — Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)

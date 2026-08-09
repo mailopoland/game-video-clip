@@ -267,3 +267,32 @@ html.has-pseudo-fullscreen body {
 .hud-fullscreen[hidden] {
   display: none;
 }
+
+/* --- Tryb deweloperski (ADR-0016) — nigdy w buildzie produkcyjnym --- */
+
+.obj.is-preview {
+  pointer-events: none;
+  opacity: 0.75;
+}
+
+.dev-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: var(--stage-width);
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.dev-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: pointer;
+}
+
+.dev-status {
+  opacity: 0.7;
+}
