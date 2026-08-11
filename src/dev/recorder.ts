@@ -92,6 +92,12 @@ export function mountDevRecorder(options: {
 
   checkbox.addEventListener('change', () => {
     active = checkbox.checked;
+    // `.overlay` ma domyslnie `pointer-events: none` (klikalne sa tylko `.obj`),
+    // zeby pasek kontrolek YouTube i klik-pauza dzialaly poza trybem dev. Bez
+    // tego przelacznika prawy-drag na pustym miejscu (rysowanie nowej sciezki)
+    // spadalby przez overlay wprost do iframe'a YouTube pod spodem, ktorego
+    // zdarzenia nigdy nie babelkuja do naszego DOM.
+    ui.overlay.classList.toggle('dev-active', active);
     if (active) {
       const rates = options.getAvailableRates();
       options.setRate(rates.length > 0 ? Math.min(...rates) : 1);

@@ -84,6 +84,16 @@ html.has-pseudo-fullscreen body {
   pointer-events: none;
 }
 
+/* Tryb deweloperski (ADR-0016): overlay musi przechwytywac wskaznik na calym
+   swoim obszarze, zeby prawy-drag na PUSTYM miejscu (rysowanie nowej sciezki)
+   trafial do .stage, a nie przez pointer-events:none wprost do iframe'a
+   YouTube pod spodem (osobny dokument — jego zdarzenia nigdy nie babelkuja
+   do naszego DOM). Poza trybem dev pozostaje pointer-events:none, zeby pasek
+   kontrolek i klik-pauza YouTube dzialaly jak dotychczas. */
+.overlay.dev-active {
+  pointer-events: auto;
+}
+
 .obj {
   position: absolute;
   translate: -50% -50%;

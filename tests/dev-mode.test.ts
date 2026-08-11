@@ -90,6 +90,19 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     expect(setRate).toHaveBeenLastCalledWith(1);
   });
 
+  it('aktywacja trybu przelacza .overlay na pointer-events: auto, zeby prawy-drag na pustym miejscu nie spadal do iframe YouTube pod spodem', () => {
+    const { game, checkbox } = setup();
+
+    expect(game.ui.overlay.classList.contains('dev-active')).toBe(false);
+
+    activate(checkbox);
+    expect(game.ui.overlay.classList.contains('dev-active')).toBe(true);
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change'));
+    expect(game.ui.overlay.classList.contains('dev-active')).toBe(false);
+  });
+
   it('prawy-drag przez kilka klatek tworzy obiekt o rosnacych t; wynik przechodzi walidacje i trafia do fetch', async () => {
     const { clock, game, dev, checkbox, fetchMock } = setup([]);
     activate(checkbox);
