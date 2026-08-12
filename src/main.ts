@@ -41,10 +41,11 @@ async function bootstrap(): Promise<void> {
   let dev: { onFrame(): void } | undefined;
   if (import.meta.env.DEV) {
     const { mountDevRecorder } = await import('./dev/recorder.js');
+    const { createBeatmapStore } = await import('./dev/beatmap-store.js');
     dev = mountDevRecorder({
       ui: game.ui,
       engine: game.engine,
-      beatmap,
+      store: createBeatmapStore(beatmap),
       getRate: () => player?.sample().rate ?? 1,
       setRate: (rate) => player?.setPlaybackRate(rate),
       getAvailableRates: () => player?.getAvailablePlaybackRates() ?? [],

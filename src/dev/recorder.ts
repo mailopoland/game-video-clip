@@ -1,6 +1,7 @@
 import { validateBeatmap } from '../engine/beatmap.js';
 import { SPRITE_KEYS } from '../sprites.js';
 import { buildPath, insertObject, nextObjectId, pushSample, removeObject, toOverlayPercent } from './record.js';
+import type { BeatmapStore } from './beatmap-store.js';
 import type { Engine } from '../engine/engine.js';
 import type { Ui } from '../ui/render.js';
 import type { Beatmap, BeatmapObject, PathPoint } from '../engine/types.js';
@@ -8,6 +9,13 @@ import type { Beatmap, BeatmapObject, PathPoint } from '../engine/types.js';
 export interface DevRecorderHandle {
   /** Wolane z petli rAF, po `game.frame()` (ADR-0016). */
   onFrame(): void;
+  /** Programowe wylaczenie trybu dev: odznacza checkbox, przerywa trwajace
+      nagranie/drag bez zapisu, chowa podglad, wywoluje `onActiveChange(false)`.
+      Idempotentne — wywolanie gdy tryb juz nieaktywny nie robi nic. */
+  deactivate(): void;
+  /** Ustawia `checkbox.disabled` — blokuje wlaczenie trybu dev z UI bez
+      wplywu na aktualny stan `active`. */
+  setDisabled(disabled: boolean): void;
 }
 
 /**
@@ -19,7 +27,7 @@ export interface DevRecorderHandle {
 export function mountDevRecorder(options: {
   ui: Ui;
   engine: Engine;
-  beatmap: Beatmap;
+  store: BeatmapStore;
   getRate: () => number;
   setRate: (rate: number) => void;
   getAvailableRates: () => number[];
@@ -30,9 +38,10 @@ export function mountDevRecorder(options: {
   playHitSound?: () => void;
   /** Jednolinijkowa diagnostyka stanu audio do paska statusu. */
   describeHitSound?: () => string;
+  /** Wolane po kazdej zmianie stanu `active` (rowniez z `deactivate()`). */
+  onActiveChange?: (active: boolean) => void;
 }): DevRecorderHandle {
-  const { ui, engine } = options;
-  let currentBeatmap = options.beatmap;
+  const { ui, engine, store } = options;
 
   let active = false;
   let recording = false;
@@ -115,7 +124,7 @@ export function mountDevRecorder(options: {
     fetch('/__beatmap', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentBeatmap),
+      body: JSON.stringify(store.get()),
     })
       .then((response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -140,8 +149,8 @@ export function mountDevRecorder(options: {
       })
       .then((json: unknown) => {
         const reloaded = validateBeatmap(json as Beatmap, SPRITE_KEYS);
-        currentBeatmap = reloaded;
-        engine.setObjects(currentBeatmap.objects);
+        store.set(reloaded);
+        engine.setObjects(reloaded.objects);
         setStatus('Wczytano.');
       })
       .catch((error: unknown) => {
@@ -150,8 +159,8 @@ export function mountDevRecorder(options: {
       });
   }
 
-  checkbox.addEventListener('change', () => {
-    active = checkbox.checked;
+  function setActive(nextActive: boolean): void {
+    active = nextActive;
     // `.overlay` ma domyslnie `pointer-events: none` (klikalne sa tylko `.obj`),
     // zeby pasek kontrolek YouTube i klik-pauza dzialaly poza trybem dev. Bez
     // tego przelacznika prawy-drag na pustym miejscu (rysowanie nowej sciezki)
@@ -165,6 +174,11 @@ export function mountDevRecorder(options: {
       options.setRate(1);
       cancelRecording();
     }
+    options.onActiveChange?.(active);
+  }
+
+  checkbox.addEventListener('change', () => {
+    setActive(checkbox.checked);
   });
 
   ui.stage.addEventListener('contextmenu', (event) => {
@@ -180,8 +194,9 @@ export function mountDevRecorder(options: {
     if (hitObject) {
       const id = (hitObject as HTMLElement).dataset.id;
       if (id) {
-        currentBeatmap = removeObject(currentBeatmap, id);
-        engine.setObjects(currentBeatmap.objects);
+        const updated = removeObject(store.get(), id);
+        store.set(updated);
+        engine.setObjects(updated.objects);
         persist();
       }
       return;
@@ -217,22 +232,22 @@ export function mountDevRecorder(options: {
     if (!path) return;
 
     const object: BeatmapObject = {
-      id: nextObjectId(currentBeatmap, path[0]!.t),
+      id: nextObjectId(store.get(), path[0]!.t),
       sprite: 'hand',
       path,
     };
 
     let updated: Beatmap;
     try {
-      updated = insertObject(currentBeatmap, object);
+      updated = insertObject(store.get(), object);
       validateBeatmap(updated, SPRITE_KEYS);
     } catch (error) {
       setStatus(`Blad: ${(error as Error).message}`);
       return;
     }
 
-    currentBeatmap = updated;
-    engine.setObjects(currentBeatmap.objects);
+    store.set(updated);
+    engine.setObjects(updated.objects);
     persist();
   });
 
@@ -254,6 +269,16 @@ export function mountDevRecorder(options: {
       const pos = toOverlayPercent(rect, lastX, lastY);
       pushSample(samples, { t: view.timeSec, x: pos.x, y: pos.y });
       ui.setRecordingPreview(pos);
+    },
+
+    deactivate(): void {
+      if (!active) return;
+      checkbox.checked = false;
+      setActive(false);
+    },
+
+    setDisabled(disabled: boolean): void {
+      checkbox.disabled = disabled;
     },
   };
 }

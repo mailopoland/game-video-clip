@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountGame } from '../src/game.js';
 import { mountDevRecorder } from '../src/dev/recorder.js';
+import { createBeatmapStore } from '../src/dev/beatmap-store.js';
 import { validateBeatmap } from '../src/engine/beatmap.js';
 import { SPRITE_KEYS } from '../src/sprites.js';
 import { FakeClock, makeBeatmap, obj } from './fake-clock.js';
@@ -42,6 +43,7 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap(objects, 999);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
+    const store = createBeatmapStore(beatmap);
 
     // jsdom nie liczy layoutu — podstawiamy rect dla .overlay (400x200, w rogu 0,0).
     game.ui.overlay.getBoundingClientRect = () =>
@@ -68,7 +70,7 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     const dev = mountDevRecorder({
       ui: game.ui,
       engine: game.engine,
-      beatmap,
+      store,
       getRate: () => 1,
       setRate,
       getAvailableRates: () => [0.25, 0.5, 1],
