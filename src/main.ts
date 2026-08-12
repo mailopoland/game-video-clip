@@ -5,6 +5,7 @@ import { SPRITE_KEYS } from './sprites.js';
 import { createFullscreenController } from './ui/fullscreen.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
+import type { DevHandEditorHandle } from './dev/hand-editor.js';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 
@@ -36,16 +37,22 @@ async function bootstrap(): Promise<void> {
   game.ui.enableFullscreen(() => void fullscreen.toggle());
   game.ui.setFullscreenActive(fullscreen.isActive());
 
-  // Tryb nagrywania sciezki reki — wylacznie dev, wycinany z buildu produkcyjnego
-  // przez import.meta.env.DEV (ADR-0016).
+  // Tryby deweloperskie (nagrywanie + edycja punktow) — wylacznie dev,
+  // wycinane z buildu produkcyjnego przez import.meta.env.DEV (ADR-0016).
+  // Wzajemnie wykluczajace sie: aktywacja jednego dezaktywuje i blokuje drugi.
   let dev: { onFrame(): void } | undefined;
   if (import.meta.env.DEV) {
     const { mountDevRecorder } = await import('./dev/recorder.js');
+    const { mountDevHandEditor } = await import('./dev/hand-editor.js');
     const { createBeatmapStore } = await import('./dev/beatmap-store.js');
-    dev = mountDevRecorder({
+    const store = createBeatmapStore(beatmap);
+
+    let handEditor: DevHandEditorHandle | undefined;
+
+    const recorder = mountDevRecorder({
       ui: game.ui,
       engine: game.engine,
-      store: createBeatmapStore(beatmap),
+      store,
       getRate: () => player?.sample().rate ?? 1,
       setRate: (rate) => player?.setPlaybackRate(rate),
       getAvailableRates: () => player?.getAvailablePlaybackRates() ?? [],
@@ -54,7 +61,30 @@ async function bootstrap(): Promise<void> {
       play: () => player?.play(),
       playHitSound: () => game.sound.play(),
       describeHitSound: () => game.sound.describe(),
+      onActiveChange: (active) => {
+        if (active) handEditor?.deactivate();
+        handEditor?.setDisabled(active);
+      },
     });
+
+    handEditor = mountDevHandEditor({
+      ui: game.ui,
+      engine: game.engine,
+      store,
+      seekBy: (deltaSec) => player?.seekBy(deltaSec),
+      pause: () => player?.pause(),
+      onActiveChange: (active) => {
+        if (active) recorder.deactivate();
+        recorder.setDisabled(active);
+      },
+    });
+
+    dev = {
+      onFrame(): void {
+        recorder.onFrame();
+        handEditor?.onFrame();
+      },
+    };
   }
 
   const loop = (): void => {
