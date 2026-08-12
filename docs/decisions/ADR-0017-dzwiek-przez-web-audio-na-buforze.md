@@ -37,10 +37,11 @@ tam, gdzie graf Web Audio się nie zbudował.
 - Węzeł źródłowy jest jednorazowy z definicji, więc **nakładanie się klapsów jest
   darmowe** — pula przestaje być potrzebna do tego, po co powstała w ADR-0011.
 - `GainNode` **naprawdę** przekracza 1.0, więc wzmocnienie z ADR-0013 wreszcie
-  działa. `LOUDNESS_BOOST` zostaje na `2` — to ta sama wartość co w ADR-0013, ale
-  teraz faktycznie stosowana; zgłoszenie „za cichy" wynikało z tego, że wzmocnienie
-  nigdy nie dochodziło do skutku, a nie z tego, że było za małe (`4` i `3` okazały
-  się na urządzeniu za głośne).
+  działa — i to zmienia dobór wartości. `LOUDNESS_BOOST` zjeżdża do **`1.5`**, czyli
+  **poniżej** `2` z ADR-0013: tamta liczba była dobrana wtedy, gdy wzmocnienie nigdy
+  nie dochodziło do skutku, więc opisywała zamiar, a nie słyszalny efekt. Zgłoszenie
+  „za cichy" wynikało z braku wzmocnienia, nie z jego wielkości — po naprawie `4`, `3`
+  i `2` okazały się na urządzeniu za głośne. Wartość jest dobrana na słuch.
 - `unlock()` nadal jest wołane w geście „Graj", ale z innego powodu niż w ADR-0011:
   `AudioContext` rodzi się `suspended` i tylko gest pozwala go wznowić. Tam startuje
   też pobranie i dekodowanie pliku.
@@ -60,6 +61,11 @@ straciłyby dźwięk całkowicie. Na tej drodze wzmocnienie nadal jest przycięt
 - Klaps jest **pobierany drugi raz** — raz przez `preload='auto'` puli zapasowej,
   raz przez `fetch` do dekodowania. Plik jest mały i idzie z cache HTTP; świadomie
   nie komplikujemy tego, dopóki nie okaże się problemem.
+- Pobranie musiało zostać **wyciągnięte przed bramkę startową** (`prefetch()`
+  w `mountGame`, obok `preloadSprites()`): startując dopiero w `unlock()`, potrafiło
+  nie zdążyć przed pierwszym trafieniem. `AudioContext` nadal powstaje wyłącznie
+  w geście — rozdzielone są więc dwie rzeczy, które wcześniej robił `unlock()`:
+  pobranie bajtów (może być wcześnie) i uruchomienie kontekstu (musi być w geście).
 - Założenie stojące za całą decyzją — że iOS pozwala Web Audio grać równolegle
   z odtwarzanym `<video>` — **zostało potwierdzone ręcznie na iPhonie**: po starcie
   filmu klaps jest słyszalny. Nadal nie ma na to testu automatycznego (jsdom nie ma

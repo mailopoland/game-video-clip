@@ -14,7 +14,7 @@ myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowan
 strony (ADR-0016); wycięty z buildu produkcyjnego.
 Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<audio>`
 (ADR-0017) — na iOS `<video>` YouTube'a przejmuje sesję audio i wycisza elementy medialne.
-`npm test` — 130 testów, zielone.
+`npm test` — 133 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

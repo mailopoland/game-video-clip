@@ -12,6 +12,13 @@
  */
 export interface HitSound {
   /**
+   * Pobiera plik do pamieci **przed** bramka startowa, zeby dekodowanie w
+   * `unlock()` bylo natychmiastowe i pierwsze trafienie nie trafilo w cisze.
+   * Nie tworzy `AudioContext` (ten wymaga gestu) i nie rzuca — nieudane
+   * pobranie zostawia ponowna probe `unlock()`.
+   */
+  prefetch(): void;
+  /**
    * Wolane w obrebie gestu uzytkownika („Graj"): startuje `AudioContext`
    * (rodzi sie `suspended`) i pobiera + dekoduje plik do `AudioBuffer`.
    * Odblokowuje tez pule zapasowa, na wypadek gdyby dekodowanie zawiodlo.
@@ -32,7 +39,7 @@ export interface HitSound {
  * Na sciezce buforowej dziala naprawde (GainNode nie ma pulapu 1.0); na drodze
  * zapasowej jest przycinane do 1.0 przez `HTMLAudioElement.volume`.
  */
-const LOUDNESS_BOOST = 2;
+const LOUDNESS_BOOST = 1.5;
 
 export interface HitSoundOptions {
   /** Rozmiar puli zapasowej `<audio>`. */
@@ -78,6 +85,9 @@ export function createHitSound(src: string, options: HitSoundOptions = {}): HitS
   let unlockAttempted = false;
   let context: AudioContext | null = null;
   let buffer: AudioBuffer | null = null;
+  /** Trwajace/zakonczone pobranie pliku; `null` = jeszcze nie zaczete albo nieudane. */
+  let bytes: Promise<ArrayBuffer> | null = null;
+  let bytesReady = false;
 
   // Stan wylacznie do diagnostyki (`describe()`), nie wplywa na odtwarzanie.
   let unlocked = 0;
@@ -88,6 +98,23 @@ export function createHitSound(src: string, options: HitSoundOptions = {}): HitS
   /** Wzmocniona glosnosc; ujemna referencja traktowana jak cisza. */
   function gainValue(): number {
     return Math.max(0, getReferenceVolume()) * boost;
+  }
+
+  /** Jedno pobranie na cykl zycia; nieudane zeruje sie, zeby `unlock()` mogl ponowic. */
+  function loadBytes(): Promise<ArrayBuffer> {
+    if (bytes) return bytes;
+    const request = fetchBuffer(src)
+      .then((data) => {
+        bytesReady = true;
+        return data;
+      })
+      .catch((error: unknown) => {
+        bytes = null;
+        lastError = `pobranie: ${String(error)}`;
+        throw error;
+      });
+    bytes = request;
+    return request;
   }
 
   function startAudioGraph(): void {
@@ -103,15 +130,19 @@ export function createHitSound(src: string, options: HitSoundOptions = {}): HitS
     // Kontekst rodzi sie `suspended` — `resume()` przechodzi tylko w gescie.
     if (ctx.state === 'suspended') void ctx.resume();
 
-    fetchBuffer(src)
-      .then((data) => ctx.decodeAudioData(data))
+    loadBytes()
+      // `decodeAudioData` bywa destrukcyjne dla przekazanego ArrayBuffer, wiec
+      // dekodujemy kopie — inaczej ponowna proba nie mialaby czego dekodowac.
+      .then((data) => ctx.decodeAudioData(data.slice(0)))
       .then((decoded) => {
         buffer = decoded;
       })
       .catch((error: unknown) => {
-        // Bez bufora zostaje droga zapasowa przez pule <audio>.
+        // Bez bufora zostaje droga zapasowa przez pule <audio>. Bledu pobrania
+        // nie przebijamy etykieta „dekod" — inaczej diagnostyka wskazywalaby
+        // zly etap.
         buffer = null;
-        lastError = `dekod: ${String(error)}`;
+        if (!lastError?.startsWith('pobranie')) lastError = `dekod: ${String(error)}`;
       });
   }
 
@@ -185,6 +216,11 @@ export function createHitSound(src: string, options: HitSoundOptions = {}): HitS
   }
 
   return {
+    prefetch(): void {
+      // Odrzucenie jest juz obsluzone w loadBytes (zeruje `bytes`); ten catch
+      // istnieje wylacznie po to, by nie zostawic nieobsluzonej obietnicy.
+      loadBytes().catch(() => {});
+    },
     unlock(): void {
       if (unlockAttempted) return;
       unlockAttempted = true;
@@ -199,6 +235,7 @@ export function createHitSound(src: string, options: HitSoundOptions = {}): HitS
       const el = lastPlayed;
       return [
         `tryb=${buffer ? 'bufor' : 'pula'}`,
+        `pobrane=${bytesReady ? 'tak' : bytes ? 'trwa' : 'nie'}`,
         `ctx=${context ? context.state : 'brak'}`,
         `gain=${gainValue().toFixed(2)}`,
         `bufor=${bufferPlays}`,

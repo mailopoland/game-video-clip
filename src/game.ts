@@ -33,6 +33,10 @@ export function mountGame(
   const engine = new Engine(beatmap, timeSource, options.now);
   const sound =
     options.sound ?? createHitSound(HIT_SOUND_SRC, { getReferenceVolume: options.getReferenceVolume });
+  // Plik klapsa leci do pamieci juz teraz, przed bramka startowa — tak jak
+  // sprite'y (ADR-0017). Bez tego pobranie startowaloby dopiero w `unlock()`
+  // i pierwsze trafienie moglo wypasc, zanim bufor bedzie gotowy.
+  sound.prefetch();
   const ui = createUi(root, {
     onStart: () => {
       // Wewnatrz gestu uzytkownika: `AudioContext` rodzi sie `suspended`

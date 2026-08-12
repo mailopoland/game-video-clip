@@ -270,6 +270,71 @@ describe('createHitSound — sciezka Web Audio na buforze', () => {
     expect(report).toContain('dekod: Error: EncodingError');
   });
 
+  it('prefetch() pobiera plik bez tworzenia AudioContext', async () => {
+    const fetches: string[] = [];
+    const sound = createHitSound('clap.mp3', {
+      createContext: () => {
+        throw new Error('AudioContext nie powinien powstac przed gestem');
+      },
+      fetchBuffer: (s) => {
+        fetches.push(s);
+        return Promise.resolve(new ArrayBuffer(8));
+      },
+      make: () => new FakeAudio() as unknown as HTMLAudioElement,
+    });
+
+    sound.prefetch();
+    await settle();
+
+    expect(fetches).toEqual(['clap.mp3']);
+    expect(sound.describe()).toContain('pobrane=tak');
+  });
+
+  it('unlock() po prefetch() nie pobiera pliku drugi raz', async () => {
+    let fetchCount = 0;
+    const sound = createHitSound('clap.mp3', {
+      createContext: () => context as unknown as AudioContext,
+      fetchBuffer: () => {
+        fetchCount++;
+        return Promise.resolve(new ArrayBuffer(8));
+      },
+      make: () => new FakeAudio() as unknown as HTMLAudioElement,
+    });
+
+    sound.prefetch();
+    await settle();
+    sound.unlock();
+    await settle();
+
+    expect(fetchCount).toBe(1);
+    expect(sound.describe()).toContain('tryb=bufor');
+  });
+
+  it('nieudany prefetch() nie blokuje ponownej proby w unlock()', async () => {
+    let fetchCount = 0;
+    const sound = createHitSound('clap.mp3', {
+      createContext: () => context as unknown as AudioContext,
+      fetchBuffer: () => {
+        fetchCount++;
+        return fetchCount === 1
+          ? Promise.reject(new Error('offline'))
+          : Promise.resolve(new ArrayBuffer(8));
+      },
+      make: () => new FakeAudio() as unknown as HTMLAudioElement,
+    });
+
+    sound.prefetch();
+    await settle();
+    expect(sound.describe()).toContain('pobrane=nie');
+    expect(sound.describe()).toContain('pobranie: Error: offline');
+
+    sound.unlock();
+    await settle();
+
+    expect(fetchCount).toBe(2);
+    expect(sound.describe()).toContain('tryb=bufor');
+  });
+
   it('drugi unlock() nie tworzy drugiego kontekstu', async () => {
     const sound = makeSound();
     sound.unlock();
