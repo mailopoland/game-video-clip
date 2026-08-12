@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 133 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 184 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -377,6 +377,12 @@ Istotne szczegóły:
   `.obj` renderuje tylko `.sprite` i `.feedback` — sam sprite dłoni jest celem, klikalny
   przez cały czas trwania jego `path`.
 - Cała geometria w **procentach**, więc skalowanie 375 px ↔ 1440 px jest darmowe.
+- **Wyłącznie w trybie dev**, po zamontowaniu edytora punktów ścieżki
+  (`mountDevHandEditor`, ADR-0018): `#frame` zostaje przeniesiony do nowego kontenera
+  `.dev-edit-layout` wstawionego obok niego w DOM, a drugim dzieckiem kontenera jest
+  panel `.dev-edit-panel` z listą punktów wybranego obiektu. Ta re-parentyzacja nigdy
+  nie zachodzi w buildzie produkcyjnym — cały moduł jest wycinany tak jak reszta
+  `src/dev/*` (ADR-0016).
 
 ---
 
@@ -540,10 +546,21 @@ częstych `pointermove` wiele równoległych requestów mogłoby wrócić w inne
 kolejności niż zostały wysłane i nadpisać nowszy stan starszym — `beatmap-write-plugin.ts`
 robi pełny atomowy zapis całej beatmapy przy każdym żądaniu, bez numeru porządkowego.
 
+Oba tryby dzielą jedną beatmapę w pamięci przez `BeatmapStore`
+(`src/dev/beatmap-store.ts`) — dzięki temu przełączenie trybu w trakcie edycji nie
+gubi niezapisanych zmian zrobionych w drugim. Wzajemna wyłączność jest sterowana
+przez `main.ts`: każdy moduł dostaje `onActiveChange`, wywoływane po zmianie
+checkboxa, i wystawia `deactivate()`/`setDisabled()`; `main.ts` łączy oba tak, że
+aktywacja jednego trybu dezaktywuje i blokuje checkbox drugiego. Szczegóły
+projektowe (odwrócenie YAGNI z ADR-0016, wybór `BeatmapStore`, mechanizm
+wyłączności, koalescencja zapisu) — w
+[ADR-0018](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md).
+
 | Plik | Rola |
 |---|---|
 | `src/dev/hand-editor.ts` | `mountDevHandEditor` — wybór obiektu/punktu, drag przesunięcia i drag rozmiaru, panel boczny, koalescencja zapisu (`dirty`/`persistInFlight`). |
 | `src/dev/record.ts` | Współdzielone z trybem nagrywania: `updatePathPoint` (kopia beatmapy ze zmienionym punktem, clamp `x`/`y` 0–100 i `size` ≥ `MIN_SIZE`), `computeDragResize` (nowy `size` proporcjonalny do zmiany odległości kursora od środka), `distancePercent`, `formatPathPoint` (tekst wiersza w panelu). |
+| `src/dev/beatmap-store.ts` | `BeatmapStore` (`get`/`set`) — jedna beatmapa w pamięci współdzielona przez oba tryby dev (ADR-0018), żeby przełączenie trybu w trakcie edycji nie gubiło niezapisanych zmian z drugiego. |
 
 Panel (`.dev-edit-panel`, obok `.frame` w nowym kontenerze `.dev-edit-layout`
 wstawianym do DOM tylko przy montażu tego modułu) jest budowany od zera przy każdej
@@ -558,7 +575,7 @@ pierścień znika.
 
 ## Testy
 
-`npm test` — **179 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **184 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -575,6 +592,8 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/dev-record.test.ts` | `node`, ADR-0016: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk). |
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 | `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (tekst = `formatPathPoint`) i pierścień zaznaczenia, klik wiersza panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
+| `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
+| `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -686,3 +705,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0015](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md) | Usunięcie approach circle i pól czasowych obiektu na rzecz `path` |
 | [0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md) | Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo |
 | [0017](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md) | Dźwięk trafienia przez Web Audio na zdekodowanym buforze (naprawa ciszy na iOS) |
+| [0018](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md) | Tryb deweloperski edycji punktów ścieżki, `BeatmapStore` i koalescencja zapisu |

@@ -14,7 +14,10 @@ myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowan
 strony (ADR-0016); wycięty z buildu produkcyjnego.
 Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<audio>`
 (ADR-0017) — na iOS `<video>` YouTube'a przejmuje sesję audio i wycisza elementy medialne.
-`npm test` — 133 testy, zielone.
+Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
+zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
+jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
+`npm test` — 184 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -149,3 +152,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0015 — Usunięcie approach circle i pól czasowych obiektu na rzecz path](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md)
 - [ADR-0016 — Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)
 - [ADR-0017 — Dźwięk trafienia przez Web Audio na zdekodowanym buforze](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md)
+- [ADR-0018 — Tryb deweloperski edycji punktów ścieżki](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md)
