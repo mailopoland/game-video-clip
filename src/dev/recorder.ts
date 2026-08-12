@@ -23,6 +23,7 @@ export function mountDevRecorder(options: {
   getRate: () => number;
   setRate: (rate: number) => void;
   getAvailableRates: () => number[];
+  seekBy: (deltaSec: number) => void;
 }): DevRecorderHandle {
   const { ui, engine } = options;
   let currentBeatmap = options.beatmap;
@@ -41,12 +42,20 @@ export function mountDevRecorder(options: {
       <input type="checkbox" id="dev-toggle" />
       Developer: edycja grafiki na osi czasu
     </label>
+    <button type="button" id="dev-seek-back">-100ms</button>
+    <button type="button" id="dev-seek-fwd">+100ms</button>
     <span class="dev-status" id="dev-status"></span>
   `;
   ui.frame.append(bar);
 
   const checkbox = bar.querySelector<HTMLInputElement>('#dev-toggle')!;
   const status = bar.querySelector<HTMLElement>('#dev-status')!;
+  const seekBackButton = bar.querySelector<HTMLButtonElement>('#dev-seek-back')!;
+  const seekFwdButton = bar.querySelector<HTMLButtonElement>('#dev-seek-fwd')!;
+
+  const SEEK_STEP_SEC = 0.1;
+  seekBackButton.addEventListener('click', () => options.seekBy(-SEEK_STEP_SEC));
+  seekFwdButton.addEventListener('click', () => options.seekBy(SEEK_STEP_SEC));
 
   function setStatus(text: string): void {
     status.textContent = text;

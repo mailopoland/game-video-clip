@@ -14,6 +14,7 @@ interface YtPlayer {
   getPlaybackRate(): number;
   setPlaybackRate(rate: number): void;
   getAvailablePlaybackRates(): number[];
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
 }
 
 interface YtNamespace {
@@ -57,6 +58,8 @@ export interface PlayerHandle extends TimeSource {
   setPlaybackRate(rate: number): void;
   /** Trybu deweloperskiego: lista temp dostepnych dla biezacego wideo. */
   getAvailablePlaybackRates(): number[];
+  /** Trybu deweloperskiego: przesuniecie czasu wideo o `deltaSec` (moze byc ujemne). */
+  seekBy(deltaSec: number): void;
 }
 
 /**
@@ -83,6 +86,17 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
     getVolume: () => (player.isMuted() ? 0 : player.getVolume() / 100),
     setPlaybackRate: (rate) => player.setPlaybackRate(rate),
     getAvailablePlaybackRates: () => player.getAvailablePlaybackRates(),
+    seekBy: (deltaSec) => {
+      const wasPlaying = player.getPlayerState() === PLAYING;
+      player.seekTo(player.getCurrentTime() + deltaSec, true);
+      // Na pauzie samo seekTo() nie odswieza wyswietlanej klatki (znany
+      // quirk IFrame API) — krotkie playVideo()/pauseVideo() wymusza
+      // przemalowanie bez wznawiania odtwarzania.
+      if (!wasPlaying) {
+        player.playVideo();
+        player.pauseVideo();
+      }
+    },
     sample: (): TimeSample => {
       const state = player.getPlayerState();
       return {

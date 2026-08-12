@@ -432,6 +432,14 @@ Prawy klik **w istniejącą rękę** usuwa ten obiekt (z pamięci i z pliku) zam
 rozpoczynać nagranie. Odznaczenie checkboxa wraca do tempa 1× i przerywa trwające
 nagranie bez zapisu.
 
+Obok checkboxa znajdują się przyciski **„-100ms"/„+100ms"** — przesuwają czas wideo
+o 100 ms w tył/przód (`player.seekTo(currentTime ± 0.1, true)`) do precyzyjnego
+dostrojenia klatki. Działają niezależnie od stanu checkboxa (przydatne do
+pozycjonowania przed włączeniem edycji) oraz niezależnie od tego, czy wideo jest
+odtwarzane — na pauzie samo `seekTo()` nie odświeża wyświetlanej klatki (znany quirk
+IFrame API), więc `seekBy` dokleja krótkie `playVideo()`/`pauseVideo()`, żeby wymusić
+przemalowanie bez faktycznego wznowienia odtwarzania.
+
 Źródłem prawdy jest **beatmapa w pamięci**, nie plik na dysku — zapis jest efektem
 ubocznym. Reload przez Vite HMR jest zablokowany dla `beatmap.json`
 (`handleHotUpdate` zwraca `[]`), więc edycja nie zeruje stanu gry.

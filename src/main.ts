@@ -48,6 +48,7 @@ async function bootstrap(): Promise<void> {
       getRate: () => player?.sample().rate ?? 1,
       setRate: (rate) => player?.setPlaybackRate(rate),
       getAvailableRates: () => player?.getAvailablePlaybackRates() ?? [],
+      seekBy: (deltaSec) => player?.seekBy(deltaSec),
     });
   }
 

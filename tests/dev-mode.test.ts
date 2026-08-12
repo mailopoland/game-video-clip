@@ -68,6 +68,7 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
       getRate: () => 1,
       setRate,
       getAvailableRates: () => [0.25, 0.5, 1],
+      seekBy: () => {},
     });
 
     const checkbox = root.querySelector<HTMLInputElement>('#dev-toggle')!;
