@@ -285,6 +285,27 @@ html.has-pseudo-fullscreen body {
   opacity: 0.75;
 }
 
+.dev-selection-ring {
+  position: absolute;
+  translate: -50% -50%;
+  pointer-events: none;
+  outline: 2px dashed #6ef58f;
+  outline-offset: 2px;
+  aspect-ratio: 1;
+}
+
+.dev-size-handle {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #6ef58f;
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+
 .dev-bar {
   display: flex;
   align-items: center;

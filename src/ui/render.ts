@@ -19,6 +19,8 @@ export interface Ui {
   setFullscreenActive(active: boolean): void;
   /** Podglad reki podczas nagrywania w trybie dev (ADR-0016); `null` usuwa go. */
   setRecordingPreview(pos: { x: number; y: number } | null): void;
+  /** Pierscien zaznaczenia + uchwyt rozmiaru dla trybu dev-edit-hand; `null` usuwa go. */
+  setHandSelection(sel: { x: number; y: number; size: number } | null): void;
 }
 
 /**
@@ -199,6 +201,33 @@ export function createUi(
     previewElement.style.top = `${pos.y}%`;
   }
 
+  let selectionElement: HTMLElement | null = null;
+
+  function setHandSelection(sel: { x: number; y: number; size: number } | null): void {
+    if (!sel) {
+      selectionElement?.remove();
+      selectionElement = null;
+      return;
+    }
+
+    if (!selectionElement) {
+      const element = document.createElement('div');
+      element.className = 'dev-selection-ring';
+      element.setAttribute('aria-hidden', 'true');
+
+      const handle = document.createElement('div');
+      handle.className = 'dev-size-handle';
+      element.append(handle);
+
+      overlay.append(element);
+      selectionElement = element;
+    }
+
+    selectionElement.style.left = `${sel.x}%`;
+    selectionElement.style.top = `${sel.y}%`;
+    selectionElement.style.width = `${(16 * sel.size) / 100}%`;
+  }
+
   return {
     playerHost: byId('player'),
     frame: byId('frame'),
@@ -206,6 +235,7 @@ export function createUi(
     overlay,
     render,
     setRecordingPreview,
+    setHandSelection,
     hideGate: () => {
       gate.hidden = true;
     },
