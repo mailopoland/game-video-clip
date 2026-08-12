@@ -20,11 +20,11 @@ export default defineConfig(({ command }) => {
     plugins: command === 'serve' ? [beatmapWritePlugin()] : [],
     server: {
       // YouTube odmawia osadzenia, gdy Referer jest golym adresem IP ("Film
-      // niedostepny") — nazwa hosta jest akceptowana. Testujac na telefonie w LAN
-      // wchodzimy wiec przez nazwe (mDNS `<host>.local` albo wildcard DNS
-      // `<ip-z-myslnikami>.nip.io`), a nie przez `http://192.168.x.y`.
-      // Vite od 6.0.9 odrzuca nieznany naglowek Host, stad ta lista.
-      allowedHosts: ['.local', '.nip.io', '.sslip.io'],
+      // niedostepny") — nazwa hosta jest akceptowana. Testujac na telefonie
+      // wchodzimy wiec przez nazwe (mDNS `<host>.local`, tunel ngrok itp.),
+      // a nie przez `http://192.168.x.y`. Vite od 6.0.9 odrzuca nieznany
+      // naglowek Host, stad `allowedHosts: true` — to dev-only serwer.
+      allowedHosts: true,
     },
     test: {
       // Logika gry nie potrzebuje DOM (ADR-0006); jsdom wlacza tylko test smoke,
