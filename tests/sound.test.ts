@@ -22,14 +22,19 @@ class FakeAudio {
   muted = false;
   currentTime = 0;
   volume = 1;
+  paused = true;
+  readyState = 4;
   playCount = 0;
 
   play(): Promise<void> {
     this.playCount++;
+    this.paused = false;
     return Promise.resolve();
   }
 
-  pause(): void {}
+  pause(): void {
+    this.paused = true;
+  }
 }
 
 describe('createHitSound', () => {
@@ -40,16 +45,15 @@ describe('createHitSound', () => {
   });
 
   function makeSound(size = 4, getReferenceVolume?: () => number) {
-    return createHitSound(
-      'clap.mp3',
+    return createHitSound('clap.mp3', {
       size,
-      () => {
+      getReferenceVolume,
+      make: () => {
         const el = new FakeAudio();
         elements.push(el);
         return el as unknown as HTMLAudioElement;
       },
-      getReferenceVolume,
-    );
+    });
   }
 
   it('unlock() dotyka kazdego elementu puli', () => {
@@ -95,6 +99,185 @@ describe('createHitSound', () => {
     sound.play();
     expect(elements[0]!.volume).toBe(1);
   });
+
+  // Diagnostyka dla urzadzen bez devtoolsow (iOS) — guzik „Test dzwieku"
+  // w trybie dev pokazuje ten string w pasku statusu.
+  it('describe() raportuje droge zapasowa i stan odtwarzanego elementu', () => {
+    const sound = makeSound(4);
+    sound.play();
+    const report = sound.describe();
+    expect(report).toContain('tryb=pula'); // jsdom nie ma Web Audio
+    expect(report).toContain('paused=false');
+    expect(report).toContain('blad=brak');
+  });
+
+  it('describe() pokazuje przyczyne odrzuconego play()', async () => {
+    const failing = createHitSound('clap.mp3', {
+      size: 1,
+      make: () => {
+        const el = new FakeAudio();
+        el.play = () => Promise.reject(new Error('NotAllowedError'));
+        return el as unknown as HTMLAudioElement;
+      },
+    });
+    failing.play();
+    await Promise.resolve();
+    expect(failing.describe()).toContain('play: Error: NotAllowedError');
+  });
+
+  it('describe() liczy elementy faktycznie odblokowane przez unlock()', async () => {
+    const sound = makeSound(4);
+    expect(sound.describe()).toContain('odblokowane=0/4');
+    sound.unlock();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sound.describe()).toContain('odblokowane=4/4');
+  });
+});
+
+/**
+ * Sciezka glowna z ADR-0017 — jsdom nie ma Web Audio API, wiec kontekst jest
+ * podstawiony. Sprawdzamy to, czego nie da sie sprawdzic na urzadzeniu: ze
+ * `play()` w ogole nie dotyka `HTMLAudioElement`, gdy bufor jest gotowy.
+ */
+describe('createHitSound — sciezka Web Audio na buforze', () => {
+  class FakeSource {
+    buffer: unknown = null;
+    started = 0;
+    connect(): void {}
+    start(): void {
+      this.started++;
+    }
+  }
+
+  class FakeGain {
+    gain = { value: 0 };
+    connect(): void {}
+  }
+
+  class FakeContext {
+    state = 'suspended';
+    destination = {};
+    resumed = 0;
+    sources: FakeSource[] = [];
+    gains: FakeGain[] = [];
+    decodeFails = false;
+
+    resume(): Promise<void> {
+      this.resumed++;
+      this.state = 'running';
+      return Promise.resolve();
+    }
+    createBufferSource(): FakeSource {
+      const source = new FakeSource();
+      this.sources.push(source);
+      return source;
+    }
+    createGain(): FakeGain {
+      const gain = new FakeGain();
+      this.gains.push(gain);
+      return gain;
+    }
+    decodeAudioData(): Promise<AudioBuffer> {
+      return this.decodeFails
+        ? Promise.reject(new Error('EncodingError'))
+        : Promise.resolve({ duration: 0.3 } as AudioBuffer);
+    }
+  }
+
+  let elements: FakeAudio[];
+  let context: FakeContext;
+
+  beforeEach(() => {
+    elements = [];
+    context = new FakeContext();
+  });
+
+  function makeSound(getReferenceVolume?: () => number) {
+    return createHitSound('clap.mp3', {
+      getReferenceVolume,
+      boost: 4,
+      createContext: () => context as unknown as AudioContext,
+      fetchBuffer: () => Promise.resolve(new ArrayBuffer(8)),
+      make: () => {
+        const el = new FakeAudio();
+        elements.push(el);
+        return el as unknown as HTMLAudioElement;
+      },
+    });
+  }
+
+  /** unlock() -> fetch -> decodeAudioData -> przypisanie bufora: lancuch
+      obietnic, ktorego dlugosc rozni sie miedzy sukcesem a odrzuceniem
+      (adopcja odrzuconej obietnicy kosztuje dodatkowe mikrozadania). */
+  function settle(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it('unlock() wznawia kontekst i dekoduje bufor', async () => {
+    const sound = makeSound();
+    sound.unlock();
+    await settle();
+
+    expect(context.resumed).toBe(1);
+    expect(sound.describe()).toContain('tryb=bufor');
+  });
+
+  it('po zdekodowaniu play() nie dotyka juz puli <audio>', async () => {
+    const sound = makeSound();
+    sound.unlock();
+    await settle();
+
+    const playsBefore = elements.reduce((sum, el) => sum + el.playCount, 0);
+    sound.play();
+
+    expect(context.sources).toHaveLength(1);
+    expect(context.sources[0]!.started).toBe(1);
+    expect(elements.reduce((sum, el) => sum + el.playCount, 0)).toBe(playsBefore);
+  });
+
+  it('wzmocnienie przekracza 1.0, czego HTMLAudioElement.volume nie umie', async () => {
+    const sound = makeSound(() => 0.5);
+    sound.unlock();
+    await settle();
+    sound.play();
+
+    expect(context.gains[0]!.gain.value).toBe(2); // 0.5 * boost 4
+  });
+
+  it('kazde trafienie dostaje wlasny source — klapsy moga sie nakladac', async () => {
+    const sound = makeSound();
+    sound.unlock();
+    await settle();
+    sound.play();
+    sound.play();
+
+    expect(context.sources).toHaveLength(2);
+    expect(context.sources.every((s) => s.started === 1)).toBe(true);
+  });
+
+  it('nieudane dekodowanie spada na droge zapasowa i raportuje przyczyne', async () => {
+    context.decodeFails = true;
+    const sound = makeSound();
+    sound.unlock();
+    await settle();
+    sound.play();
+
+    expect(context.sources).toHaveLength(0);
+    expect(elements.reduce((sum, el) => sum + el.playCount, 0)).toBeGreaterThan(0);
+    const report = sound.describe();
+    expect(report).toContain('tryb=pula');
+    expect(report).toContain('dekod: Error: EncodingError');
+  });
+
+  it('drugi unlock() nie tworzy drugiego kontekstu', async () => {
+    const sound = makeSound();
+    sound.unlock();
+    sound.unlock();
+    await settle();
+
+    expect(context.resumed).toBe(1);
+  });
 });
 
 describe('dzwiek trafienia w rozgrywce', () => {
@@ -108,10 +291,12 @@ describe('dzwiek trafienia w rozgrywce', () => {
   });
 
   function mount(beatmap: ReturnType<typeof makeBeatmap>, clock: FakeClock) {
-    const sound = createHitSound('clap.mp3', 4, () => {
-      const el = new FakeAudio();
-      elements.push(el);
-      return el as unknown as HTMLAudioElement;
+    const sound = createHitSound('clap.mp3', {
+      make: () => {
+        const el = new FakeAudio();
+        elements.push(el);
+        return el as unknown as HTMLAudioElement;
+      },
     });
     const game = mountGame(root, beatmap, clock, { now: clock.now, sound });
     return game;

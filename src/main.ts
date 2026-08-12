@@ -51,6 +51,8 @@ async function bootstrap(): Promise<void> {
       seekBy: (deltaSec) => player?.seekBy(deltaSec),
       pause: () => player?.pause(),
       play: () => player?.play(),
+      playHitSound: () => game.sound.play(),
+      describeHitSound: () => game.sound.describe(),
     });
   }
 

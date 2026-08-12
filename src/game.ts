@@ -7,6 +7,9 @@ import type { Beatmap, TimeSource } from './engine/types.js';
 export interface GameHandle {
   engine: Engine;
   ui: Ui;
+  /** Ta sama instancja, ktora gra przy trafieniu — tryb dev testuje przez nia
+      dokladnie te sama sciezke odtwarzania, bez drugiej puli obok. */
+  sound: HitSound;
   /** Jedna klatka: odczyt czasu -> aktualizacja stanu -> render. */
   frame(): void;
 }
@@ -29,11 +32,11 @@ export function mountGame(
 ): GameHandle {
   const engine = new Engine(beatmap, timeSource, options.now);
   const sound =
-    options.sound ?? createHitSound(HIT_SOUND_SRC, undefined, undefined, options.getReferenceVolume);
+    options.sound ?? createHitSound(HIT_SOUND_SRC, { getReferenceVolume: options.getReferenceVolume });
   const ui = createUi(root, {
     onStart: () => {
-      // Wewnatrz gestu uzytkownika: iOS/WebKit odblokowuje konkretny element
-      // <audio>, na ktorym padlo play() w tym gescie — nie strone (ADR-0011).
+      // Wewnatrz gestu uzytkownika: `AudioContext` rodzi sie `suspended`
+      // i tylko gest pozwala go wznowic (ADR-0017).
       sound.unlock();
       ui.hideGate();
       options.onStart?.();
@@ -50,5 +53,5 @@ export function mountGame(
   };
 
   frame();
-  return { engine, ui, frame };
+  return { engine, ui, sound, frame };
 }

@@ -62,6 +62,8 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     vi.stubGlobal('fetch', fetchMock);
     const pause = vi.fn();
     const play = vi.fn();
+    const playHitSound = vi.fn();
+    const describeHitSound = vi.fn().mockReturnValue('graf=nie blad=brak');
 
     const dev = mountDevRecorder({
       ui: game.ui,
@@ -73,10 +75,12 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
       seekBy: () => {},
       pause,
       play,
+      playHitSound,
+      describeHitSound,
     });
 
     const checkbox = root.querySelector<HTMLInputElement>('#dev-toggle')!;
-    return { clock, game, dev, checkbox, setRate, fetchMock, pause, play };
+    return { clock, game, dev, checkbox, setRate, fetchMock, pause, play, playHitSound, describeHitSound };
   }
 
   function activate(checkbox: HTMLInputElement): void {
@@ -206,6 +210,33 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
 
     root.querySelector<HTMLButtonElement>('#dev-play')!.click();
     expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  // Guzik diagnostyczny dla iOS: te sama sciezke co trafienie w reke da sie
+  // wywolac bez trafiania w ruchomy cel, a wynik laduje w pasku
+  // statusu — na iPhonie nie ma jak odczytac console.warn.
+  it('Test dzwieku odtwarza klaps i wypisuje diagnostyke w pasku statusu', () => {
+    vi.useFakeTimers();
+    try {
+      const { playHitSound, describeHitSound } = setup();
+
+      root.querySelector<HTMLButtonElement>('#dev-sound')!.click();
+      expect(playHitSound).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(400);
+      expect(describeHitSound).toHaveBeenCalledTimes(1);
+      expect(root.querySelector('#dev-status')!.textContent).toContain('graf=nie blad=brak');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Test dzwieku dziala niezaleznie od checkboxa trybu dev', () => {
+    const { checkbox, playHitSound } = setup();
+    expect(checkbox.checked).toBe(false);
+
+    root.querySelector<HTMLButtonElement>('#dev-sound')!.click();
+    expect(playHitSound).toHaveBeenCalledTimes(1);
   });
 
   it('Reload beatmap.json pobiera plik z dysku i podmienia obiekty w silniku', async () => {

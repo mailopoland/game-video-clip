@@ -12,7 +12,9 @@ pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014).
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.
-`npm test` — 115 testów, zielone.
+Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<audio>`
+(ADR-0017) — na iOS `<video>` YouTube'a przejmuje sesję audio i wycisza elementy medialne.
+`npm test` — 130 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -146,3 +148,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0014 — Ścieżka ruchu w beatmapie i niezmiennicza geometria](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md)
 - [ADR-0015 — Usunięcie approach circle i pól czasowych obiektu na rzecz path](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md)
 - [ADR-0016 — Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)
+- [ADR-0017 — Dźwięk trafienia przez Web Audio na zdekodowanym buforze](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md)

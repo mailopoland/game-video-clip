@@ -26,6 +26,10 @@ export function mountDevRecorder(options: {
   seekBy: (deltaSec: number) => void;
   pause: () => void;
   play: () => void;
+  /** Ta sama sciezka co przy trafieniu w reke — guzik „Test dzwieku". */
+  playHitSound?: () => void;
+  /** Jednolinijkowa diagnostyka stanu audio do paska statusu. */
+  describeHitSound?: () => string;
 }): DevRecorderHandle {
   const { ui, engine } = options;
   let currentBeatmap = options.beatmap;
@@ -49,6 +53,7 @@ export function mountDevRecorder(options: {
     <button type="button" id="dev-stop">Stop</button>
     <button type="button" id="dev-play">Play</button>
     <button type="button" id="dev-reload">Reload beatmap.json</button>
+    <button type="button" id="dev-sound">Test dzwieku</button>
     <span class="dev-status" id="dev-status"></span>
   `;
   ui.frame.append(bar);
@@ -60,6 +65,7 @@ export function mountDevRecorder(options: {
   const stopButton = bar.querySelector<HTMLButtonElement>('#dev-stop')!;
   const playButton = bar.querySelector<HTMLButtonElement>('#dev-play')!;
   const reloadButton = bar.querySelector<HTMLButtonElement>('#dev-reload')!;
+  const soundButton = bar.querySelector<HTMLButtonElement>('#dev-sound')!;
 
   const SEEK_STEP_SEC = 0.1;
   seekBackButton.addEventListener('click', () => options.seekBy(-SEEK_STEP_SEC));
@@ -67,6 +73,19 @@ export function mountDevRecorder(options: {
   stopButton.addEventListener('click', () => options.pause());
   playButton.addEventListener('click', () => options.play());
   reloadButton.addEventListener('click', () => void reloadBeatmap());
+
+  // Diagnostyka dzwieku na urzadzeniu bez devtoolsow (iOS). Odczyt stanu jest
+  // opozniony, bo `play()` odrzuca sie asynchronicznie, a `currentTime` musi
+  // zdazyc ruszyc — to wlasnie ono odroznia „zablokowane play()" od „gra, ale
+  // nie slychac".
+  const SOUND_PROBE_MS = 400;
+  soundButton.addEventListener('click', () => {
+    options.playHitSound?.();
+    setStatus('Dzwiek: gram…');
+    setTimeout(() => {
+      setStatus(`Dzwiek: ${options.describeHitSound?.() ?? 'brak diagnostyki'}`);
+    }, SOUND_PROBE_MS);
+  });
 
   function setStatus(text: string): void {
     status.textContent = text;

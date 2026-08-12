@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 119 testow, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 130 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -283,20 +283,28 @@ obsługuje oba warianty bez zmian. **Podmiana obrazka = jedna linia w `SPRITES`.
 
 ### Dźwięk trafienia
 
-`src/ui/sound.ts` (`createHitSound`) trzyma pulę **4 elementów `HTMLAudioElement`** na
-tym samym `src` (`HIT_SOUND_SRC`), używanych round-robin — jeden element restartowany
-przez `currentTime = 0` ucinałby poprzedni klaps przy dwóch szybkich trafieniach.
-Wszystkie mają `preload = 'auto'`, więc plik jest w cache przed pierwszym trafieniem.
+`src/ui/sound.ts` (`createHitSound`) odtwarza klaps przez **Web Audio na zdekodowanym
+buforze** ([ADR-0017](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md)):
+`fetch` → `decodeAudioData` → `AudioBuffer`, a każde trafienie to nowy
+`AudioBufferSourceNode` → `GainNode` → `destination`.
 
-- **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu „Graj":
-  na każdym elemencie puli wyciszony `play()`, a **dopiero po ustabilizowaniu się
-  jego `Promise`** — `pause()` → `currentTime = 0` → zdjęcie wyciszenia. Wywołanie
-  `pause()` synchronicznie zaraz po `play()`, zanim przeglądarka faktycznie ruszyła
-  odtwarzanie, przerywa `play()` błędem, który na części przeglądarek (Safari) liczy
-  się jako niedokończone odblokowanie elementu — stąd `.then()`, nie kolejna linijka.
-  iOS/WebKit odblokowuje *konkretny element* `<audio>`, na którym padł `play()`
-  w obrębie gestu — nie „stronę" — stąd pula jest odblokowywana cała naraz, a nie
-  klonowana później.
+**Dlaczego nie `<audio>`:** iOS/WebKit utrzymuje sesję audio dla **jednego elementu
+medialnego naraz**, więc po starcie `<video>` YouTube'a każdy nasz `<audio>` milknie —
+zaobserwowane na urządzeniu (klaps słyszalny przed startem filmu, niesłyszalny po).
+`AudioBufferSourceNode` nie jest elementem medialnym, więc tego ograniczenia nie dotyka.
+Węzeł źródłowy jest jednorazowy z definicji, więc nakładanie się dwóch szybkich klapsów
+jest darmowe.
+
+- **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu „Graj",
+  bo `AudioContext` rodzi się `suspended` i tylko gest pozwala go wznowić. Tam startuje
+  też pobranie i dekodowanie pliku. Powtórne wywołanie nie tworzy drugiego kontekstu.
+- **Droga zapasowa: pula 4 elementów `HTMLAudioElement`** (`preload = 'auto'`,
+  round-robin), używana **wyłącznie** gdy nie ma `AudioContext` albo dekodowanie
+  zawiodło — czyli w `jsdom` (testy) i w starszych przeglądarkach. Na tej drodze
+  wzmocnienie jest przycięte do `1.0`. `unlock()` odblokowuje ją tak jak dawniej:
+  wyciszony `play()`, a **dopiero po ustabilizowaniu się jego `Promise`** —
+  `pause()` → `currentTime = 0` → zdjęcie wyciszenia (synchroniczne `pause()` zaraz
+  po `play()` przerywa je błędem, co na Safari liczy się jako nieudane odblokowanie).
 - **`play()`** — wywoływane wyłącznie w `onHit`, gdy `engine.hit(id)` zwróci `true`.
   Ponieważ `resync()`/`sweepMisses()` nie przechodzą przez tę ścieżkę, przewinięcie
   (w tył czy w przód) **konstrukcyjnie** nie ma jak wywołać dźwięku — tak samo jak wynik
@@ -306,18 +314,23 @@ Wszystkie mają `preload = 'auto'`, więc plik jest w cache przed pierwszym traf
   `HTMLMediaElement`) są połykane, żeby brak dźwięku nie mógł wywrócić rozgrywki —
   ale nieudane trafienie loguje `console.warn` z przyczyną, żeby dało się to
   zdiagnozować w devtoolsach zamiast zgadywać.
+- **`describe()`** — jednolinijkowy stan ścieżki dźwięku (`tryb=bufor|pula`, stan
+  `AudioContext`, aktualny `gain`, licznik odtworzeń z bufora, liczba odblokowanych
+  elementów puli, `readyState`, `currentTime`/`paused`/`volume` ostatniego elementu
+  puli, ostatni błąd). Wyłącznie diagnostyka — nie wpływa na odtwarzanie; konsument to guzik
+  „Test dzwieku" w pasku dev (patrz [Tryb deweloperski](#tryb-deweloperski--nagrywanie-ścieżki-ręki)).
 
-**Głośność jest proporcjonalna do aktualnej głośności YouTube i podwojona
-(ADR-0013):** `play()` liczy `gain = getReferenceVolume() * 2` tuż przed każdym
-odtworzeniem (`getReferenceVolume` domyślnie `() => 1`, w produkcji
-`PlayerHandle.getVolume()` z `src/ui/youtube.ts` — `isMuted() ? 0 :
-getVolume() / 100`). `HTMLAudioElement.volume` fizycznie nie może przekroczyć
-`1.0`, więc podwojenie wymaga **Web Audio API**: `createHitSound` łączy każdy
-element puli przez `MediaElementAudioSourceNode` w jeden `GainNode`
-(`ensureAudioGraph()`, budowany raz w `unlock()` — `AudioContext` startuje
-`suspended` i wymaga gestu użytkownika, żeby ruszyć). Bez Web Audio (starsze
-przeglądarki) działa zapasowa ścieżka `el.volume = min(1, getReferenceVolume())`
-— proporcja do YouTube zostaje, ale bez podwojenia ponad naturalny poziom pliku.
+**Głośność jest proporcjonalna do aktualnej głośności YouTube i wzmocniona
+(ADR-0013, ADR-0017):** `play()` liczy `gain = getReferenceVolume() * LOUDNESS_BOOST`
+tuż przed każdym odtworzeniem, gdzie `LOUDNESS_BOOST = 2` — dobrane na słuch na
+urządzeniu (`4` i `3` były za głośne) (`getReferenceVolume`
+domyślnie `() => 1`, w produkcji `PlayerHandle.getVolume()` z `src/ui/youtube.ts` —
+`isMuted() ? 0 : getVolume() / 100`). Na ścieżce buforowej `GainNode` przekracza `1.0`
+bez przeszkód, więc wzmocnienie **działa naprawdę** — wcześniej (ADR-0013) szło przez
+`MediaElementAudioSourceNode`, czyli nadal przez element medialny, i na iOS nie miało
+szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceVolume())`
+— proporcja do YouTube zostaje, ale bez wzmocnienia ponad naturalny poziom pliku.
+**Chcesz głośniej/ciszej: `LOUDNESS_BOOST` w `src/ui/sound.ts`, jedna stała.**
 
 ---
 
@@ -454,6 +467,16 @@ waliduje go (`validateBeatmap`) i podmienia obiekty w silniku
 po ręcznej edycji `beatmap.json` w edytorze tekstu, gdy trzeba wczytać zmiany bez
 przeładowania strony.
 
+Ostatni przycisk paska, **„Test dzwieku"**, odtwarza klaps **tą samą instancją
+`HitSound` co trafienie w rękę** (`game.sound.play()` — nie druga pula obok), a po
+400 ms wypisuje w pasku statusu wynik `HitSound.describe()`. Powstał do diagnostyki
+braku dźwięku na iOS, gdzie `console.warn` jest nie do odczytania (Chrome i Brave na
+iPhonie to WKWebView bez devtoolsów). Działa niezależnie od checkboxa trybu dev.
+Interpretacja: `paused=false` i rosnące `t` przy ciszy oznaczają, że dźwięk płynie,
+ale nie dociera do głośnika (kategoria sesji audio / przełącznik Dzwonek-Cisza);
+`paused=true` z wypełnionym `blad=` oznacza odrzucone `play()` (brak odblokowania
+gestem); `odblokowane=0/4` po kliknięciu „Graj" oznacza, że `unlock()` nie zadziałał.
+
 Źródłem prawdy jest **beatmapa w pamięci**, nie plik na dysku — zapis jest efektem
 ubocznym. Reload przez Vite HMR jest zablokowany dla `beatmap.json`
 (`handleHotUpdate` zwraca `[]`), więc edycja nie zeruje stanu gry; przycisk „Reload
@@ -478,7 +501,7 @@ znane ograniczenia jak `FADE_OUT_MS` przy tempie ≠ 1) — w
 
 ## Testy
 
-`npm test` — **119 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **130 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -490,10 +513,10 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
 | `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
-| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
+| `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
 | `tests/dev-record.test.ts` | `node`, ADR-0016: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk). |
-| `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie. |
+| `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 
 Test smoke montuje **tę samą grę** co produkcja (`mountGame` z `src/game.ts`), tylko
 z podstawionym `TimeSource`.
@@ -544,11 +567,16 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 - **Obwódka GIF-a na krawędziach dłoni** — 1-bitowa przezroczystość `hand-idle.gif` /
   `hand-hit.gif` może dać widoczną krawędź na tle konkretnego wideo. Niezweryfikowane
   wizualnie.
-- **Podwojenie głośności klapsa przez `GainNode` (ADR-0013) jest niezweryfikowane
-  w prawdziwej przeglądarce.** `jsdom` nie implementuje Web Audio API, więc unit
-  testy pokrywają wyłącznie ścieżkę zapasową bez `GainNode` (proporcja do
-  `getReferenceVolume()`, bez podwojenia). Wymaga jednego ręcznego sprawdzenia
-  w `npm run dev`: zmień głośność playera YouTube i porównaj głośność klapsu.
+- **Wzmocnienie głośności klapsa przez `GainNode` (ADR-0013, ADR-0017) jest
+  niezweryfikowane w prawdziwej przeglądarce.** `jsdom` nie implementuje Web Audio
+  API, więc `AudioContext` w testach jest **podstawiony** — pokryte jest to, że
+  `play()` idzie buforem i jaką wartość dostaje `gain`, ale nie realny poziom
+  dźwięku. Wymaga ręcznego sprawdzenia w `npm run dev`: zmień głośność playera
+  YouTube i porównaj głośność klapsu.
+- **Dźwięk na iOS (ADR-0017) — potwierdzony ręcznie na iPhonie**, po starcie filmu,
+  guzikiem „Test dzwieku" w trybie dev. Automatycznie **niepokryty**: jsdom nie ma
+  Web Audio, więc testy sprawdzają logikę wyboru ścieżki i wartość `gain`, nie realne
+  wyjście dźwięku — regresja tutaj nie wywali `npm test`.
 - **Jednostki `cqw` i `container-type: inline-size` (ADR-0014) nie są pokryte
   testami** — `jsdom` nie liczy layoutu, więc niezmienniczość pozycji celu
   względem rozmiaru sceny wymaga jednego ręcznego sprawdzenia w `npm run dev`:
@@ -599,3 +627,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0014](docs/decisions/ADR-0014-sciezka-ruchu-i-niezmiennicza-geometria.md) | Ścieżka ruchu w beatmapie i niezmiennicza geometria |
 | [0015](docs/decisions/ADR-0015-usuniecie-okregu-i-pol-czasowych-obiektu.md) | Usunięcie approach circle i pól czasowych obiektu na rzecz `path` |
 | [0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md) | Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo |
+| [0017](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md) | Dźwięk trafienia przez Web Audio na zdekodowanym buforze (naprawa ciszy na iOS) |
