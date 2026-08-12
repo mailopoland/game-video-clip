@@ -143,6 +143,6 @@ export function formatPathPoint(point: PathPoint): string {
   const tFixed = point.t.toFixed(3);
   const xFixed = point.x.toFixed(1);
   const yFixed = point.y.toFixed(1);
-  const sizeFixed = point.size.toFixed(1);
-  return `t=${tFixed}s  x=${xFixed}  y=${yFixed}  size=${sizeFixed}`;
+  const sizeRounded = Math.round(point.size).toString();
+  return `t=${tFixed}s  x=${xFixed}  y=${yFixed}  size=${sizeRounded}`;
 }

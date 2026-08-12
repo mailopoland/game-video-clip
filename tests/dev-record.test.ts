@@ -366,17 +366,17 @@ describe('formatPathPoint', () => {
     expect(formatted).toMatch(/t=11\.500s/);
     expect(formatted).toMatch(/x=60\.0/);
     expect(formatted).toMatch(/y=41\.0/);
-    expect(formatted).toMatch(/size=100\.0/);
+    expect(formatted).toMatch(/size=100/);
   });
 
   it('dokladnie formatuje punkt', () => {
     const point: PathPoint = { t: 11.5, x: 60, y: 41, size: 100 };
-    expect(formatPathPoint(point)).toBe('t=11.500s  x=60.0  y=41.0  size=100.0');
+    expect(formatPathPoint(point)).toBe('t=11.500s  x=60.0  y=41.0  size=100');
   });
 
   it('dokladnie formatuje punkt z ulamkowymi skladowymi', () => {
     const point: PathPoint = { t: 5.123, x: 12.34, y: 56.789, size: 99.5 };
-    expect(formatPathPoint(point)).toBe('t=5.123s  x=12.3  y=56.8  size=99.5');
+    expect(formatPathPoint(point)).toBe('t=5.123s  x=12.3  y=56.8  size=100');
   });
 
   it('dokladnie formatuje punkt z czasem zaokraglonym do 3 miejsc po przecinku', () => {
