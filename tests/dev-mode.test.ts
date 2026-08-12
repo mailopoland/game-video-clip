@@ -66,6 +66,7 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     const play = vi.fn();
     const playHitSound = vi.fn();
     const describeHitSound = vi.fn().mockReturnValue('graf=nie blad=brak');
+    const onActiveChange = vi.fn();
 
     const dev = mountDevRecorder({
       ui: game.ui,
@@ -79,10 +80,23 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
       play,
       playHitSound,
       describeHitSound,
+      onActiveChange,
     });
 
     const checkbox = root.querySelector<HTMLInputElement>('#dev-toggle')!;
-    return { clock, game, dev, checkbox, setRate, fetchMock, pause, play, playHitSound, describeHitSound };
+    return {
+      clock,
+      game,
+      dev,
+      checkbox,
+      setRate,
+      fetchMock,
+      pause,
+      play,
+      playHitSound,
+      describeHitSound,
+      onActiveChange,
+    };
   }
 
   function activate(checkbox: HTMLInputElement): void {
@@ -273,5 +287,63 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     activate(checkbox);
     const after = fire(document.querySelector<HTMLElement>('#stage')!, 'contextmenu');
     expect(after.defaultPrevented).toBe(true);
+  });
+
+  it('onActiveChange jest wywolywane z true przy aktywacji i z false przy deaktywacji checkboxem', () => {
+    const { checkbox, onActiveChange } = setup();
+
+    activate(checkbox);
+    expect(onActiveChange).toHaveBeenLastCalledWith(true);
+
+    checkbox.checked = false;
+    checkbox.dispatchEvent(new Event('change'));
+    expect(onActiveChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('deactivate() odznacza checkbox, przerywa trwajace nagranie, chowa podglad i wywoluje onActiveChange(false)', () => {
+    const { game, dev, checkbox, onActiveChange } = setup([]);
+    activate(checkbox);
+    onActiveChange.mockClear();
+
+    fire(game.ui.stage, 'pointerdown', { button: 2, clientX: 40, clientY: 20 });
+    dev.onFrame();
+    expect(game.ui.overlay.querySelector('.obj.is-preview')).not.toBeNull();
+
+    dev.deactivate();
+
+    expect(checkbox.checked).toBe(false);
+    expect(game.ui.overlay.classList.contains('dev-active')).toBe(false);
+    expect(game.ui.overlay.querySelector('.obj.is-preview')).toBeNull();
+    expect(onActiveChange).toHaveBeenCalledTimes(1);
+    expect(onActiveChange).toHaveBeenLastCalledWith(false);
+
+    // pointerup po deaktywacji nie powinien nic dosypywac (nagranie juz przerwane).
+    fire(game.ui.stage, 'pointerup');
+    expect(game.ui.overlay.querySelector('.obj.is-preview')).toBeNull();
+  });
+
+  it('deactivate() jest idempotentne — powtorne wywolanie gdy tryb juz nieaktywny nie robi nic', () => {
+    const { dev, checkbox, onActiveChange } = setup();
+    activate(checkbox);
+    onActiveChange.mockClear();
+
+    dev.deactivate();
+    expect(onActiveChange).toHaveBeenCalledTimes(1);
+    expect(onActiveChange).toHaveBeenLastCalledWith(false);
+
+    dev.deactivate();
+    expect(onActiveChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('setDisabled(true) ustawia checkbox.disabled, setDisabled(false) je zdejmuje', () => {
+    const { dev, checkbox } = setup();
+
+    expect(checkbox.disabled).toBe(false);
+
+    dev.setDisabled(true);
+    expect(checkbox.disabled).toBe(true);
+
+    dev.setDisabled(false);
+    expect(checkbox.disabled).toBe(false);
   });
 });
