@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 115 testow, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 119 testow, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -262,8 +262,14 @@ Wariant `kind: 'image'` ma opcjonalne `hitSrc` — grafikę pokazywaną wyłącz
 stan wizualny, jakiego wymaga maszyna stanów celu, więc zamiast pełnej mapy
 `Record<Outcome, src>` jest jedno opcjonalne pole. `render.ts` podmienia `img.src` na
 `hitSrc`, gdy `visible.outcome === 'hit'` — idempotentnie, bo `render()` leci co klatkę
-przez cały `FADE_OUT_MS`. `hitSrc` jest wstępnie ładowany (`new Image().src = hitSrc`)
-przy montażu obiektu, żeby podmiana nie dała pustej klatki.
+przez cały `FADE_OUT_MS`.
+
+**Wszystkie warianty graficzne (`src` i `hitSrc`) są preładowane raz, przy montażu UI**
+— `preloadSprites()` z `src/sprites.ts`, wołane na początku `createUi()`, czyli jeszcze
+przed bramką startową i odtwarzaniem. Wcześniej preładowany był wyłącznie `hitSrc`, a
+`src` pobierał się dopiero przy pierwszym montażu obiektu: `hand-idle.gif` waży ~200 kB,
+a pierwszy cel żyje ~2 s, więc na pierwszym przebiegu widać było pusty (ale klikalny)
+obiekt, a dłoń pojawiała się dopiero po przewinięciu w tył — gdy plik był już w cache.
 
 Pliki leżą w `public/sprites/` (`hand-idle.gif`, `hand-hit.gif`) — animowane GIF-y,
 nie WebP: GIF ma 1-bitową przezroczystość (możliwa widoczna obwódka na krawędziach
@@ -440,9 +446,18 @@ odtwarzane — na pauzie samo `seekTo()` nie odświeża wyświetlanej klatki (zn
 IFrame API), więc `seekBy` dokleja krótkie `playVideo()`/`pauseVideo()`, żeby wymusić
 przemalowanie bez faktycznego wznowienia odtwarzania.
 
+Dalej w pasku są przyciski **„Stop"/„Play"** — wywołują wprost `player.pause()`/
+`player.play()`, niezależnie od stanu checkboxa. Ostatni przycisk, **„Reload
+beatmap.json"**, wczytuje plik z dysku (`fetch('/src/data/beatmap.json')`),
+waliduje go (`validateBeatmap`) i podmienia obiekty w silniku
+(`Engine.setObjects`) — **odrzucając niezapisane zmiany w pamięci**. Przydaje się
+po ręcznej edycji `beatmap.json` w edytorze tekstu, gdy trzeba wczytać zmiany bez
+przeładowania strony.
+
 Źródłem prawdy jest **beatmapa w pamięci**, nie plik na dysku — zapis jest efektem
 ubocznym. Reload przez Vite HMR jest zablokowany dla `beatmap.json`
-(`handleHotUpdate` zwraca `[]`), więc edycja nie zeruje stanu gry.
+(`handleHotUpdate` zwraca `[]`), więc edycja nie zeruje stanu gry; przycisk „Reload
+beatmap.json" to jedyny sposób na ręczne wczytanie pliku z dysku w trakcie sesji.
 
 Szczegóły projektowe (metryka RDP, format `id`, limity zapisu, brak `@types/node`,
 znane ograniczenia jak `FADE_OUT_MS` przy tempie ≠ 1) — w
@@ -463,7 +478,7 @@ znane ograniczenia jak `FADE_OUT_MS` przy tempie ≠ 1) — w
 
 ## Testy
 
-`npm test` — **115 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **119 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -473,7 +488,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce). |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |

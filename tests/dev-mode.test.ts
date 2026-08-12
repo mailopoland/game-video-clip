@@ -60,6 +60,8 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
     const setRate = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
     vi.stubGlobal('fetch', fetchMock);
+    const pause = vi.fn();
+    const play = vi.fn();
 
     const dev = mountDevRecorder({
       ui: game.ui,
@@ -69,10 +71,12 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
       setRate,
       getAvailableRates: () => [0.25, 0.5, 1],
       seekBy: () => {},
+      pause,
+      play,
     });
 
     const checkbox = root.querySelector<HTMLInputElement>('#dev-toggle')!;
-    return { clock, game, dev, checkbox, setRate, fetchMock };
+    return { clock, game, dev, checkbox, setRate, fetchMock, pause, play };
   }
 
   function activate(checkbox: HTMLInputElement): void {
@@ -192,6 +196,39 @@ describe('tryb deweloperski nagrywania sciezki (ADR-0016)', () => {
 
     expect(target.classList.contains('is-hit')).toBe(true);
     expect(game.engine.getStats().hits).toBe(1);
+  });
+
+  it('Stop/Play wywoluja pause/play playera', () => {
+    const { pause, play } = setup();
+
+    root.querySelector<HTMLButtonElement>('#dev-stop')!.click();
+    expect(pause).toHaveBeenCalledTimes(1);
+
+    root.querySelector<HTMLButtonElement>('#dev-play')!.click();
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it('Reload beatmap.json pobiera plik z dysku i podmienia obiekty w silniku', async () => {
+    const { clock, game, fetchMock } = setup([obj('o1', 10)]);
+
+    const freshBeatmap = makeBeatmap([obj('o2', 20)], 999);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve(freshBeatmap),
+    });
+
+    root.querySelector<HTMLButtonElement>('#dev-reload')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fetchMock).toHaveBeenLastCalledWith('/src/data/beatmap.json');
+
+    clock.seekTo(20);
+    game.frame();
+    expect(game.engine.getView().visible.map((v) => v.object.id)).toEqual(['o2']);
   });
 
   it('contextmenu jest preventDefault tylko przy aktywnym trybie dev', () => {

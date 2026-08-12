@@ -23,5 +23,21 @@ export const SPRITES: Record<string, Sprite> = {
 
 export const SPRITE_KEYS = Object.keys(SPRITES);
 
+/**
+ * Sciaga do cache przegladarki wszystkie warianty graficzne z rejestru.
+ * Wolane raz przy montazu UI, jeszcze przed startem odtwarzania — inaczej plik
+ * jest pobierany dopiero przy pierwszym montazu obiektu, a pierwszy cel zyje
+ * ~2 s: na pierwszym przebiegu widac pusty obiekt, a dlon pojawia sie dopiero
+ * po przewinieciu w tyl (gdy plik jest juz w cache).
+ */
+export function preloadSprites(): void {
+  if (typeof Image === 'undefined') return;
+  for (const sprite of Object.values(SPRITES)) {
+    if (sprite.kind !== 'image') continue;
+    new Image().src = sprite.src;
+    if (sprite.hitSrc) new Image().src = sprite.hitSrc;
+  }
+}
+
 /** Sciezka dzwieku trafienia (ADR-0011) — liczona tak samo od BASE_URL jak sprite'y. */
 export const HIT_SOUND_SRC = `${import.meta.env.BASE_URL}sounds/clap.mp3`;

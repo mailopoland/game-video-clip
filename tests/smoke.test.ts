@@ -226,6 +226,30 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(target.style.top).toBe('66%');
   });
 
+  it('preladowuje wszystkie warianty sprite ow juz przy montazu UI', () => {
+    // Pierwszy cel zyje ~1-2 s; gdyby GIF idle byl pobierany dopiero przy jego
+    // montazu, na pierwszym przebiegu widac pusty obiekt (dopiero po przewinieciu
+    // w tyl plik jest w cache). Preload musi objac oba warianty przed startem.
+    const requested: string[] = [];
+    class RecordingImage {
+      set src(value: string) {
+        requested.push(value);
+      }
+    }
+    vi.stubGlobal('Image', RecordingImage);
+
+    const clock = new FakeClock();
+    mountGame(root, makeBeatmap([obj('o1', 10, { sprite: 'hand' })], 20), clock, {
+      now: clock.now,
+    });
+
+    const hand = SPRITES.hand as { kind: 'image'; src: string; hitSrc?: string };
+    expect(requested).toContain(hand.src);
+    expect(requested).toContain(hand.hitSrc!);
+
+    vi.unstubAllGlobals();
+  });
+
   it('na koncu klipu pokazuje ekran wyniku z liczbami', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10), obj('o2', 12)], 15);

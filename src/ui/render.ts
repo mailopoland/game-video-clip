@@ -1,4 +1,4 @@
-import { SPRITES } from '../sprites.js';
+import { SPRITES, preloadSprites } from '../sprites.js';
 import type { GameView, VisibleObject } from '../engine/types.js';
 
 export interface Ui {
@@ -29,6 +29,11 @@ export function createUi(
   root: HTMLElement,
   handlers: { onStart: () => void; onHit: (objectId: string) => void },
 ): Ui {
+  // Assety ida do cache od razu przy montazu, a nie przy pierwszym montazu
+  // obiektu — pierwszy cel zyje ok. 2 s i inaczej zdazylby zniknac, zanim GIF
+  // sie pobierze (dlon widoczna dopiero po przewinieciu w tyl).
+  preloadSprites();
+
   // Scena i HUD siedza we wspolnej ramce, bo to ona idzie na pelny ekran —
   // element w top layer zasloniby wszystko, co zostaloby na zewnatrz (ADR-0010).
   root.innerHTML = `
@@ -91,10 +96,6 @@ export function createUi(
         : document.createElement('span');
     spriteElement.classList.add('sprite');
     if (sprite.kind === 'css') spriteElement.classList.add(sprite.className);
-    // Preload, zeby podmiana src przy trafieniu nie dala pustej klatki.
-    if (sprite.kind === 'image' && sprite.hitSrc && typeof Image !== 'undefined') {
-      new Image().src = sprite.hitSrc;
-    }
     element.append(spriteElement);
 
     const feedback = document.createElement('span');

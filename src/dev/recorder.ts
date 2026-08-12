@@ -24,6 +24,8 @@ export function mountDevRecorder(options: {
   setRate: (rate: number) => void;
   getAvailableRates: () => number[];
   seekBy: (deltaSec: number) => void;
+  pause: () => void;
+  play: () => void;
 }): DevRecorderHandle {
   const { ui, engine } = options;
   let currentBeatmap = options.beatmap;
@@ -44,6 +46,9 @@ export function mountDevRecorder(options: {
     </label>
     <button type="button" id="dev-seek-back">-100ms</button>
     <button type="button" id="dev-seek-fwd">+100ms</button>
+    <button type="button" id="dev-stop">Stop</button>
+    <button type="button" id="dev-play">Play</button>
+    <button type="button" id="dev-reload">Reload beatmap.json</button>
     <span class="dev-status" id="dev-status"></span>
   `;
   ui.frame.append(bar);
@@ -52,10 +57,16 @@ export function mountDevRecorder(options: {
   const status = bar.querySelector<HTMLElement>('#dev-status')!;
   const seekBackButton = bar.querySelector<HTMLButtonElement>('#dev-seek-back')!;
   const seekFwdButton = bar.querySelector<HTMLButtonElement>('#dev-seek-fwd')!;
+  const stopButton = bar.querySelector<HTMLButtonElement>('#dev-stop')!;
+  const playButton = bar.querySelector<HTMLButtonElement>('#dev-play')!;
+  const reloadButton = bar.querySelector<HTMLButtonElement>('#dev-reload')!;
 
   const SEEK_STEP_SEC = 0.1;
   seekBackButton.addEventListener('click', () => options.seekBy(-SEEK_STEP_SEC));
   seekFwdButton.addEventListener('click', () => options.seekBy(SEEK_STEP_SEC));
+  stopButton.addEventListener('click', () => options.pause());
+  playButton.addEventListener('click', () => options.play());
+  reloadButton.addEventListener('click', () => void reloadBeatmap());
 
   function setStatus(text: string): void {
     status.textContent = text;
@@ -96,6 +107,27 @@ export function mountDevRecorder(options: {
         // moze od razu przewinac wideo (rozstrzygniecie #1).
         console.error('Zapis beatmapy nie powiodl sie:', error);
         setStatus(`Blad zapisu: ${(error as Error).message}`);
+      });
+  }
+
+  /** Wczytuje beatmap.json z dysku (nadpisujac niezapisane zmiany w pamieci)
+      i podmienia obiekty w silniku — przydatne po recznej edycji pliku. */
+  function reloadBeatmap(): void {
+    setStatus('Wczytywanie…');
+    fetch('/src/data/beatmap.json')
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((json: unknown) => {
+        const reloaded = validateBeatmap(json as Beatmap, SPRITE_KEYS);
+        currentBeatmap = reloaded;
+        engine.setObjects(currentBeatmap.objects);
+        setStatus('Wczytano.');
+      })
+      .catch((error: unknown) => {
+        console.error('Wczytanie beatmapy nie powiodlo sie:', error);
+        setStatus(`Blad wczytania: ${(error as Error).message}`);
       });
   }
 
