@@ -6,6 +6,12 @@ import {
   pushSample,
   removeObject,
   toOverlayPercent,
+  clamp0To100,
+  MIN_SIZE,
+  updatePathPoint,
+  computeDragResize,
+  distancePercent,
+  formatPathPoint,
 } from '../src/dev/record.js';
 import { Engine } from '../src/engine/engine.js';
 import { validateBeatmap } from '../src/engine/beatmap.js';
@@ -163,5 +169,219 @@ describe('Engine.setObjects', () => {
     engine.setObjects([]);
     expect(engine.getStats()).toEqual({ score: 0, hits: 0, misses: 0, accuracy: 0 });
     expect(engine.getOutcome('o1')).toBeUndefined();
+  });
+});
+
+describe('clamp0To100', () => {
+  it('zwraca wartosc w przedziale 0-100 bez zmian', () => {
+    expect(clamp0To100(0)).toBe(0);
+    expect(clamp0To100(50)).toBe(50);
+    expect(clamp0To100(100)).toBe(100);
+  });
+
+  it('clampuje wartosci ujemne do 0', () => {
+    expect(clamp0To100(-10)).toBe(0);
+    expect(clamp0To100(-0.5)).toBe(0);
+  });
+
+  it('clampuje wartosci wieksze niz 100 do 100', () => {
+    expect(clamp0To100(150)).toBe(100);
+    expect(clamp0To100(1000)).toBe(100);
+  });
+});
+
+describe('MIN_SIZE', () => {
+  it('jest wiekszy od zera', () => {
+    expect(MIN_SIZE).toBeGreaterThan(0);
+  });
+
+  it('wynosi 1', () => {
+    expect(MIN_SIZE).toBe(1);
+  });
+});
+
+describe('updatePathPoint', () => {
+  it('modyfikuje tylko wskazany punkt obiektu', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [
+          { t: 10, x: 20, y: 30, size: 100 },
+          { t: 11, x: 40, y: 50, size: 100 },
+        ],
+      },
+    ]);
+
+    const updated = updatePathPoint(beatmap, 'o1', 0, { x: 60 });
+    expect(updated.objects[0].path[0]).toEqual({ t: 10, x: 60, y: 30, size: 100 });
+    expect(updated.objects[0].path[1]).toEqual({ t: 11, x: 40, y: 50, size: 100 });
+  });
+
+  it('clampuje x i y do 0-100', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [{ t: 10, x: 50, y: 50, size: 100 }, { t: 11, x: 50, y: 50, size: 100 }],
+      },
+    ]);
+
+    const updated = updatePathPoint(beatmap, 'o1', 0, { x: 150, y: -20 });
+    expect(updated.objects[0].path[0]).toEqual({ t: 10, x: 100, y: 0, size: 100 });
+  });
+
+  it('clampuje size do >= MIN_SIZE', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [{ t: 10, x: 50, y: 50, size: 100 }, { t: 11, x: 50, y: 50, size: 100 }],
+      },
+    ]);
+
+    const updated = updatePathPoint(beatmap, 'o1', 0, { size: 0.5 });
+    expect(updated.objects[0].path[0].size).toBe(MIN_SIZE);
+  });
+
+  it('zwraca niezmieniona beatmape dla nieznanego objectId', () => {
+    const beatmap = makeBeatmap([obj('o1', 10)]);
+    const updated = updatePathPoint(beatmap, 'unknown', 0, { x: 60 });
+    expect(updated).toBe(beatmap);
+  });
+
+  it('zwraca niezmieniona beatmape dla pointIndex poza zakresem', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [
+          { t: 10, x: 20, y: 30, size: 100 },
+          { t: 11, x: 40, y: 50, size: 100 },
+        ],
+      },
+    ]);
+
+    const updated1 = updatePathPoint(beatmap, 'o1', -1, { x: 60 });
+    expect(updated1).toBe(beatmap);
+
+    const updated2 = updatePathPoint(beatmap, 'o1', 2, { x: 60 });
+    expect(updated2).toBe(beatmap);
+  });
+
+  it('zwraca niezmieniona beatmape gdy brak zmian', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [{ t: 10, x: 50, y: 50, size: 100 }, { t: 11, x: 50, y: 50, size: 100 }],
+      },
+    ]);
+
+    const updated = updatePathPoint(beatmap, 'o1', 0, {});
+    expect(updated).toBe(beatmap);
+  });
+
+  it('nie mutuje oryginalnej beatmapy', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [
+          { t: 10, x: 20, y: 30, size: 100 },
+          { t: 11, x: 40, y: 50, size: 100 },
+        ],
+      },
+    ]);
+
+    const originalPath = beatmap.objects[0].path[0];
+    updatePathPoint(beatmap, 'o1', 0, { x: 60 });
+    expect(beatmap.objects[0].path[0]).toEqual(originalPath);
+  });
+});
+
+describe('computeDragResize', () => {
+  it('podwojenie dystansu podwaja rozmiar', () => {
+    const result = computeDragResize(100, 50, 100);
+    expect(result).toBeCloseTo(200, 5);
+  });
+
+  it('polowienie dystansu polawia rozmiar', () => {
+    const result = computeDragResize(100, 50, 25);
+    expect(result).toBeCloseTo(50, 5);
+  });
+
+  it('zwraca initialSize gdy initialDistance <= 0', () => {
+    expect(computeDragResize(100, 0, 50)).toBe(100);
+    expect(computeDragResize(100, -10, 50)).toBe(100);
+  });
+
+  it('wynik nigdy nie jest mniejszy niz MIN_SIZE', () => {
+    const result = computeDragResize(50, 100, 1);
+    expect(result).toBeGreaterThanOrEqual(MIN_SIZE);
+  });
+
+  it('przeciagniecie blisze do centrum (zmniejszenie dystansu) zmniejsza rozmiar', () => {
+    const result = computeDragResize(100, 100, 50);
+    expect(result).toBeCloseTo(50, 5);
+  });
+});
+
+describe('distancePercent', () => {
+  it('trojkat 3-4-5 daje dystans 5', () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 3, y: 4 };
+    expect(distancePercent(a, b)).toBeCloseTo(5, 5);
+  });
+
+  it('identyczne punkty daja dystans 0', () => {
+    const a = { x: 50, y: 50 };
+    const b = { x: 50, y: 50 };
+    expect(distancePercent(a, b)).toBe(0);
+  });
+
+  it('pionowy dystans jest liczony poprawnie', () => {
+    const a = { x: 50, y: 0 };
+    const b = { x: 50, y: 100 };
+    expect(distancePercent(a, b)).toBeCloseTo(100, 5);
+  });
+
+  it('poziomy dystans jest liczony poprawnie', () => {
+    const a = { x: 0, y: 50 };
+    const b = { x: 100, y: 50 };
+    expect(distancePercent(a, b)).toBeCloseTo(100, 5);
+  });
+
+  it('dystans od srodka (50, 50) do rogu (0, 0) wynosi okolo 70.7', () => {
+    const a = { x: 50, y: 50 };
+    const b = { x: 0, y: 0 };
+    expect(distancePercent(a, b)).toBeCloseTo(Math.sqrt(5000), 1);
+  });
+});
+
+describe('formatPathPoint', () => {
+  it('formatuje punkt sciezki na czytelny string', () => {
+    const point: PathPoint = { t: 11.5, x: 60, y: 41, size: 100 };
+    const formatted = formatPathPoint(point);
+    expect(formatted).toMatch(/t=11\.500s/);
+    expect(formatted).toMatch(/x=60\.0/);
+    expect(formatted).toMatch(/y=41\.0/);
+    expect(formatted).toMatch(/size=100\.0/);
+  });
+
+  it('dokladnie formatuje punkt', () => {
+    const point: PathPoint = { t: 11.5, x: 60, y: 41, size: 100 };
+    expect(formatPathPoint(point)).toBe('t=11.500s  x=60.0  y=41.0  size=100.0');
+  });
+
+  it('dokladnie formatuje punkt z ulamkowymi skladowymi', () => {
+    const point: PathPoint = { t: 5.123, x: 12.34, y: 56.789, size: 99.5 };
+    expect(formatPathPoint(point)).toBe('t=5.123s  x=12.3  y=56.8  size=99.5');
+  });
+
+  it('dokladnie formatuje punkt z czasem zaokraglonym do 3 miejsc po przecinku', () => {
+    const point: PathPoint = { t: 7.1234, x: 25, y: 75, size: 50 };
+    const formatted = formatPathPoint(point);
+    expect(formatted).toContain('t=7.123s');
   });
 });

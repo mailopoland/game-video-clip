@@ -5,7 +5,7 @@ import type { Beatmap, BeatmapObject, PathPoint } from '../engine/types.js';
     drugi punkt (rozstrzygniecie #4 w planie ADR-0016). */
 export const MIN_PATH_SEC = 0.25;
 
-function clamp0To100(value: number): number {
+export function clamp0To100(value: number): number {
   return Math.min(100, Math.max(0, value));
 }
 
@@ -70,4 +70,79 @@ export function insertObject(beatmap: Beatmap, object: BeatmapObject): Beatmap {
 /** Kopia beatmapy bez obiektu o danym `id`. */
 export function removeObject(beatmap: Beatmap, id: string): Beatmap {
   return { ...beatmap, objects: beatmap.objects.filter((o) => o.id !== id) };
+}
+
+export const MIN_SIZE = 1;
+
+/**
+ * Copy of the beatmap with the specified object's path point updated.
+ * x/y clamped to 0-100, size clamped to >= MIN_SIZE. Unknown objectId or
+ * pointIndex out of range -> returns beatmap unchanged.
+ */
+export function updatePathPoint(
+  beatmap: Beatmap,
+  objectId: string,
+  pointIndex: number,
+  patch: Partial<Pick<PathPoint, 'x' | 'y' | 'size'>>,
+): Beatmap {
+  const objectIndex = beatmap.objects.findIndex((o) => o.id === objectId);
+  if (objectIndex === -1) return beatmap;
+
+  const object = beatmap.objects[objectIndex];
+  if (pointIndex < 0 || pointIndex >= object.path.length) return beatmap;
+
+  const point = object.path[pointIndex];
+  const updated: PathPoint = {
+    ...point,
+    x: patch.x !== undefined ? clamp0To100(patch.x) : point.x,
+    y: patch.y !== undefined ? clamp0To100(patch.y) : point.y,
+    size: patch.size !== undefined ? Math.max(MIN_SIZE, patch.size) : point.size,
+  };
+
+  if (updated.t === point.t && updated.x === point.x && updated.y === point.y && updated.size === point.size) {
+    return beatmap;
+  }
+
+  const newObjects = [...beatmap.objects];
+  newObjects[objectIndex] = {
+    ...object,
+    path: [...object.path],
+  };
+  newObjects[objectIndex].path[pointIndex] = updated;
+
+  return { ...beatmap, objects: newObjects };
+}
+
+/**
+ * New size proportional to the change in cursor distance from the object's
+ * center relative to the distance at drag start. initialDistance <= 0
+ * (click exactly on center) -> returns initialSize unchanged.
+ */
+export function computeDragResize(
+  initialSize: number,
+  initialDistance: number,
+  currentDistance: number,
+): number {
+  if (initialDistance <= 0) return initialSize;
+  const ratio = currentDistance / initialDistance;
+  return Math.max(MIN_SIZE, initialSize * ratio);
+}
+
+/** Euclidean distance between two points in game-layer percent units. */
+export function distancePercent(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** Human-readable rendering of a path point for the panel list. */
+export function formatPathPoint(point: PathPoint): string {
+  const tFixed = point.t.toFixed(3);
+  const xFixed = point.x.toFixed(1);
+  const yFixed = point.y.toFixed(1);
+  const sizeFixed = point.size.toFixed(1);
+  return `t=${tFixed}s  x=${xFixed}  y=${yFixed}  size=${sizeFixed}`;
 }
