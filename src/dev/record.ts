@@ -74,6 +74,46 @@ export function removeObject(beatmap: Beatmap, id: string): Beatmap {
 
 export const MIN_SIZE = 1;
 
+/** Najmniejsza dopuszczalna liczba punktow sciezki (spawn + despawn). */
+export const MIN_PATH_POINTS = 2;
+
+/**
+ * Copy of the beatmap with a new path point inserted into the given object's
+ * path, sorted by `t`. Caller is responsible for validating the result
+ * (e.g. strictly increasing `t`, `x`/`y`/`size` ranges) via `validateBeatmap`.
+ * Unknown `objectId` -> returns beatmap unchanged.
+ */
+export function insertPathPoint(beatmap: Beatmap, objectId: string, point: PathPoint): Beatmap {
+  const objectIndex = beatmap.objects.findIndex((o) => o.id === objectId);
+  if (objectIndex === -1) return beatmap;
+
+  const object = beatmap.objects[objectIndex];
+  const path = [...object.path, point].sort((a, b) => a.t - b.t);
+
+  const newObjects = [...beatmap.objects];
+  newObjects[objectIndex] = { ...object, path };
+  return { ...beatmap, objects: newObjects };
+}
+
+/**
+ * Copy of the beatmap with the given path point removed. Refuses to drop
+ * below `MIN_PATH_POINTS` (a path always needs a spawn and a despawn point).
+ * Unknown `objectId` or `pointIndex` out of range -> returns beatmap unchanged.
+ */
+export function removePathPoint(beatmap: Beatmap, objectId: string, pointIndex: number): Beatmap {
+  const objectIndex = beatmap.objects.findIndex((o) => o.id === objectId);
+  if (objectIndex === -1) return beatmap;
+
+  const object = beatmap.objects[objectIndex];
+  if (pointIndex < 0 || pointIndex >= object.path.length) return beatmap;
+  if (object.path.length <= MIN_PATH_POINTS) return beatmap;
+
+  const path = object.path.filter((_, index) => index !== pointIndex);
+  const newObjects = [...beatmap.objects];
+  newObjects[objectIndex] = { ...object, path };
+  return { ...beatmap, objects: newObjects };
+}
+
 /**
  * Copy of the beatmap with the specified object's path point updated.
  * x/y clamped to 0-100, size clamped to >= MIN_SIZE. Unknown objectId or

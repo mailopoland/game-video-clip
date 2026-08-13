@@ -1,10 +1,23 @@
 import { validateBeatmap } from '../engine/beatmap.js';
 import { SPRITE_KEYS } from '../sprites.js';
-import { computeDragResize, distancePercent, formatClock, toOverlayPercent, updatePathPoint } from './record.js';
+import {
+  computeDragResize,
+  distancePercent,
+  formatClock,
+  insertPathPoint,
+  MIN_PATH_POINTS,
+  removePathPoint,
+  toOverlayPercent,
+  updatePathPoint,
+} from './record.js';
 import type { BeatmapStore } from './beatmap-store.js';
 import type { Engine } from '../engine/engine.js';
 import type { Ui } from '../ui/render.js';
-import type { Beatmap } from '../engine/types.js';
+import type { Beatmap, PathPoint } from '../engine/types.js';
+
+const POINT_FIELDS = ['t', 'size', 'x', 'y'] as const;
+type PointField = (typeof POINT_FIELDS)[number];
+const FIELD_LABELS: Record<PointField, string> = { t: 't', size: 's', x: 'x', y: 'y' };
 
 export interface DevHandEditorHandle {
   /** Wolane z petli rAF, po `game.frame()`. */
@@ -42,6 +55,8 @@ export function mountDevHandEditor(options: {
   let capturedPointerId: number | null = null;
   let dirty = false;
   let persistInFlight = false;
+  let draftGapIndex: number | null = null;
+  let draftValues: Partial<Record<PointField, number>> = {};
 
   const bar = document.createElement('div');
   bar.className = 'dev-bar';
@@ -91,49 +106,132 @@ export function mountDevHandEditor(options: {
     return currentBeatmap().objects.find((o) => o.id === selectedObjectId) ?? null;
   }
 
+  function fieldStep(field: PointField): string {
+    return field === 't' ? '0.001' : field === 'size' ? '1' : '0.1';
+  }
+
+  function renderPointRow(point: PathPoint, index: number, pointCount: number): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'dev-edit-point';
+    li.dataset.index = String(index);
+    if (index === selectedPointIndex) li.classList.add('is-selected');
+
+    const seekButton = document.createElement('button');
+    seekButton.type = 'button';
+    seekButton.className = 'dev-edit-point-seek';
+    seekButton.textContent = `#${index}`;
+    seekButton.addEventListener('click', () => selectPoint(index));
+    li.append(seekButton);
+
+    POINT_FIELDS.forEach((field) => {
+      const label = document.createElement('label');
+      label.className = 'dev-edit-point-label';
+      label.append(`${FIELD_LABELS[field]}:`);
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = `dev-edit-point-field dev-edit-point-${field}`;
+      input.step = fieldStep(field);
+      input.value = String(point[field]);
+      input.addEventListener('change', () => {
+        const value = input.valueAsNumber;
+        if (Number.isNaN(value)) {
+          input.value = String(selectedObject()?.path[index]?.[field] ?? point[field]);
+          return;
+        }
+        applyPointPatchAt(index, { [field]: value });
+      });
+      label.append(input);
+      li.append(label);
+    });
+
+    const deleteButton = document.createElement('button');
+    deleteButton.type = 'button';
+    deleteButton.className = 'dev-edit-point-delete';
+    deleteButton.textContent = '−';
+    deleteButton.disabled = pointCount <= MIN_PATH_POINTS;
+    deleteButton.title =
+      pointCount <= MIN_PATH_POINTS ? 'Sciezka musi miec co najmniej 2 punkty' : 'Usun punkt';
+    deleteButton.addEventListener('click', () => deletePoint(index));
+    li.append(deleteButton);
+
+    return li;
+  }
+
+  function renderGap(gapIndex: number): HTMLElement {
+    const li = document.createElement('li');
+    li.className = 'dev-edit-gap';
+
+    if (draftGapIndex === gapIndex) {
+      POINT_FIELDS.forEach((field) => {
+        const label = document.createElement('label');
+        label.className = 'dev-edit-point-label';
+        label.append(`${FIELD_LABELS[field]}:`);
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = `dev-edit-point-field dev-edit-point-${field}`;
+        input.step = fieldStep(field);
+        if (draftValues[field] !== undefined) input.value = String(draftValues[field]);
+        input.addEventListener('change', () => {
+          const value = input.valueAsNumber;
+          if (Number.isNaN(value)) {
+            delete draftValues[field];
+            return;
+          }
+          draftValues[field] = value;
+          tryCommitDraft();
+        });
+        label.append(input);
+        li.append(label);
+      });
+
+      const cancelButton = document.createElement('button');
+      cancelButton.type = 'button';
+      cancelButton.className = 'dev-edit-gap-cancel';
+      cancelButton.textContent = '×';
+      cancelButton.title = 'Anuluj nowy punkt';
+      cancelButton.addEventListener('click', () => {
+        draftGapIndex = null;
+        draftValues = {};
+        rebuildPanel();
+      });
+      li.append(cancelButton);
+    } else {
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.className = 'dev-edit-gap-add';
+      addButton.textContent = '+';
+      addButton.title = 'Dodaj punkt';
+      addButton.addEventListener('click', () => {
+        draftGapIndex = gapIndex;
+        draftValues = {};
+        rebuildPanel();
+      });
+      li.append(addButton);
+    }
+
+    return li;
+  }
+
   function rebuildPanel(): void {
     const object = selectedObject();
     if (!active || !object) {
       panel.hidden = true;
       panelPoints.innerHTML = '';
       panelObjectLabel.textContent = '';
+      draftGapIndex = null;
+      draftValues = {};
       return;
     }
 
     panel.hidden = false;
     panelObjectLabel.textContent = object.id;
     panelPoints.innerHTML = '';
+    panelPoints.append(renderGap(0));
     object.path.forEach((point, index) => {
-      const li = document.createElement('li');
-      li.className = 'dev-edit-point';
-      li.dataset.index = String(index);
-      if (index === selectedPointIndex) li.classList.add('is-selected');
-
-      const seekButton = document.createElement('button');
-      seekButton.type = 'button';
-      seekButton.className = 'dev-edit-point-seek';
-      seekButton.textContent = `#${index}`;
-      seekButton.addEventListener('click', () => selectPoint(index));
-      li.append(seekButton);
-
-      (['t', 'x', 'y', 'size'] as const).forEach((field) => {
-        const input = document.createElement('input');
-        input.type = 'number';
-        input.className = `dev-edit-point-field dev-edit-point-${field}`;
-        input.step = field === 't' ? '0.001' : field === 'size' ? '1' : '0.1';
-        input.value = String(point[field]);
-        input.addEventListener('change', () => {
-          const value = input.valueAsNumber;
-          if (Number.isNaN(value)) {
-            input.value = String(selectedObject()?.path[index]?.[field] ?? point[field]);
-            return;
-          }
-          applyPointPatchAt(index, { [field]: value });
-        });
-        li.append(input);
-      });
-
-      panelPoints.append(li);
+      panelPoints.append(renderPointRow(point, index, object.path.length));
+      panelPoints.append(renderGap(index + 1));
     });
   }
 
@@ -141,12 +239,49 @@ export function mountDevHandEditor(options: {
     const object = selectedObject();
     const point = object?.path[index];
     if (!point) return;
-    const li = panelPoints.querySelector<HTMLElement>(`[data-index="${index}"]`);
+    const li = panelPoints.querySelector<HTMLElement>(`.dev-edit-point[data-index="${index}"]`);
     if (!li) return;
-    (['t', 'x', 'y', 'size'] as const).forEach((field) => {
+    POINT_FIELDS.forEach((field) => {
       const input = li.querySelector<HTMLInputElement>(`.dev-edit-point-${field}`);
       if (input && document.activeElement !== input) input.value = String(point[field]);
     });
+  }
+
+  function tryCommitDraft(): void {
+    if (!selectedObjectId) return;
+    const { t, x, y, size } = draftValues;
+    if (t === undefined || x === undefined || y === undefined || size === undefined) return;
+
+    const beatmap = currentBeatmap();
+    const updated = insertPathPoint(beatmap, selectedObjectId, { t, x, y, size });
+
+    try {
+      validateBeatmap(updated, SPRITE_KEYS);
+    } catch (error) {
+      setStatus(`Blad: ${(error as Error).message}`);
+      return;
+    }
+
+    store.set(updated);
+    engine.setObjects(updated.objects);
+    dirty = true;
+    draftGapIndex = null;
+    draftValues = {};
+    selectedPointIndex = null;
+    rebuildPanel();
+  }
+
+  function deletePoint(index: number): void {
+    if (!selectedObjectId) return;
+    const beatmap = currentBeatmap();
+    const updated = removePathPoint(beatmap, selectedObjectId, index);
+    if (updated === beatmap) return;
+
+    store.set(updated);
+    engine.setObjects(updated.objects);
+    dirty = true;
+    if (selectedPointIndex !== null && index <= selectedPointIndex) selectedPointIndex = null;
+    rebuildPanel();
   }
 
   function clearRing(): void {

@@ -336,7 +336,7 @@ html.has-pseudo-fullscreen body {
   width: 100%;
 }
 .dev-edit-panel {
-  width: 14rem;
+  width: 17rem;
   max-height: calc(var(--stage-width) * 9 / 16);
   overflow-y: auto;
   font-size: 0.75rem;
@@ -348,13 +348,17 @@ html.has-pseudo-fullscreen body {
 .dev-edit-panel-points { list-style: none; margin: 0; padding: 0; }
 .dev-edit-point {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
   padding: 0.3rem 0.4rem;
   border-radius: 0.25rem;
 }
 .dev-edit-point.is-selected { outline: 1px solid #6ef58f; }
-.dev-edit-point-seek {
+.dev-edit-point-seek,
+.dev-edit-point-delete,
+.dev-edit-gap-add,
+.dev-edit-gap-cancel {
   flex: none;
   font: inherit;
   color: inherit;
@@ -364,14 +368,31 @@ html.has-pseudo-fullscreen body {
   padding: 0.15rem 0.3rem;
   cursor: pointer;
 }
+.dev-edit-point-delete:disabled { opacity: 0.35; cursor: not-allowed; }
+.dev-edit-point-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: none;
+}
 .dev-edit-point-field {
-  width: 3.4rem;
+  width: 3rem;
   font: inherit;
   color: inherit;
   background: rgb(255 255 255 / 0.08);
   border: 1px solid rgb(255 255 255 / 0.2);
   border-radius: 0.25rem;
   padding: 0.1rem 0.25rem;
+}
+.dev-edit-gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.4rem;
+}
+.dev-edit-gap-add {
+  margin: 0 auto;
 }
 
 .dev-time-display {

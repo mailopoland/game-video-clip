@@ -530,8 +530,11 @@ się `.dev-time-display` z aktualnym czasem wideo w formacie `M:ss.mm` (minuty:s
 setne części sekundy — np. `1:23.45`), aktualizowany co klatkę (`formatClock` w
 `src/dev/record.ts`); widoczny wyłącznie, gdy ten tryb jest aktywny. Kliknij lewym
 przyciskiem myszy w obiekt na scenie — po prawej stronie sceny pojawia się panel z
-listą punktów jego ścieżki, każdy wiersz z polami liczbowymi `t`/`x`/`y`/`size` do
-edycji **przez wpisanie wartości** i osobnym przyciskiem `#<indeks>` do wyboru punktu.
+listą punktów jego ścieżki.
+
+Każdy wiersz punktu pokazuje cztery **osobno podpisane** pola liczbowe w stałej
+kolejności `t:`, `s:` (size), `x:`, `y:`, edytowalne przez wpisanie wartości, przycisk
+`#<indeks>` do wyboru punktu (do drag-a na scenie) i przycisk `−` do jego usunięcia.
 Wpisanie wartości i opuszczenie pola (`change`) zapisuje ją natychmiast — tym samym
 mechanizmem koalescencji zapisu, co drag na scenie (patrz niżej). Zmiana `t` musi
 zachować ściśle rosnącą kolejność punktów w ścieżce (`validateBeatmap`); w przeciwnym
@@ -542,9 +545,24 @@ edycji drag-iem**, klik w rękę na scenie nigdy sam z siebie nie zmienia wybran
 punktu. Gdy punkt jest wybrany, kolejne przeciągnięcie ręki po scenie przesuwa
 **wyłącznie ten punkt** (`x`/`y`); przeciąganie zielonego uchwytu w rogu pierścienia
 zaznaczenia zmienia jego `size` proporcjonalnie do zmiany odległości kursora od
-środka obiektu. Bez wybranego punktu przeciąganie ręki nic nie robi. Wszystkie
-interakcje wymagają zamrożonego silnika (pauzy) — w trakcie odtwarzania tryb nie
-reaguje na klik/drag/edycję pól.
+środka obiektu. Bez wybranego punktu przeciąganie ręki nic nie robi.
+
+Między wierszami punktów (i przed pierwszym/za ostatnim) panel pokazuje przycisk
+`+` do dodania nowego punktu. Kliknięcie otwiera w tym miejscu pusty wiersz z tymi
+samymi czterema polami (`t`/`s`/`x`/`y`), bez wartości początkowych, i przyciskiem
+`×` do anulowania. Punkt trafia do beatmapy i od razu się zapisuje dopiero, gdy
+**wszystkie cztery pola są wypełnione** — wstawiany jest wtedy w pozycję wyznaczoną
+przez jego `t` (sortowanie, nie miejsce kliknięcia `+`) i przechodzi przez
+`validateBeatmap` jak każda inna zmiana; kolizja `t` z istniejącym punktem jest
+odrzucana z komunikatem błędu, a wiersz roboczy zostaje otwarty do poprawki.
+Przycisk `−` przy każdym punkcie usuwa go natychmiast (bez potwierdzenia) i zapisuje
+zmianę tym samym mechanizmem — jest jednak **zablokowany, gdy ścieżka ma tylko 2
+punkty**, bo `path` zawsze wymaga co najmniej spawn + despawn (`MIN_PATH_POINTS` w
+`src/dev/record.ts`).
+
+Wszystkie interakcje (drag, edycja pól, dodawanie/usuwanie punktów) wymagają
+zamrożonego silnika (pauzy) — w trakcie odtwarzania tryb nie reaguje na klik/drag/
+edycję.
 
 Każda zmiana trafia **natychmiast i bez throttlingu** do silnika
 (`Engine.setObjects`) — podgląd na scenie jest błyskawiczny. Zapis na dysk jest
@@ -567,8 +585,8 @@ wyłączności, koalescencja zapisu) — w
 
 | Plik | Rola |
 |---|---|
-| `src/dev/hand-editor.ts` | `mountDevHandEditor` — wybór obiektu/punktu, drag przesunięcia i drag rozmiaru, edycja pól `t`/`x`/`y`/`size` w panelu, wyświetlacz czasu wideo, koalescencja zapisu (`dirty`/`persistInFlight`). |
-| `src/dev/record.ts` | Współdzielone z trybem nagrywania: `updatePathPoint` (kopia beatmapy ze zmienionym punktem — `t` bez clampu, walidowane wyżej przez `validateBeatmap`; `x`/`y` clamp 0–100, `size` ≥ `MIN_SIZE`), `computeDragResize` (nowy `size` proporcjonalny do zmiany odległości kursora od środka), `distancePercent`, `formatClock` (czas wideo jako `M:ss.mm`, używany też przez `.dev-time-display`). |
+| `src/dev/hand-editor.ts` | `mountDevHandEditor` — wybór obiektu/punktu, drag przesunięcia i drag rozmiaru, edycja pól `t`/`s`/`x`/`y` w panelu, dodawanie punktu przez `+` między wierszami (wstawia dopiero po wypełnieniu wszystkich pól), usuwanie punktu przez `−` (zablokowane przy 2 punktach), wyświetlacz czasu wideo, koalescencja zapisu (`dirty`/`persistInFlight`). |
+| `src/dev/record.ts` | Współdzielone z trybem nagrywania: `updatePathPoint` (kopia beatmapy ze zmienionym punktem — `t` bez clampu, walidowane wyżej przez `validateBeatmap`; `x`/`y` clamp 0–100, `size` ≥ `MIN_SIZE`), `insertPathPoint` (kopia z nowym punktem dopisanym i posortowanym po `t`, walidacja po stronie wołającego), `removePathPoint` (kopia bez wskazanego punktu; no-op poniżej `MIN_PATH_POINTS`), `computeDragResize` (nowy `size` proporcjonalny do zmiany odległości kursora od środka), `distancePercent`, `formatClock` (czas wideo jako `M:ss.mm`, używany też przez `.dev-time-display`). |
 | `src/dev/beatmap-store.ts` | `BeatmapStore` (`get`/`set`) — jedna beatmapa w pamięci współdzielona przez oba tryby dev (ADR-0018), żeby przełączenie trybu w trakcie edycji nie gubiło niezapisanych zmian z drugiego. |
 
 Panel (`.dev-edit-panel`, obok `.frame` w nowym kontenerze `.dev-edit-layout`
@@ -600,7 +618,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
 | `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
-| `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
+| `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, `+` między punktami otwiera puste pola i dopisuje nowy punkt (posortowany po `t`) dopiero po wypełnieniu wszystkich czterech, nowy punkt z `t` kolidującym z istniejącym jest odrzucany bez zmiany beatmapy, `−` jest zablokowany przy dokładnie 2 punktach i usuwa punkt natychmiast przy większej liczbie, brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
 | `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
 | `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
 

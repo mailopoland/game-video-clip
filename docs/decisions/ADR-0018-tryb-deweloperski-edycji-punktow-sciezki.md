@@ -122,12 +122,44 @@ widok/devtools.
 `formatPathPoint` (tylko-do-odczytu format punktu) zostal usuniety jako martwy kod
 po przejsciu panelu na pola edytowalne — nie mial juz zadnego wywolania w `src/`.
 
+### Dopisek: dodawanie i usuwanie punktow z panelu (2026-08-13)
+
+Do tej pory panel pozwalal tylko edytowac punkty juz istniejace w `path` — dodanie
+nowego wymagalo powtornego nagrania calej sciezki (tryb rekordera), a usuniecie
+pojedynczego punktu nie bylo mozliwe w ogole. Kazdy wiersz punktu w panelu dostal
+etykietowane pola w stalej kolejnosci `t:`/`s:`/`x:`/`y:` (zamiast jednego bloku
+pol bez opisu) oraz przycisk `−` do natychmiastowego usuniecia punktu. Miedzy
+wierszami (i przed pierwszym/za ostatnim) panel pokazuje przycisk `+`.
+
+**Dodawanie:** klikniecie `+` nie tworzy od razu nowego punktu w beatmapie — otwiera
+w tym miejscu pusty wiersz roboczy (`draftGapIndex`/`draftValues` w
+`hand-editor.ts`) bez wartosci poczatkowych. Punkt trafia do `path` (przez nowa
+`insertPathPoint` w `record.ts`, ktora dopisuje punkt i sortuje po `t`) i zapisuje
+sie dopiero, gdy wszystkie cztery pola sa wypelnione — proba z niepelnymi danymi
+nie ma sensownej wartosci do zwalidowania. Pozycja `+`, ktory user kliknal, jest
+tylko UX-owa podpowiedzia miejsca w liscie — o rzeczywistej pozycji w `path`
+decyduje wylacznie wpisany `t` (sortowanie), bo `path` jest z definicji uporzadkowany
+czasowo i nie ma innego sensownego zachowania. Walidacja (np. kolizja `t` z
+istniejacym punktem) dziala tym samym mechanizmem `validateBeatmap` w try/catch co
+edycja istniejacych pol — nieudana proba zostawia wiersz roboczy otwarty z
+komunikatem bledu zamiast go czyscic, zeby user nie stracil wpisanych danych.
+
+**Usuwanie:** `removePathPoint` w `record.ts` odrzuca usuniecie, gdy zostalyby mniej
+niz `MIN_PATH_POINTS` (= 2) punkty — `path` z definicji wymaga spawn + despawn
+(patrz `validateBeatmap`), wiec proba zejscia ponizej tej liczby nigdy nie
+przejdzie walidacji; zamiast pozwolic userowi trafic na blad po fakcie, przycisk
+`−` jest z gory zablokowany (`disabled`) przy dokladnie 2 punktach. W
+przeciwienstwie do dodawania i edycji, usuniecie nie wymaga wrappingu w
+`validateBeatmap`: skoro pozostale punkty byly juz poprawne (rosnacy `t`, zakresy
+`x`/`y`/`size`) i usuniecie samo z siebie nie moze zlamac tych warunkow, dodatkowa
+walidacja bylaby martwym kodem.
+
 ## Konsekwencje
 
 - Nowe pliki: `src/dev/beatmap-store.ts`, `src/dev/hand-editor.ts`.
 - `src/dev/record.ts`: nowe funkcje wspoldzielone przez oba tryby —
-  `updatePathPoint` (dziala tez z `t`), `computeDragResize`, `distancePercent`,
-  `formatClock`.
+  `updatePathPoint` (dziala tez z `t`), `insertPathPoint`, `removePathPoint`,
+  `MIN_PATH_POINTS`, `computeDragResize`, `distancePercent`, `formatClock`.
 - `src/ui/render.ts`: `Ui` eksponuje `setHandSelection` (piersciensiegien
   zaznaczenia + uchwyt rozmiaru), uzywane wylacznie przez `hand-editor.ts`.
 - `src/main.ts`: `createBeatmapStore` tworzony raz, przekazywany do obu
