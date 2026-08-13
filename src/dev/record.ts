@@ -83,7 +83,7 @@ export function updatePathPoint(
   beatmap: Beatmap,
   objectId: string,
   pointIndex: number,
-  patch: Partial<Pick<PathPoint, 'x' | 'y' | 'size'>>,
+  patch: Partial<Pick<PathPoint, 't' | 'x' | 'y' | 'size'>>,
 ): Beatmap {
   const objectIndex = beatmap.objects.findIndex((o) => o.id === objectId);
   if (objectIndex === -1) return beatmap;
@@ -94,6 +94,7 @@ export function updatePathPoint(
   const point = object.path[pointIndex];
   const updated: PathPoint = {
     ...point,
+    t: patch.t !== undefined ? patch.t : point.t,
     x: patch.x !== undefined ? clamp0To100(patch.x) : point.x,
     y: patch.y !== undefined ? clamp0To100(patch.y) : point.y,
     size: patch.size !== undefined ? Math.max(MIN_SIZE, patch.size) : point.size,
@@ -138,11 +139,12 @@ export function distancePercent(
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-/** Human-readable rendering of a path point for the panel list. */
-export function formatPathPoint(point: PathPoint): string {
-  const tFixed = point.t.toFixed(3);
-  const xFixed = point.x.toFixed(1);
-  const yFixed = point.y.toFixed(1);
-  const sizeRounded = Math.round(point.size).toString();
-  return `t=${tFixed}s  x=${xFixed}  y=${yFixed}  size=${sizeRounded}`;
+/** Formatuje czas wideo jako M:ss.mm (minuty:sekundy.setne), np. 1:23.45. */
+export function formatClock(timeSec: number): string {
+  const totalCentis = Math.max(0, Math.round(timeSec * 100));
+  const minutes = Math.floor(totalCentis / 6000);
+  const seconds = Math.floor((totalCentis % 6000) / 100);
+  const centis = totalCentis % 100;
+  return `${minutes}:${String(seconds).padStart(2, '0')}.${String(centis).padStart(2, '0')}`;
 }
+

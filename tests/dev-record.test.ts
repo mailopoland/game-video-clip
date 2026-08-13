@@ -11,7 +11,7 @@ import {
   updatePathPoint,
   computeDragResize,
   distancePercent,
-  formatPathPoint,
+  formatClock,
 } from '../src/dev/record.js';
 import { Engine } from '../src/engine/engine.js';
 import { validateBeatmap } from '../src/engine/beatmap.js';
@@ -282,6 +282,22 @@ describe('updatePathPoint', () => {
     expect(updated).toBe(beatmap);
   });
 
+  it('modyfikuje t punktu', () => {
+    const beatmap = makeBeatmap([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [
+          { t: 10, x: 20, y: 30, size: 100 },
+          { t: 11, x: 40, y: 50, size: 100 },
+        ],
+      },
+    ]);
+
+    const updated = updatePathPoint(beatmap, 'o1', 0, { t: 10.5 });
+    expect(updated.objects[0].path[0]).toEqual({ t: 10.5, x: 20, y: 30, size: 100 });
+  });
+
   it('nie mutuje oryginalnej beatmapy', () => {
     const beatmap = makeBeatmap([
       {
@@ -359,29 +375,28 @@ describe('distancePercent', () => {
   });
 });
 
-describe('formatPathPoint', () => {
-  it('formatuje punkt sciezki na czytelny string', () => {
-    const point: PathPoint = { t: 11.5, x: 60, y: 41, size: 100 };
-    const formatted = formatPathPoint(point);
-    expect(formatted).toMatch(/t=11\.500s/);
-    expect(formatted).toMatch(/x=60\.0/);
-    expect(formatted).toMatch(/y=41\.0/);
-    expect(formatted).toMatch(/size=100/);
+describe('formatClock', () => {
+  it('formatuje czas ponizej minuty', () => {
+    expect(formatClock(23.45)).toBe('0:23.45');
   });
 
-  it('dokladnie formatuje punkt', () => {
-    const point: PathPoint = { t: 11.5, x: 60, y: 41, size: 100 };
-    expect(formatPathPoint(point)).toBe('t=11.500s  x=60.0  y=41.0  size=100');
+  it('formatuje czas z pelnymi minutami', () => {
+    expect(formatClock(83.45)).toBe('1:23.45');
   });
 
-  it('dokladnie formatuje punkt z ulamkowymi skladowymi', () => {
-    const point: PathPoint = { t: 5.123, x: 12.34, y: 56.789, size: 99.5 };
-    expect(formatPathPoint(point)).toBe('t=5.123s  x=12.3  y=56.8  size=100');
+  it('dwucyfrowe minuty', () => {
+    expect(formatClock(725)).toBe('12:05.00');
   });
 
-  it('dokladnie formatuje punkt z czasem zaokraglonym do 3 miejsc po przecinku', () => {
-    const point: PathPoint = { t: 7.1234, x: 25, y: 75, size: 50 };
-    const formatted = formatPathPoint(point);
-    expect(formatted).toContain('t=7.123s');
+  it('zaokragla setne w gore', () => {
+    expect(formatClock(1.006)).toBe('0:01.01');
+  });
+
+  it('zero daje 0:00.00', () => {
+    expect(formatClock(0)).toBe('0:00.00');
+  });
+
+  it('wartosci ujemne clampuja do 0:00.00', () => {
+    expect(formatClock(-5)).toBe('0:00.00');
   });
 });

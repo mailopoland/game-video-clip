@@ -180,8 +180,8 @@ describe('wyluczajaca sie aktywacja trybow dev (nagrywanie / edycja punktow)', (
 
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
     fire(target, 'pointerdown', { button: 0 });
-    const li = root.querySelector<HTMLElement>('.dev-edit-point[data-index="1"]')!;
-    fire(li, 'click');
+    const seekButton = root.querySelector<HTMLElement>('.dev-edit-point[data-index="1"] .dev-edit-point-seek')!;
+    fire(seekButton, 'click');
     fire(target, 'pointerdown', { button: 0 });
     fire(game.ui.stage, 'pointermove', { clientX: 200, clientY: 100 });
 

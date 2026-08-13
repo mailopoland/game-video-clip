@@ -1,6 +1,6 @@
 import { validateBeatmap } from '../engine/beatmap.js';
 import { SPRITE_KEYS } from '../sprites.js';
-import { computeDragResize, distancePercent, formatPathPoint, toOverlayPercent, updatePathPoint } from './record.js';
+import { computeDragResize, distancePercent, formatClock, toOverlayPercent, updatePathPoint } from './record.js';
 import type { BeatmapStore } from './beatmap-store.js';
 import type { Engine } from '../engine/engine.js';
 import type { Ui } from '../ui/render.js';
@@ -73,6 +73,11 @@ export function mountDevHandEditor(options: {
   parent.insertBefore(layout, ui.frame);
   layout.append(ui.frame, panel);
 
+  const timeDisplay = document.createElement('div');
+  timeDisplay.className = 'dev-time-display';
+  timeDisplay.hidden = true;
+  ui.frame.insertBefore(timeDisplay, ui.stage);
+
   function setStatus(text: string): void {
     status.textContent = text;
   }
@@ -102,19 +107,46 @@ export function mountDevHandEditor(options: {
       const li = document.createElement('li');
       li.className = 'dev-edit-point';
       li.dataset.index = String(index);
-      li.textContent = formatPathPoint(point);
       if (index === selectedPointIndex) li.classList.add('is-selected');
+
+      const seekButton = document.createElement('button');
+      seekButton.type = 'button';
+      seekButton.className = 'dev-edit-point-seek';
+      seekButton.textContent = `#${index}`;
+      seekButton.addEventListener('click', () => selectPoint(index));
+      li.append(seekButton);
+
+      (['t', 'x', 'y', 'size'] as const).forEach((field) => {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.className = `dev-edit-point-field dev-edit-point-${field}`;
+        input.step = field === 't' ? '0.001' : field === 'size' ? '1' : '0.1';
+        input.value = String(point[field]);
+        input.addEventListener('change', () => {
+          const value = input.valueAsNumber;
+          if (Number.isNaN(value)) {
+            input.value = String(selectedObject()?.path[index]?.[field] ?? point[field]);
+            return;
+          }
+          applyPointPatchAt(index, { [field]: value });
+        });
+        li.append(input);
+      });
+
       panelPoints.append(li);
     });
   }
 
-  function refreshSelectedRow(): void {
+  function refreshPointRow(index: number): void {
     const object = selectedObject();
-    if (!object || selectedPointIndex === null) return;
-    const point = object.path[selectedPointIndex];
+    const point = object?.path[index];
     if (!point) return;
-    const li = panelPoints.querySelector<HTMLElement>(`[data-index="${selectedPointIndex}"]`);
-    if (li) li.textContent = formatPathPoint(point);
+    const li = panelPoints.querySelector<HTMLElement>(`[data-index="${index}"]`);
+    if (!li) return;
+    (['t', 'x', 'y', 'size'] as const).forEach((field) => {
+      const input = li.querySelector<HTMLInputElement>(`.dev-edit-point-${field}`);
+      if (input && document.activeElement !== input) input.value = String(point[field]);
+    });
   }
 
   function clearRing(): void {
@@ -146,6 +178,7 @@ export function mountDevHandEditor(options: {
   function setActive(nextActive: boolean): void {
     active = nextActive;
     ui.overlay.classList.toggle('dev-active', active);
+    timeDisplay.hidden = !active;
     if (active) {
       // Odswiezenie z magazynu — dogania zmiany zrobione w innym trybie dev.
       selectedObjectId = null;
@@ -187,17 +220,38 @@ export function mountDevHandEditor(options: {
       });
   }
 
-  function applyPointPatch(patch: { x?: number; y?: number; size?: number }): void {
-    if (!selectedObjectId || selectedPointIndex === null) return;
+  function applyPointPatchAt(index: number, patch: { t?: number; x?: number; y?: number; size?: number }): void {
+    if (!selectedObjectId) return;
     const beatmap = currentBeatmap();
-    const updated = updatePathPoint(beatmap, selectedObjectId, selectedPointIndex, patch);
+    const updated = updatePathPoint(beatmap, selectedObjectId, index, patch);
     if (updated === beatmap) return;
 
-    validateBeatmap(updated, SPRITE_KEYS);
+    try {
+      validateBeatmap(updated, SPRITE_KEYS);
+    } catch (error) {
+      setStatus(`Blad: ${(error as Error).message}`);
+      refreshPointRow(index);
+      return;
+    }
+
     store.set(updated);
     engine.setObjects(updated.objects);
     dirty = true;
-    refreshSelectedRow();
+    refreshPointRow(index);
+  }
+
+  function applyPointPatch(patch: { x?: number; y?: number; size?: number }): void {
+    if (selectedPointIndex === null) return;
+    applyPointPatchAt(selectedPointIndex, patch);
+  }
+
+  function selectPoint(index: number): void {
+    const object = selectedObject();
+    const point = object?.path[index];
+    if (!point) return;
+    selectedPointIndex = index;
+    options.seekBy(point.t - engine.getView().timeSec);
+    rebuildPanel();
   }
 
   ui.stage.addEventListener('pointerdown', (event) => {
@@ -280,23 +334,11 @@ export function mountDevHandEditor(options: {
     if (dragMode) endDrag();
   });
 
-  panelPoints.addEventListener('click', (event) => {
-    const li = (event.target as Element).closest<HTMLElement>('.dev-edit-point');
-    if (!li) return;
-    const object = selectedObject();
-    if (!object) return;
-
-    const index = Number(li.dataset.index);
-    const point = object.path[index];
-    if (!point) return;
-
-    selectedPointIndex = index;
-    options.seekBy(point.t - engine.getView().timeSec);
-    rebuildPanel();
-  });
-
   return {
     onFrame(): void {
+      timeDisplay.hidden = !active;
+      if (active) timeDisplay.textContent = formatClock(engine.getView().timeSec);
+
       if (active && selectedObjectId) {
         const visible = engine.getView().visible.find((v) => v.object.id === selectedObjectId);
         ui.setHandSelection(visible ? { x: visible.x, y: visible.y, size: visible.size } : null);

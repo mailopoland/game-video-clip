@@ -347,9 +347,37 @@ html.has-pseudo-fullscreen body {
 .dev-edit-panel[hidden] { display: none; }
 .dev-edit-panel-points { list-style: none; margin: 0; padding: 0; }
 .dev-edit-point {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
   padding: 0.3rem 0.4rem;
-  cursor: pointer;
   border-radius: 0.25rem;
 }
-.dev-edit-point:hover { background: rgb(255 255 255 / 0.1); }
 .dev-edit-point.is-selected { outline: 1px solid #6ef58f; }
+.dev-edit-point-seek {
+  flex: none;
+  font: inherit;
+  color: inherit;
+  background: rgb(255 255 255 / 0.1);
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.15rem 0.3rem;
+  cursor: pointer;
+}
+.dev-edit-point-field {
+  width: 3.4rem;
+  font: inherit;
+  color: inherit;
+  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.2);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.25rem;
+}
+
+.dev-time-display {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 0.2rem 0;
+  opacity: 0.9;
+}

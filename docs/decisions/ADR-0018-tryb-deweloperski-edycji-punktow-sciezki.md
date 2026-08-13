@@ -92,11 +92,42 @@ usunalby wyscigu** (dwa opoznione zapisy nadal moga wystartowac rownolegle,
 jesli zmiany przychodza czesciej niz okno debounce) — strazenik "co najwyzej
 jeden w locie" usuwa przyczyne, nie tylko objaw.
 
+### Dopisek: edytowalne pola panelu i wyswietlacz czasu (2026-08-13)
+
+Panel z lista punktow byl poczatkowo tylko-do-odczytu (`formatPathPoint`) — jedynym
+sposobem zmiany `x`/`y`/`size` bylo przeciaganie na scenie, a `t` w ogole nie dalo
+sie zmienic bez ponownego nagrania punktu. W praktyce doprecyzowanie `t` o ulamek
+sekundy albo drobna korekta `size` bez dostepu do myszy (np. touchpad) byly
+niewygodne. Kazdy wiersz panelu dostal cztery pola liczbowe (`t`/`x`/`y`/`size`)
+edytowalne przez wpisanie wartosci, zapisywane natychmiast po `change` (blur/Enter,
+nie po kazdym znaku) — tym samym mechanizmem `applyPointPatch`/koalescencji zapisu,
+co drag na scenie. Wybor punktu do przeciagania na scenie przeniesiony na osobny
+przycisk `#<indeks>` w wierszu, zeby klikniecie w polu input nie wywolywalo seeka.
+
+`updatePathPoint` (record.ts) rozszerzone o pole `t` bez wlasnego clampu — w
+przeciwienstwie do `x`/`y`/`size` nie ma naturalnego zakresu, ale musi zachowac
+scisle rosnaca kolejnosc w `path`, ktora juz egzekwuje `validateBeatmap`. Zamiast
+duplikowac ta regule w `record.ts`, `applyPointPatchAt` w `hand-editor.ts` owija
+`validateBeatmap` w try/catch: nieudana walidacja (np. `t` kolidujace z sasiednim
+punktem) nie trafia do `store`/silnika, status pokazuje komunikat bledu, a pole w
+DOM wraca do wartosci z magazynu — bez tego pojedynczy zly wpis zawieszalby aplikacje
+na nieprzechwyconym wyjatku.
+
+Wyswietlacz czasu (`.dev-time-display`, `formatClock` w `record.ts`) pokazuje
+`timeSec` z `engine.getView()` w formacie `M:ss.mm` (minuty, sekundy, setne czesci
+sekundy) nad scena, wylacznie gdy ten tryb jest aktywny — dostrajanie `t` w panelu
+wymaga odniesienia do aktualnej pozycji w klipie bez przelaczania sie na inny
+widok/devtools.
+
+`formatPathPoint` (tylko-do-odczytu format punktu) zostal usuniety jako martwy kod
+po przejsciu panelu na pola edytowalne — nie mial juz zadnego wywolania w `src/`.
+
 ## Konsekwencje
 
 - Nowe pliki: `src/dev/beatmap-store.ts`, `src/dev/hand-editor.ts`.
 - `src/dev/record.ts`: nowe funkcje wspoldzielone przez oba tryby —
-  `updatePathPoint`, `computeDragResize`, `distancePercent`, `formatPathPoint`.
+  `updatePathPoint` (dziala tez z `t`), `computeDragResize`, `distancePercent`,
+  `formatClock`.
 - `src/ui/render.ts`: `Ui` eksponuje `setHandSelection` (piersciensiegien
   zaznaczenia + uchwyt rozmiaru), uzywane wylacznie przez `hand-editor.ts`.
 - `src/main.ts`: `createBeatmapStore` tworzony raz, przekazywany do obu

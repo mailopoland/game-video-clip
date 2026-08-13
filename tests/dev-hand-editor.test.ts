@@ -5,7 +5,7 @@ import { mountGame } from '../src/game.js';
 import { mountDevHandEditor } from '../src/dev/hand-editor.js';
 import { createBeatmapStore } from '../src/dev/beatmap-store.js';
 import { validateBeatmap } from '../src/engine/beatmap.js';
-import { formatPathPoint } from '../src/dev/record.js';
+import { formatClock } from '../src/dev/record.js';
 import { SPRITE_KEYS } from '../src/sprites.js';
 import { FakeClock, makeBeatmap } from './fake-clock.js';
 import type { Beatmap } from '../src/engine/types.js';
@@ -150,8 +150,19 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
   }
 
   function selectPointOne(): void {
-    const li = root.querySelector<HTMLElement>('.dev-edit-point[data-index="1"]')!;
-    fire(li, 'click');
+    const button = root.querySelector<HTMLElement>('.dev-edit-point[data-index="1"] .dev-edit-point-seek')!;
+    fire(button, 'click');
+  }
+
+  function fieldInput(index: number, field: 't' | 'x' | 'y' | 'size'): HTMLInputElement {
+    return root.querySelector<HTMLInputElement>(
+      `.dev-edit-point[data-index="${index}"] .dev-edit-point-${field}`,
+    )!;
+  }
+
+  function setFieldAndCommit(input: HTMLInputElement, value: string): void {
+    input.value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   it('aktywacja wywoluje pause() dokladnie raz', () => {
@@ -175,8 +186,78 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
     const items = panel.querySelectorAll<HTMLElement>('.dev-edit-point');
     expect(items.length).toBe(2);
     const path = game.engine.getView().visible.find((v) => v.object.id === 'o1')!.object.path;
-    expect(items[0]!.textContent).toBe(formatPathPoint(path[0]!));
-    expect(items[1]!.textContent).toBe(formatPathPoint(path[1]!));
+    expect(fieldInput(0, 't').value).toBe(String(path[0]!.t));
+    expect(fieldInput(0, 'x').value).toBe(String(path[0]!.x));
+    expect(fieldInput(0, 'y').value).toBe(String(path[0]!.y));
+    expect(fieldInput(0, 'size').value).toBe(String(path[0]!.size));
+    expect(fieldInput(1, 't').value).toBe(String(path[1]!.t));
+  });
+
+  it('pokazuje aktualny czas wideo w formacie M:ss.mm tylko gdy tryb jest aktywny', () => {
+    const { clock, game, dev, checkbox } = setup();
+
+    clock.timeSec = 71.234;
+    game.frame();
+    dev.onFrame();
+    let display = root.querySelector<HTMLElement>('.dev-time-display')!;
+    expect(display.hidden).toBe(true);
+
+    activate(checkbox);
+    pauseAt(clock, game.frame, 71.234);
+    dev.onFrame();
+
+    display = root.querySelector<HTMLElement>('.dev-time-display')!;
+    expect(display.hidden).toBe(false);
+    expect(display.textContent).toBe(formatClock(71.234));
+
+    dev.deactivate();
+    expect(display.hidden).toBe(true);
+  });
+
+  it('edycja pola x/y/size/t w panelu zapisuje sie natychmiast po zmianie (change)', () => {
+    const { clock, game, checkbox, store } = setup();
+    activate(checkbox);
+    pauseAt(clock, game.frame, 10.0);
+
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    fire(target, 'pointerdown', { button: 0 });
+
+    setFieldAndCommit(fieldInput(0, 'x'), '65');
+    setFieldAndCommit(fieldInput(0, 'y'), '35');
+    setFieldAndCommit(fieldInput(0, 'size'), '150');
+
+    const updated = store.get().objects.find((o) => o.id === 'o1')!;
+    expect(updated.path[0]).toEqual({ t: 10, x: 65, y: 35, size: 150 });
+  });
+
+  it('edycja pola t przesuwa punkt w czasie, jesli zachowuje rosnaca kolejnosc', () => {
+    const { clock, game, checkbox, store } = setup();
+    activate(checkbox);
+    pauseAt(clock, game.frame, 10.0);
+
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    fire(target, 'pointerdown', { button: 0 });
+
+    setFieldAndCommit(fieldInput(0, 't'), '10.5');
+
+    const updated = store.get().objects.find((o) => o.id === 'o1')!;
+    expect(updated.path[0]!.t).toBe(10.5);
+  });
+
+  it('edycja pola t naruszajaca rosnaca kolejnosc jest odrzucana i wiersz wraca do poprzedniej wartosci', () => {
+    const { clock, game, checkbox, store } = setup();
+    activate(checkbox);
+    pauseAt(clock, game.frame, 10.0);
+
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    fire(target, 'pointerdown', { button: 0 });
+
+    const before = JSON.parse(JSON.stringify(store.get())) as Beatmap;
+    const input = fieldInput(0, 't');
+    setFieldAndCommit(input, '20');
+
+    expect(store.get()).toEqual(before);
+    expect(input.value).toBe('10');
   });
 
   it('klik w wiersz panelu wola seekBy z dokladnie point.t - view.timeSec, zaznacza ten wiersz i tylko ten', () => {
