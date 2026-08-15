@@ -129,9 +129,12 @@ html.has-pseudo-fullscreen body {
   text-shadow: 0 0 0.5rem #000;
 }
 
-.obj.is-hit .sprite,
-.obj.is-miss .sprite {
+.obj.is-hit .sprite {
   animation: pop 0.5s ease-out forwards;
+}
+
+.obj.is-miss .sprite {
+  opacity: 0;
 }
 
 .obj.is-hit .feedback {
