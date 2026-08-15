@@ -17,7 +17,7 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 184 testy, zielone.
+`npm test` — 197 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

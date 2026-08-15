@@ -154,6 +154,20 @@ przeciwienstwie do dodawania i edycji, usuniecie nie wymaga wrappingu w
 `x`/`y`/`size`) i usuniecie samo z siebie nie moze zlamac tych warunkow, dodatkowa
 walidacja bylaby martwym kodem.
 
+### Dopisek: usuwanie punktu z 2-punktowej ścieżki usuwa cały obiekt (2026-08-15)
+
+Przyciski usuwania punktu (`−` przy wierszu i `.dev-edit-panel-delete-point` w
+nagłówku panelu) były zablokowane (`disabled`), gdy ścieżka miała dokładnie
+`MIN_PATH_POINTS` (= 2) punkty — `removePathPoint` odrzuca zejście poniżej tej
+liczby, więc guzik nie miał nic sensownego do zrobienia. W praktyce to zaskakujące
+z perspektywy edytującego: chce usunąć jeden zły punkt, a guzik jest po prostu
+martwy bez wyjaśnienia na scenie (tylko `title` przy najechaniu). Zamiast blokady,
+`deletePoint` w `hand-editor.ts` sprawdza długość `path` przed wywołaniem
+`removePathPoint`: przy dokładnie 2 punktach usuwa **cały obiekt** przez
+`removeObject` (ten sam mechanizm co prawy klik w obiekt w trybie nagrywania,
+ADR-0016) i czyści zaznaczenie/panel (`deselect()`). Oba guziki usuwania punktu nie
+są już nigdy `disabled` — semantyka "usuń to, co widzisz" zawsze coś robi.
+
 ## Konsekwencje
 
 - Nowe pliki: `src/dev/beatmap-store.ts`, `src/dev/hand-editor.ts`.

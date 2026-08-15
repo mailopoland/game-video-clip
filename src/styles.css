@@ -348,6 +348,20 @@ html.has-pseudo-fullscreen body {
   padding: 0.5rem;
 }
 .dev-edit-panel[hidden] { display: none; }
+.dev-edit-panel-delete-point {
+  display: block;
+  width: 100%;
+  margin: 0.4rem 0 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  color: inherit;
+  background: rgb(255 107 107 / 0.15);
+  border: 1px solid rgb(255 107 107 / 0.4);
+  border-radius: 0.25rem;
+  padding: 0.3rem;
+  cursor: pointer;
+}
+.dev-edit-panel-delete-point[hidden] { display: none; }
 .dev-edit-panel-points { list-style: none; margin: 0; padding: 0; }
 .dev-edit-point {
   display: flex;
@@ -371,7 +385,6 @@ html.has-pseudo-fullscreen body {
   padding: 0.15rem 0.3rem;
   cursor: pointer;
 }
-.dev-edit-point-delete:disabled { opacity: 0.35; cursor: not-allowed; }
 .dev-edit-point-label {
   display: inline-flex;
   align-items: center;

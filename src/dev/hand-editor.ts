@@ -6,6 +6,7 @@ import {
   formatClock,
   insertPathPoint,
   MIN_PATH_POINTS,
+  removeObject,
   removePathPoint,
   toOverlayPercent,
   updatePathPoint,
@@ -77,10 +78,15 @@ export function mountDevHandEditor(options: {
   panel.hidden = true;
   panel.innerHTML = `
     <h2>Sciezka: <span class="dev-edit-panel-object"></span></h2>
+    <button type="button" class="dev-edit-panel-delete-point" hidden>Usun punkt</button>
     <ol class="dev-edit-panel-points"></ol>
   `;
   const panelObjectLabel = panel.querySelector<HTMLElement>('.dev-edit-panel-object')!;
+  const panelDeletePointButton = panel.querySelector<HTMLButtonElement>('.dev-edit-panel-delete-point')!;
   const panelPoints = panel.querySelector<HTMLOListElement>('.dev-edit-panel-points')!;
+  panelDeletePointButton.addEventListener('click', () => {
+    if (selectedPointIndex !== null) deletePoint(selectedPointIndex);
+  });
 
   const parent = ui.frame.parentElement!;
   const layout = document.createElement('div');
@@ -149,9 +155,8 @@ export function mountDevHandEditor(options: {
     deleteButton.type = 'button';
     deleteButton.className = 'dev-edit-point-delete';
     deleteButton.textContent = '−';
-    deleteButton.disabled = pointCount <= MIN_PATH_POINTS;
     deleteButton.title =
-      pointCount <= MIN_PATH_POINTS ? 'Sciezka musi miec co najmniej 2 punkty' : 'Usun punkt';
+      pointCount <= MIN_PATH_POINTS ? 'Usun caly obiekt (sciezka ma tylko 2 punkty)' : 'Usun punkt';
     deleteButton.addEventListener('click', () => deletePoint(index));
     li.append(deleteButton);
 
@@ -235,6 +240,7 @@ export function mountDevHandEditor(options: {
       panel.hidden = true;
       panelPoints.innerHTML = '';
       panelObjectLabel.textContent = '';
+      panelDeletePointButton.hidden = true;
       draftGapIndex = null;
       draftValues = {};
       return;
@@ -242,6 +248,9 @@ export function mountDevHandEditor(options: {
 
     panel.hidden = false;
     panelObjectLabel.textContent = object.id;
+    panelDeletePointButton.hidden = selectedPointIndex === null;
+    panelDeletePointButton.title =
+      object.path.length <= MIN_PATH_POINTS ? 'Usun caly obiekt (sciezka ma tylko 2 punkty)' : '';
     panelPoints.innerHTML = '';
     panelPoints.append(renderGap(0));
     object.path.forEach((point, index) => {
@@ -286,9 +295,24 @@ export function mountDevHandEditor(options: {
     rebuildPanel();
   }
 
+  /** Usuniecie punktu z 2-punktowej sciezki nie ma sensownego wyniku (path
+      zawsze wymaga spawn + despawn) — zamiast blokowac guzik, usuwamy caly
+      obiekt, tak jak prawy klik w obiekt w trybie nagrywania (ADR-0016). */
   function deletePoint(index: number): void {
     if (!selectedObjectId) return;
     const beatmap = currentBeatmap();
+    const object = beatmap.objects.find((o) => o.id === selectedObjectId);
+    if (!object) return;
+
+    if (object.path.length <= MIN_PATH_POINTS) {
+      const updated = removeObject(beatmap, selectedObjectId);
+      store.set(updated);
+      engine.setObjects(updated.objects);
+      dirty = true;
+      deselect();
+      return;
+    }
+
     const updated = removePathPoint(beatmap, selectedObjectId, index);
     if (updated === beatmap) return;
 

@@ -428,8 +428,8 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
     expect(updated.path[1]).toEqual({ t: 10.5, x: 20, y: 20, size: 100 });
   });
 
-  it('minus usuwa punkt i od razu aktualizuje beatmape; przycisk jest zablokowany przy 2 punktach', () => {
-    const { clock, game, checkbox } = setup();
+  it('minus na sciezce z 2 punktami usuwa caly obiekt (zamiast byc zablokowany)', () => {
+    const { clock, game, checkbox, store } = setup();
     activate(checkbox);
     pauseAt(clock, game.frame, 10.0);
 
@@ -437,8 +437,11 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
     fire(target, 'pointerdown', { button: 0 });
 
     const deleteButtons = root.querySelectorAll<HTMLButtonElement>('.dev-edit-point-delete');
-    expect(deleteButtons[0]!.disabled).toBe(true);
-    expect(deleteButtons[1]!.disabled).toBe(true);
+    expect(deleteButtons[0]!.disabled).toBe(false);
+    fire(deleteButtons[0]!, 'click');
+
+    expect(store.get().objects.find((o) => o.id === 'o1')).toBeUndefined();
+    expect(root.querySelector<HTMLElement>('.dev-edit-panel')!.hidden).toBe(true);
   });
 
   it('minus usuwa punkt gdy sciezka ma wiecej niz 2 punkty', () => {
@@ -469,6 +472,57 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
       { t: 10, x: 20, y: 20, size: 100 },
       { t: 11, x: 80, y: 80, size: 100 },
     ]);
+  });
+
+  it('guzik "Usun punkt" pod naglowkiem panelu jest ukryty bez wybranego punktu i usuwa go po kliku, gdy jest wybrany', () => {
+    const { clock, game, checkbox, store } = setup([
+      {
+        id: 'o1',
+        sprite: 'hand',
+        path: [
+          { t: 10, x: 20, y: 20, size: 100 },
+          { t: 10.5, x: 50, y: 50, size: 100 },
+          { t: 11, x: 80, y: 80, size: 100 },
+        ],
+      },
+    ]);
+    activate(checkbox);
+    pauseAt(clock, game.frame, 10.0);
+
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    fire(target, 'pointerdown', { button: 0 });
+
+    const panelDeleteButton = root.querySelector<HTMLButtonElement>('.dev-edit-panel-delete-point')!;
+    expect(panelDeleteButton.hidden).toBe(true);
+
+    selectPointOne();
+    expect(panelDeleteButton.hidden).toBe(false);
+    expect(panelDeleteButton.disabled).toBe(false);
+    fire(panelDeleteButton, 'click');
+
+    const updated = store.get().objects.find((o) => o.id === 'o1')!;
+    expect(updated.path).toEqual([
+      { t: 10, x: 20, y: 20, size: 100 },
+      { t: 11, x: 80, y: 80, size: 100 },
+    ]);
+  });
+
+  it('guzik "Usun punkt" na sciezce z dokladnie 2 punktami usuwa caly obiekt', () => {
+    const { clock, game, checkbox, store } = setup();
+    activate(checkbox);
+    pauseAt(clock, game.frame, 10.0);
+
+    const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
+    fire(target, 'pointerdown', { button: 0 });
+    selectPointOne();
+
+    const panelDeleteButton = root.querySelector<HTMLButtonElement>('.dev-edit-panel-delete-point')!;
+    expect(panelDeleteButton.hidden).toBe(false);
+    expect(panelDeleteButton.disabled).toBe(false);
+    fire(panelDeleteButton, 'click');
+
+    expect(store.get().objects.find((o) => o.id === 'o1')).toBeUndefined();
+    expect(root.querySelector<HTMLElement>('.dev-edit-panel')!.hidden).toBe(true);
   });
 
   it('koalescencja zapisow: kilka pointermove przed jednym onFrame() -> co najwyzej jeden fetch; w trakcie nierozwiazanego fetch kolejne zmiany nie wywoluja drugiego', async () => {
