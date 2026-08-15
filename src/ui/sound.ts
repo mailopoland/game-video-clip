@@ -39,7 +39,7 @@ export interface HitSound {
  * Na sciezce buforowej dziala naprawde (GainNode nie ma pulapu 1.0); na drodze
  * zapasowej jest przycinane do 1.0 przez `HTMLAudioElement.volume`.
  */
-const LOUDNESS_BOOST = 1.5;
+const LOUDNESS_BOOST = 0.55;
 
 export interface HitSoundOptions {
   /** Rozmiar puli zapasowej `<audio>`. */
