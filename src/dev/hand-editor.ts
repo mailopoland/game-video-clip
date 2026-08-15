@@ -107,7 +107,7 @@ export function mountDevHandEditor(options: {
   }
 
   function fieldStep(field: PointField): string {
-    return field === 't' ? '0.001' : field === 'size' ? '1' : '0.1';
+    return field === 't' ? '0.1' : field === 'size' ? '1' : '0.1';
   }
 
   function renderPointRow(point: PathPoint, index: number, pointCount: number): HTMLElement {
@@ -119,7 +119,7 @@ export function mountDevHandEditor(options: {
     const seekButton = document.createElement('button');
     seekButton.type = 'button';
     seekButton.className = 'dev-edit-point-seek';
-    seekButton.textContent = `#${index}`;
+    seekButton.textContent = selectedObjectId ?? `#${index}`;
     seekButton.addEventListener('click', () => selectPoint(index));
     li.append(seekButton);
 
@@ -156,6 +156,20 @@ export function mountDevHandEditor(options: {
     li.append(deleteButton);
 
     return li;
+  }
+
+  function currentDraftDefaults(): Partial<Record<PointField, number>> {
+    const timeSec = engine.getView().timeSec;
+    const defaults: Partial<Record<PointField, number>> = { t: timeSec };
+    if (selectedObjectId) {
+      const visible = engine.getView().visible.find((v) => v.object.id === selectedObjectId);
+      if (visible) {
+        defaults.x = visible.x;
+        defaults.y = visible.y;
+        defaults.size = visible.size;
+      }
+    }
+    return defaults;
   }
 
   function renderGap(gapIndex: number): HTMLElement {
@@ -205,7 +219,8 @@ export function mountDevHandEditor(options: {
       addButton.title = 'Dodaj punkt';
       addButton.addEventListener('click', () => {
         draftGapIndex = gapIndex;
-        draftValues = {};
+        draftValues = currentDraftDefaults();
+        tryCommitDraft();
         rebuildPanel();
       });
       li.append(addButton);

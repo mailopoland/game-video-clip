@@ -389,10 +389,10 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
     return gaps[gapIndex]!.querySelector<HTMLButtonElement>('.dev-edit-gap-add')!;
   }
 
-  it('plus miedzy punktami otwiera puste pola, a wypelnienie wszystkich dodaje nowy punkt', () => {
+  it('plus miedzy punktami wstawia od razu punkt z biezacymi wartosciami (czas wideo, zinterpolowana pozycja)', () => {
     const { clock, game, checkbox, store } = setup();
     activate(checkbox);
-    pauseAt(clock, game.frame, 10.0);
+    pauseAt(clock, game.frame, 10.5);
 
     const target = root.querySelector<HTMLElement>('.obj[data-id="o1"]')!;
     fire(target, 'pointerdown', { button: 0 });
@@ -400,27 +400,12 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
     // 3 gapy: przed punktem 0, miedzy 0 i 1, po punkcie 1. Wstawiamy w srodkowy.
     fire(gapAddButton(1), 'click');
 
-    const draftInputs = root.querySelectorAll<HTMLElement>('.dev-edit-gap')[1]!;
-    const tInput = draftInputs.querySelector<HTMLInputElement>('.dev-edit-point-t')!;
-    const sizeInput = draftInputs.querySelector<HTMLInputElement>('.dev-edit-point-size')!;
-    const xInput = draftInputs.querySelector<HTMLInputElement>('.dev-edit-point-x')!;
-    const yInput = draftInputs.querySelector<HTMLInputElement>('.dev-edit-point-y')!;
-    expect(tInput.value).toBe('');
-
-    setFieldAndCommit(tInput, '10.5');
-    setFieldAndCommit(sizeInput, '90');
-    let updated = store.get().objects.find((o) => o.id === 'o1')!;
-    expect(updated.path.length).toBe(2);
-
-    setFieldAndCommit(xInput, '50');
-    setFieldAndCommit(yInput, '50');
-
-    updated = store.get().objects.find((o) => o.id === 'o1')!;
+    const updated = store.get().objects.find((o) => o.id === 'o1')!;
     expect(updated.path.length).toBe(3);
-    expect(updated.path[1]).toEqual({ t: 10.5, x: 50, y: 50, size: 90 });
+    expect(updated.path[1]).toEqual({ t: 10.5, x: 50, y: 50, size: 100 });
   });
 
-  it('nowy punkt z t kolidujacym z istniejacym jest odrzucany (walidacja)', () => {
+  it('nowy punkt z t kolidujacym z istniejacym (biezacy czas rowny punktowi) jest odrzucany, a pola zostaja wypelnione biezacymi wartosciami', () => {
     const { clock, game, checkbox, store } = setup();
     activate(checkbox);
     pauseAt(clock, game.frame, 10.0);
@@ -430,13 +415,17 @@ describe('tryb deweloperski edycji punktow sciezki (dev-edit-hand)', () => {
 
     const before = JSON.parse(JSON.stringify(store.get())) as Beatmap;
     fire(gapAddButton(1), 'click');
-    const draft = root.querySelectorAll<HTMLElement>('.dev-edit-gap')[1]!;
-    setFieldAndCommit(draft.querySelector<HTMLInputElement>('.dev-edit-point-t')!, '10');
-    setFieldAndCommit(draft.querySelector<HTMLInputElement>('.dev-edit-point-size')!, '90');
-    setFieldAndCommit(draft.querySelector<HTMLInputElement>('.dev-edit-point-x')!, '50');
-    setFieldAndCommit(draft.querySelector<HTMLInputElement>('.dev-edit-point-y')!, '50');
 
     expect(store.get()).toEqual(before);
+
+    const draft = root.querySelectorAll<HTMLElement>('.dev-edit-gap')[1]!;
+    const tInput = draft.querySelector<HTMLInputElement>('.dev-edit-point-t')!;
+    expect(tInput.value).toBe('10');
+
+    setFieldAndCommit(tInput, '10.5');
+    const updated = store.get().objects.find((o) => o.id === 'o1')!;
+    expect(updated.path.length).toBe(3);
+    expect(updated.path[1]).toEqual({ t: 10.5, x: 20, y: 20, size: 100 });
   });
 
   it('minus usuwa punkt i od razu aktualizuje beatmape; przycisk jest zablokowany przy 2 punktach', () => {
