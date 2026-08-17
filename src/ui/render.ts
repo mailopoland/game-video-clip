@@ -132,12 +132,10 @@ export function createUi(
       element.style.top = `${visible.y}%`;
       element.style.width = `${(16 * visible.size) / 100}%`;
 
-      const resolved = visible.outcome === 'hit' || visible.outcome === 'miss';
       element.classList.toggle('is-hit', visible.outcome === 'hit');
       element.classList.toggle('is-miss', visible.outcome === 'miss');
-      if (resolved) {
-        element.querySelector<HTMLElement>('.feedback')!.textContent =
-          visible.outcome === 'hit' ? '+1' : '✕';
+      if (visible.outcome === 'hit') {
+        element.querySelector<HTMLElement>('.feedback')!.textContent = '+1';
       }
       if (visible.outcome === 'hit') {
         const sprite = SPRITES[visible.object.sprite]!;

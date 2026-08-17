@@ -140,8 +140,9 @@ czasowych ani okna tolerancji:
 - **Reka jest klikalna przez cały ten czas.** Nie ma pojęcia „poza oknem" ani spóźnienia —
   klik w dowolnym momencie między spawnem a despawnem to zawsze trafienie. Brak kliku do
   despawnu (włącznie) to pudło.
-- Po rozstrzygnięciu cel zostaje na ekranie jeszcze **`FADE_OUT_MS = 500`** — tyle trwa
-  animacja `+1` / `✕`.
+- Po rozstrzygnięciu cel zostaje na ekranie jeszcze **`FADE_OUT_MS = 500`**. Trafienie
+  pokazuje animację `+1`; pudło nie pokazuje żadnego feedbacku tekstowego (dłoń po
+  prostu znika bez oznaczenia).
 - Przejście do `hit` dodatkowo: podmienia grafikę sprite'a na wariant `hitSrc` (jeśli
   zarejestrowany) i odtwarza dźwięk trafienia — zobacz sekcję [Sprite'y](#sprite-y).
   `miss` nie zmienia grafiki. Dźwięk leci **wyłącznie** z tej ścieżki (`onHit` w

@@ -142,11 +142,6 @@ html.has-pseudo-fullscreen body {
   animation: rise 0.5s ease-out forwards;
 }
 
-.obj.is-miss .feedback {
-  color: #ff6b6b;
-  animation: rise 0.5s ease-out forwards;
-}
-
 @keyframes pop {
   to {
     transform: scale(1.5);

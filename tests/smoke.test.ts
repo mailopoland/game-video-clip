@@ -90,7 +90,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(img.src.endsWith(expectedSrc)).toBe(true);
   });
 
-  it('brak kliku do despawnu pokazuje X i nie daje punktu', () => {
+  it('brak kliku do despawnu nie pokazuje feedbacku i nie daje punktu', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10)]); // despawn 11
     const game = mountGame(root, beatmap, clock, { now: clock.now });
@@ -100,7 +100,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     playTo(clock, game.frame, 11.05);
 
     expect(target.classList.contains('is-miss')).toBe(true);
-    expect(target.querySelector('.feedback')!.textContent).toBe('✕');
+    expect(target.querySelector('.feedback')!.textContent).toBe('');
     expect(root.querySelector('#hud-score')!.textContent).toBe('0');
   });
 
