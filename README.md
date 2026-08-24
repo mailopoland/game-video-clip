@@ -40,6 +40,41 @@ Działające warianty: `http://<nazwa-komputera>.local:5173/` (mDNS, iOS obsług
 natywnie) albo `http://192-168-0-94.nip.io:5173/`. Oba hosty są dopuszczone
 w `server.allowedHosts` w `vite.config.ts` — Vite od 6.0.9 odrzuca nieznany `Host`.
 
+### Uruchomienie bez trybu deweloperskiego (build produkcyjny)
+
+`npm run dev` zawsze ładuje tryb deweloperski (nagrywanie/edycję ścieżki prawym
+przyciskiem myszy). Żeby zobaczyć grę tak, jak wygląda na GitHub Pages — bez kodu
+`src/dev/*` — trzeba zbudować i zaserwować `dist/`:
+
+```bash
+npm run build     # dist/, base = /game-video-clip/ (ADR-0007)
+npm run preview   # http://localhost:4173/game-video-clip/  — UWAGA na tej maszynie nie działa (patrz niżej)
+```
+
+⚠️ **`npm run preview` (Vite) na tym Windowsie jest zepsuty** — serwer zwraca
+`index.html` dla każdego zapytania, także o realnie istniejące pliki w
+`dist/assets/` (błąd `NS_ERROR_CORRUPTED_CONTENT` / zły `Content-Type` w
+konsoli przeglądarki). Obejście — zaserwuj `dist/` prostym serwerem statycznym
+pod strukturą katalogów odpowiadającą `base: /game-video-clip/`:
+
+```bash
+mkdir -p /tmp/preview-root/game-video-clip
+cp -r dist/. /tmp/preview-root/game-video-clip/
+cd /tmp/preview-root && python -m http.server 4174
+# otwórz http://localhost:4174/game-video-clip/
+```
+
+### Udostępnienie na zewnątrz przez ngrok
+
+Serwer z powyższego obejścia działa na porcie **4174**:
+
+```bash
+ngrok http 4174
+```
+
+Wejdź pod link, który wypisze ngrok, dopisując ścieżkę: `https://<losowy-subdomain>.ngrok-free.app/game-video-clip/`
+(sam adres bazowy pokaże pustą stronę — `index.html` żyje pod `/game-video-clip/`, nie pod `/`).
+
 ---
 
 ## Stack
