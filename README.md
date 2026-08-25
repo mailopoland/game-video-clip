@@ -469,7 +469,7 @@ Dlatego potrzebne są **trzy** niezależne środki, nie jeden:
 | Środek | Co usuwa | Kiedy działa |
 |---|---|---|
 | `--player-overscan: 15%` na `.stage` | pasek tytułu, avatar, udostępnianie, „More videos", logo | zawsze |
-| `.chrome-mask` | duży przycisk play/pauza na środku | zawsze (z opóźnieniem znikania) |
+| `.chrome-mask` | duży przycisk play/pauza na środku | zawsze (stała, bezstanowa) |
 | `.shield.is-covering` | ekran cued / buforowania / pauzy / końca | poza `PLAYING` |
 
 ### `--player-overscan` — player wyższy niż scena
@@ -482,17 +482,30 @@ tam, gdzie było**. Dzięki temu **współrzędne beatmapy zostają nietknięte*
 nagrane pozycje ręki nie wymagają migracji. Zmierzone: scena 426 px → player
 554 px, przesunięcie −64 px; cały branding znika ze sceny.
 
-> ⚠️ Gdyby obraz wyglądał na przybliżony, a cele przestały pasować do wideo —
-> ustaw `--player-overscan: 0%`. Patrz „Znane ograniczenia".
+Potwierdzone na urządzeniu: obraz nie jest przybliżony, a cele nadal pokrywają
+się z wideo. Gdyby kiedyś przestało — `--player-overscan: 0%` cofa to jedną
+linią.
 
 ### `.chrome-mask` — duży przycisk na środku
 
-Geometria go nie usunie, bo jest wyśrodkowany **razem z obrazem**. Zostaje
-zakrycie: okrąg `clamp(60px, 10%, 96px)` między `.shield` a `.overlay`. To
-osobny element, nie pseudoelement tarczy — krycie pseudoelementu mnoży się
-przez krycie rodzica, więc znikałby razem z nią, a musi żyć dłużej: znika
-z **opóźnieniem `2600ms`**, bo YouTube trzyma swój przycisk jeszcze chwilę po
-wejściu w `PLAYING`.
+Geometria go nie usunie, bo jest wyśrodkowany **razem z obrazem**: wideo jest
+wycentrowane w playerze, więc środek playera zawsze pokrywa się ze środkiem
+obrazu i żadne przesunięcie ich nie rozdzieli. Zostaje zakrycie.
+
+**Maska jest stała, nie sterowana `view.frozen`.** Wariant czasowy (gasnący po
+`2600ms`) był wdrożony i obalony na urządzeniu: ikona pauzy jest widoczna na
+`0:03`, dokładnie gdy maska zgasła. YouTube nie chowa przycisku sam.
+
+**Zamiast zakrycia — rozmycie tła.** Nieprzezroczysta plama była równie zła jak
+sama ikona („czarna dziura" w środku kadru). `backdrop-filter: blur(26px)`
+działa też na treść iframe'a **cross-origin** — nie czyta pikseli, więc nie
+narusza origin — co zweryfikowano w przeglądarce: przycisk rozpływa się
+w nieczytelną plamę, a wideo pod spodem zostaje widoczne. Zasłonka
+`rgb(0 0 0 / 0.35)` zbija kontrast ikony, `mask-image` daje miękką krawędź.
+
+To osobny element, nie pseudoelement tarczy — krycie pseudoelementu mnoży się
+przez krycie rodzica, więc znikałby razem z nią. Leży między `.shield`
+a `.overlay`, więc **cele rysują się nad nim i pozostają ostre**.
 
 ### `.shield` — zasłona poza odtwarzaniem
 
@@ -509,9 +522,9 @@ Za krótko: overlay YouTube'a przebija przy starcie; za długo: czarny kadr po
 wznowieniu. Koszt: na pauzie widać wyłącznie cele na czarnym tle, a nie
 zatrzymaną klatkę wideo.
 
-**Pokrętła, gdyby coś jeszcze mrugnęło** (wszystkie w `src/styles.css`):
-`--player-overscan` (ile playera wystaje poza scenę), opóźnienie `2600ms`
-w `transition` na `.chrome-mask` (jak długo maska żyje po starcie) i `800ms`
+**Pokrętła, gdyby coś jeszcze przebiło** (wszystkie w `src/styles.css`):
+`--player-overscan` (ile playera wystaje poza scenę), `--chrome-mask-size`
+i `blur()` na `.chrome-mask` (zasięg i siła rozmycia środka) oraz `800ms`
 zanikania `.shield`.
 
 Pasek `.transport` (`src/ui/render.ts`, między `.stage` a `.hud`, wewnątrz `.frame`)
@@ -794,7 +807,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę. Osobne testy warstw ADR-0019: `.shield` i `.chrome-mask` istnieją w DOM w kolejności `.player` → `.shield` → `.chrome-mask` → `.overlay` i obie dostają klasę `is-covering` dokładnie gdy `view.frozen`, tracąc ją przy odtwarzaniu. Realne blokowanie dotyku, krycie, geometria `--player-overscan` i animacje nie są pokryte — jsdom nie liczy layoutu ani nie animuje. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę. Osobne testy warstw ADR-0019: `.shield` i `.chrome-mask` istnieją w DOM w kolejności `.player` → `.shield` → `.chrome-mask` → `.overlay` ; `.shield` dostaje klasę `is-covering` dokładnie gdy `view.frozen` i traci ją przy odtwarzaniu, a `.chrome-mask` jest bezstanowa (klasa nie zmienia się w żadnym stanie). Realne blokowanie dotyku, krycie, rozmycie, geometria `--player-overscan` i animacje nie są pokryte — jsdom nie liczy layoutu ani nie animuje. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
 | `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
@@ -869,16 +882,13 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   względem rozmiaru sceny wymaga jednego ręcznego sprawdzenia w `npm run dev`:
   ten sam cel na telefonie i w pełnym ekranie musi lądować w tym samym miejscu
   kadru.
-- **⚠️ `--player-overscan` opiera się na niezweryfikowanym założeniu, że YouTube
-  wpisuje wideo w player z letterboxem (`contain`), a nie kadruje go (`cover`).**
-  Miniatura stanu `cued` demonstracyjnie używa `cover` (przy nadmiarze wygląda
-  na przybliżoną), ale ta jest i tak zakryta bramką i zasłoną. **Samego
-  odtwarzania nie udało się zweryfikować** — w instancji Chrome sterowanej przez
-  rozszerzenie żadne wideo YouTube nie wychodzi poza `BUFFERING` (sprawdzone na
-  dwóch filmach i na osobnej stronie testowej poza projektem, więc to
-  środowisko, nie kod). **Do sprawdzenia okiem:** czy obraz nie jest
-  przybliżony i czy ręce nadal pokrywają się z wideo. Jeśli nie —
-  `--player-overscan: 0%` przywraca poprzedni stan jedną linią.
+- **`--player-overscan` potwierdzone na urządzeniu** — obraz nie jest
+  przybliżony, a cele nadal pokrywają się z wideo, czyli YouTube faktycznie
+  wpisuje wideo w player z letterboxem, a nie kadruje go. Gdyby kiedyś
+  przestało — `--player-overscan: 0%` cofa to jedną linią.
+- **Środek kadru ma stały, delikatnie rozmyty krążek** (`.chrome-mask`) — cena
+  za brak ikony pauzy, której YouTube nie chowa sam. Cele rysują się nad maską,
+  więc pozostają ostre.
 - **Geometria i animacje z ADR-0019 nie są pokryte testami** — `jsdom` nie liczy
   layoutu, nie animuje i nie renderuje prawdziwego iframe'a; pokryte są
   wyłącznie obecność i kolejność `.shield` oraz `.chrome-mask` w DOM i
@@ -888,9 +898,9 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   YouTube'a** — ani paska tytułu, ani dużego przycisku na środku, ani „More
   videos"/logo; (3) w pełnym ekranie scena + pasek transportu + HUD mieszczą
   się w viewport.
-- **`800ms` zanikania tarczy i `2600ms` opóźnienia maski są dobrane
-  analitycznie, nie zmierzone** — długość własnych animacji YouTube'a nie jest
-  udokumentowana i może się zmienić.
+- **`800ms` zanikania tarczy jest dobrane analitycznie, nie zmierzone** —
+  długość własnej animacji zanikania overlaya YouTube'a nie jest udokumentowana
+  i może się zmienić.
 - **Zachowanie playera na pauzie/końcu przy `controls: 0` (ADR-0019) jest
   niezweryfikowane z prawdziwym YouTube** — nie wiadomo z pewnością, czy wtedy
   nie pojawia się własna nakładka YouTube („Watch on YouTube”, propozycje

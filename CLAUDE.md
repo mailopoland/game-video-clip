@@ -20,10 +20,12 @@ i `showinfo` są martwe, `rel: 0` tylko zawęża propozycje). Branding jest wido
 **w trakcie odtwarzania**, więc potrzebne są trzy środki naraz: `--player-overscan: 15%`
 robi `.player` wyższym niż scena, przez co pasek tytułu i dolny rząd wyjeżdżają poza
 `overflow: hidden` (wideo, ograniczone szerokością, zostaje na miejscu — **beatmapa bez
-migracji**); `.chrome-mask` zakrywa duży przycisk na środku, którego geometria nie ruszy;
+migracji**); `.chrome-mask` **rozmywa** (`backdrop-filter`, działa też na iframe cross-origin) duży
+przycisk na środku, którego geometria nie ruszy, bo jest wyśrodkowany razem z obrazem —
+maska jest **stała**, bo YouTube nie chowa przycisku sam (widoczny na `0:03`);
 `.shield` przechwytuje dotyk i zasłania kadr na czarno, gdy silnik jest zamrożony
-(`is-covering` ↔ `view.frozen`). Założenie letterboxu wideo jest **niezweryfikowane** —
-gdyby obraz był przybliżony, `--player-overscan: 0%` cofa zmianę.
+(`is-covering` ↔ `view.frozen`). Letterbox potwierdzony na urządzeniu — obraz nie jest
+przybliżony, cele pokrywają się z wideo; w razie czego `--player-overscan: 0%` cofa zmianę.
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.

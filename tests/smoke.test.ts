@@ -172,11 +172,13 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(shield.classList.contains('is-covering')).toBe(false);
   });
 
-  it('maska srodkowego przycisku lezy miedzy tarcza a warstwa gry i podaza za frozen', () => {
+  it('maska srodkowego przycisku lezy miedzy tarcza a warstwa gry i NIE zalezy od stanu', () => {
     // Gorny pasek tytulu i dolny rzad YouTube'a wyjezdzaja poza kadr dzieki
     // nadmiarowej wysokosci `.player` (--player-overscan), ale duzy przycisk
-    // play/pauza jest wysrodkowany razem z obrazem — geometria go nie usunie,
-    // wiec zakrywa go osobna maska (ADR-0019).
+    // play/pauza jest wysrodkowany razem z obrazem — geometria go nie usunie.
+    // Ikona pauzy NIE znika sama w trakcie odtwarzania (zweryfikowane na
+    // urzadzeniu: widoczna na 0:03, gdy maska czasowa juz zgasla), wiec maska
+    // musi byc STALA, a nie sterowana `view.frozen` (ADR-0019).
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
 
@@ -191,11 +193,11 @@ describe('smoke: render i wejscie dotykowe', () => {
 
     clock.playing = false;
     game.frame();
-    expect(mask.classList.contains('is-covering')).toBe(true);
+    expect(mask.className).toBe('chrome-mask');
 
     clock.playing = true;
     playTo(clock, game.frame, 1);
-    expect(mask.classList.contains('is-covering')).toBe(false);
+    expect(mask.className).toBe('chrome-mask');
   });
 
   it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {

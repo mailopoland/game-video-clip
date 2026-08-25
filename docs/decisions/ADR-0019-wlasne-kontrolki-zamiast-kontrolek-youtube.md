@@ -82,13 +82,26 @@ w pelnym ekranie (ADR-0010):
    `-64 px` (`-15%`); pasek tytulu, avatar, ikony i logo znikaja ze sceny.
 
 1d. **`.chrome-mask` — maska duzego przycisku play/pauza.** Geometria z (1c) nie
-   usunie przycisku na srodku, bo jest on wysrodkowany **razem z obrazem** —
-   zadne przesuniecie playera ich nie rozdzieli. Zostaje zakrycie: osobny
-   element (nie pseudoelement tarczy — krycie pseudoelementu mnozy sie przez
-   krycie rodzica, wiec znikalby razem z nia), okrag o srednicy
-   `clamp(60px, 10%, 96px)`, miedzy `.shield` a `.overlay`. Trzyma sie tego
-   samego stanu co tarcza, ale znika z **opoznieniem `2600ms`**, bo YouTube
-   pokazuje swoj przycisk jeszcze chwile po wejsciu w `PLAYING`.
+   usunie przycisku na srodku, bo jest on wysrodkowany **razem z obrazem**:
+   wideo jest wycentrowane w playerze, wiec srodek playera zawsze pokrywa sie
+   ze srodkiem obrazu i zadne przesuniecie ich nie rozdzieli. Zostaje zakrycie.
+
+   **Maska jest STALA, nie sterowana `view.frozen`.** Pierwsza wersja gasla
+   z opoznieniem `2600ms`, w zalozeniu ze YouTube sam chowa przycisk po starcie.
+   Obalone na urzadzeniu: ikona pauzy jest widoczna na `0:03`, dokladnie gdy
+   maska zgasla. Kazdy wariant czasowy tylko odsuwa problem.
+
+   **Zamiast czarnej dziury — rozmycie tla.** Nieprzezroczysta plama byla
+   rownie zla jak sama ikona („czarna dziura"). `backdrop-filter: blur(26px)`
+   dziala takze na tresc iframe'a **cross-origin** — nie czyta pikseli, wiec
+   nie narusza origin — co zweryfikowano w przegladarce: przycisk rozplywa sie
+   w nieczytelna plame, a wideo pod spodem zostaje widoczne. Lekka zaslonka
+   `rgb(0 0 0 / 0.35)` zbija kontrast ikony, a `mask-image` z gradientem
+   radialnym daje miekka krawedz zamiast ostrego kola.
+
+   Osobny element, nie pseudoelement tarczy: krycie pseudoelementu mnozy sie
+   przez krycie rodzica, wiec znikalby razem z zaslona. Lezy miedzy `.shield`
+   a `.overlay`, wiec cele rysuja sie nad nim i pozostaja ostre.
 
 2. **`controls: 0` i `disablekb: 1`** w `playerVars` (`src/ui/youtube.ts`) —
    YouTube nie renderuje wlasnych kontrolek ani nie reaguje na klawiature.
@@ -124,16 +137,16 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   (`.overlay` maluje sie nad tarcza) na czarnym tle, a nie zatrzymana klatke
   wideo. To swiadomy koszt: alternatywa to pokazywanie brandingu YouTube'a,
   ktorego nie da sie ukryc inaczej.
-- **⚠️ Zalozenie niezweryfikowane: `--player-overscan` opiera sie na tym, ze
-  YouTube wpisuje wideo w player z letterboxem (`contain`), nie kadruje go
-  (`cover`).** Miniatura stanu `cued` demonstracyjnie uzywa `cover` (przy
-  nadmiarze wyglada na przyblizona), ale ta jest i tak zakryta bramka
-  i zaslona. Samego **odtwarzania nie udalo sie zweryfikowac** — w instancji
-  Chrome sterowanej przez rozszerzenie zadne wideo YouTube nie wychodzi poza
-  `BUFFERING` (sprawdzone na dwoch filmach i na osobnej stronie testowej poza
-  projektem, wiec to srodowisko, nie kod). Gdyby obraz okazal sie przyblizony
-  i cele przestaly pasowac do wideo — `--player-overscan: 0%` przywraca
-  poprzedni stan jedna linia.
+- **`--player-overscan` potwierdzone na urzadzeniu.** Zalozenie, ze YouTube
+  wpisuje wideo w player z letterboxem (`contain`), a nie kadruje go (`cover`),
+  sprawdzilo sie: przy nadmiarze obraz nie jest przyblizony, a cele nadal
+  pokrywaja sie z wideo — czyli wspolrzedne beatmapy pozostaly wazne.
+  (Miniatura stanu `cued` faktycznie uzywa `cover` i wyglada na przyblizona,
+  ale jest zakryta bramka i zaslona, wiec nie ma to znaczenia.)
+  Gdyby kiedys przestalo — `--player-overscan: 0%` cofa zmiane jedna linia.
+- **Srodek kadru ma staly, delikatnie rozmyty krazek.** Cena za brak ikony
+  pauzy: maska nie moze byc czasowa, bo YouTube nie chowa przycisku sam.
+  Cele rysuja sie nad maska, wiec pozostaja ostre.
 - Nietestowalne w jsdom (jak `cqw` w ADR-0014): rzeczywiste blokowanie dotyku,
   realne krycie tarczy, dobor `800ms`/`2600ms`, `--player-overscan` i
   `--hud-height` — jsdom nie liczy layoutu, nie animuje i nie renderuje
@@ -166,3 +179,9 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
 - **Nieprzezroczyste pasy na gorze i dole sceny** — zero ryzyka geometrycznego,
   ale kasuje ok. 28% obrazu wideo na stale. Odrzucone: (1c) osiaga to samo
   bez straty obrazu.
+- **Czasowa maska srodkowego przycisku** (gasnaca po `2600ms`) — wdrozona
+  i obalona na urzadzeniu: ikona pauzy jest widoczna na `0:03`. YouTube nie
+  chowa przycisku sam, wiec maska musi byc stala.
+- **Nieprzezroczysta (czarna) maska srodka** — wdrozona i odrzucona po
+  opinii uzytkownika: „czarna dziura" w srodku kadru jest rownie zla jak
+  sama ikona. Stad rozmycie tla zamiast zakrycia go.

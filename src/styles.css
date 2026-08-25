@@ -68,9 +68,9 @@ html.has-pseudo-fullscreen body {
   container-type: inline-size;
   /* Ile playera wystaje poza scene u gory i u dolu — patrz `.player` (ADR-0019). */
   --player-overscan: 15%;
-  /* Srednica maski duzego przycisku YouTube'a. Sam przycisk ma ok. 50-70 px
-     niezaleznie od rozmiaru sceny, stad clamp zamiast czystych procentow. */
-  --chrome-mask-size: clamp(60px, 10%, 96px);
+  /* Srednica maski duzego przycisku YouTube'a. Przycisk skaluje sie z playerem,
+     ale nie liniowo, stad clamp: dol chroni telefon, gora — duzy ekran. */
+  --chrome-mask-size: clamp(72px, 15%, 132px);
 }
 
 /* Player jest CELOWO wyzszy niz scena. YouTube kotwiczy pasek tytulu (gora)
@@ -136,12 +136,22 @@ html.has-pseudo-fullscreen body {
   transition: none;
 }
 
-/* Maska duzego przycisku play/pauza. Osobny element, NIE pseudoelement tarczy:
-   krycie pseudoelementu mnozy sie przez krycie rodzica, wiec zniknalby razem
-   z nia. Musi zyc dluzej — YouTube trzyma swoj przycisk jeszcze chwile PO
-   wejsciu w PLAYING, a geometria (`--player-overscan`) go nie usunie, bo jest
-   wysrodkowany razem z obrazem. Stad OPOZNIENIE w `transition` (ADR-0019).
-   To drugie pokretlo, gdyby przycisk zdazyl mrugnac: zwieksz opoznienie. */
+/* Maska duzego przycisku play/pauza YouTube'a. Geometria (`--player-overscan`)
+   go nie usunie, bo jest wysrodkowany RAZEM z obrazem — przesuniecie playera
+   przesuwa oba, wiec nigdy sie nie rozjada.
+
+   Maska jest STALA, nie sterowana `view.frozen`: ikona pauzy nie znika sama
+   w trakcie odtwarzania (zweryfikowane na urzadzeniu — widoczna na 0:03, gdy
+   wczesniejsza maska czasowa juz zgasla), wiec kazdy wariant czasowy tylko
+   odsuwa problem.
+
+   Zamiast czarnej dziury ROZMYWAMY tlo pod spodem: `backdrop-filter` dziala
+   takze na tresc iframe'a cross-origin (nie czyta pikseli, wiec nie narusza
+   origin) — zweryfikowane w przegladarce. Ikona rozplywa sie w nieczytelna
+   plame, a wideo zostaje widoczne. Lekka zaslonka zbija jej kontrast, a
+   `mask-image` daje miekka krawedz zamiast ostrego kola (ADR-0019).
+
+   Pokretla: `--chrome-mask-size` (srednica) i `blur()` ponizej. */
 .chrome-mask {
   position: absolute;
   left: 50%;
@@ -149,16 +159,12 @@ html.has-pseudo-fullscreen body {
   translate: -50% -50%;
   width: var(--chrome-mask-size);
   aspect-ratio: 1;
-  border-radius: 50%;
-  background: #000;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 400ms ease-out 2600ms;
-}
-
-.chrome-mask.is-covering {
-  opacity: 1;
-  transition: none;
+  background: rgb(0 0 0 / 0.35);
+  -webkit-backdrop-filter: blur(26px);
+  backdrop-filter: blur(26px);
+  -webkit-mask-image: radial-gradient(circle, #000 62%, transparent 88%);
+  mask-image: radial-gradient(circle, #000 62%, transparent 88%);
 }
 
 /* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny
