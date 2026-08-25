@@ -13,7 +13,9 @@ uzasadnienia po ADR-0019 (koszt migracji beatmapy).
 Kontrolki YouTube są wyłączone (`controls: 0`, `disablekb: 1`) i player nie reaguje na
 wskaźnik — całe sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez własny
 pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w pełnym ekranie (ADR-0019,
-unieważnia mitygację z ADR-0008).
+unieważnia mitygację z ADR-0008). `pointer-events: none` na samym iframie nie wystarczyło
+na iOS Safari (dotyk przebijał się do natywnych kontrolek YouTube) — dodatkowa warstwa
+`.shield` między `.player` a `.overlay` fizycznie przechwytuje dotyk.
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.
@@ -22,7 +24,7 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 210 testów, zielone.
+`npm test` — 211 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

@@ -61,6 +61,7 @@ export function createUi(
     <div class="frame" id="frame">
       <main class="stage" id="stage">
         <div class="player" id="player"></div>
+        <div class="shield" id="shield"></div>
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
           <button class="gate-button" id="start" type="button">Graj</button>

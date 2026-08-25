@@ -30,7 +30,19 @@ trafia do wlasnego paska **pod scena**, wewnatrz `.frame`, wiec dziala tez
 w pelnym ekranie (ADR-0010):
 
 1. **`.player iframe { pointer-events: none; }`** — blokada wskaznika na
-   iframie, bez nowego wezla DOM.
+   iframie. **Niewystarczajaca sama w sobie** — na iOS Safari `pointer-events:
+   none` na iframie nie jest niezawodne dla wbudowanego `<video>` (potwierdzone
+   na urzadzeniu: dotkniecie mimo tego przebijalo sie do natywnych kontrolek
+   YouTube, w tym duzej ikony pauzy na srodku ekranu). Dlatego dochodzi:
+1b. **`.shield`** — przezroczysta warstwa `position: absolute; inset: 0` miedzy
+   `.player` a `.overlay` w DOM, z `pointer-events: auto`. Fizycznie przechwytuje
+   kazde dotkniecie na poziomie hit-testu DOM, zanim dotrze do iframe'a — nie
+   polega na `pointer-events` dzialajacym poprawnie wewnatrz zagniezdzonego
+   dokumentu. Malowana NAD playerem, ale POD `.overlay`/`.gate`/`.results`
+   (kolejnosc w DOM), wiec cele, bramka startowa i ekran wyniku zostaja
+   klikalne bez zmian. Zdarzenia `pointerdown`/`contextmenu` trybu dev nadal
+   dzialaja — nasluchy sa na `ui.stage`, wiec bubblowanie z tarczy do gory
+   ich nie omija.
 2. **`controls: 0` i `disablekb: 1`** w `playerVars` (`src/ui/youtube.ts`) —
    YouTube nie renderuje wlasnych kontrolek ani nie reaguje na klawiature.
 3. **`.transport`** — nowy pasek w `src/ui/render.ts`: play/pauza, suwak
@@ -61,9 +73,11 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   prawdopodobnie zbedny, skoro iframe juz nie przechwytuje wskaznika —
   zostaje bez zmian do czasu recznej weryfikacji i ewentualnego usuniecia
   osobnym krokiem.
-- Nietestowalne w jsdom (jak `cqw` w ADR-0014): `pointer-events: none` na
-  iframie i `--hud-height` — jsdom nie liczy layoutu. Wymagaja recznej
-  weryfikacji w przegladarce.
+- Nietestowalne w jsdom (jak `cqw` w ADR-0014): rzeczywiste blokowanie dotyku
+  przez `.shield`/`pointer-events: none` na iframie i `--hud-height` — jsdom
+  nie liczy layoutu ani nie renderuje prawdziwego iframe'a. Pokryta jest
+  wylacznie obecnosc i kolejnosc `.shield` w DOM (`tests/smoke.test.ts`);
+  realne blokowanie dotyku wymaga recznej weryfikacji w przegladarce.
 
 ## Odrzucone warianty
 

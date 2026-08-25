@@ -135,6 +135,25 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(frame.contains(game.ui.playerHost)).toBe(true);
   });
 
+  it('tarcza nad playerem znajduje sie miedzy .player a .overlay w porzadku DOM', () => {
+    // Chroni przed dotknieciem iframe'a YouTube (kontrolki, duza ikona pauzy) —
+    // `pointer-events: none` na iframie samo w sobie nie jest niezawodne na iOS
+    // Safari (ADR-0019). Tarcza musi malowac sie NAD playerem, ale POD .overlay
+    // (i wiec pod .obj/.gate/.results), zeby cele i bramka zostaly klikalne.
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+
+    const shield = root.querySelector<HTMLElement>('#shield')!;
+    expect(shield).not.toBeNull();
+
+    const playerPos = game.ui.playerHost.compareDocumentPosition(shield);
+    expect(playerPos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const overlay = root.querySelector<HTMLElement>('#overlay')!;
+    const shieldPos = shield.compareDocumentPosition(overlay);
+    expect(shieldPos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });

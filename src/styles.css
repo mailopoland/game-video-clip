@@ -83,6 +83,20 @@ html.has-pseudo-fullscreen body {
   pointer-events: none;
 }
 
+/* Tarcza: `pointer-events: none` na iframie NIE jest niezawodne na iOS Safari
+   dla wbudowanego <video> — dotkniecie potrafi mimo to przebic sie do
+   natywnych kontrolek YouTube (duza ikona pauzy, pasek tytulu, logo).
+   Zamiast polegac wylacznie na tej wlasciwosci CSS, przezroczysta warstwa
+   z `pointer-events: auto` fizycznie przechwytuje kazde dotkniecie na
+   poziomie hit-testu DOM, zanim dotrze do iframe'a. Malowana NAD playerem,
+   ale POD .overlay/.gate/.results (kolejnosc w DOM), wiec cele, bramka
+   i ekran wyniku zostaja klikalne bez zmian (ADR-0019). */
+.shield {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
 /* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny
    (mitygacja z ADR-0008). Pas jest w PROCENTACH, nie w rem: wartosc absolutna
    stanowila 5% wysokosci sceny w pelnym ekranie i 27% na telefonie, przez co
