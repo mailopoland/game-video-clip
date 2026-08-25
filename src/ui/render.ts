@@ -102,6 +102,7 @@ export function createUi(
   const results = byId('results');
   const hudScore = byId('hud-score');
   const hudFrozen = byId('hud-frozen');
+  const shield = byId('shield');
 
   const transportPlay = byId<HTMLButtonElement>('transport-play');
   const transportSeek = byId<HTMLInputElement>('transport-seek');
@@ -192,6 +193,13 @@ export function createUi(
 
     hudScore.textContent = String(view.stats.score);
     hudFrozen.hidden = !view.frozen;
+
+    // Poza stanem PLAYING YouTube rysuje wlasny overlay (tytul, avatar kanalu,
+    // udostepnianie, miniatury powiazane, logo, duzy przycisk) i zadne
+    // `playerVars` tego nie wylaczaja — `modestbranding`/`showinfo` sa martwe,
+    // a `rel: 0` od 2018 tylko zawezaja propozycje. Zaslaniamy wiec kadr
+    // wlasna warstwa dokladnie wtedy, gdy silnik jest zamrozony (ADR-0019).
+    shield.classList.toggle('is-covering', view.frozen);
 
     if (transportControls) {
       lastFrozen = view.frozen;

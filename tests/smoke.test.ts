@@ -154,6 +154,24 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(shieldPos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('tarcza zakrywa kadr, gdy silnik jest zamrozony, i odslania go przy odtwarzaniu', () => {
+    // YouTube rysuje overlay stanu "pauza" (tytul, avatar, udostepnianie,
+    // miniatury powiazane, logo, duzy przycisk) niezaleznie od `controls: 0`;
+    // `modestbranding`/`showinfo` sa martwe, a `rel: 0` nie wylacza propozycji.
+    // Jedyne skuteczne wyjscie to zaslonic kadr wlasna warstwa (ADR-0019).
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const shield = root.querySelector<HTMLElement>('#shield')!;
+
+    clock.playing = false;
+    game.frame();
+    expect(shield.classList.contains('is-covering')).toBe(true);
+
+    clock.playing = true;
+    playTo(clock, game.frame, 1);
+    expect(shield.classList.contains('is-covering')).toBe(false);
+  });
+
   it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });

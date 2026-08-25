@@ -95,6 +95,26 @@ html.has-pseudo-fullscreen body {
   position: absolute;
   inset: 0;
   pointer-events: auto;
+  /* Druga robota tarczy: ZASLANIA kadr, gdy player nie odtwarza. Poza stanem
+     PLAYING YouTube rysuje wlasny overlay (tytul, avatar kanalu, ikona
+     udostepniania, miniatury powiazane, logo, duzy przycisk pauzy) i zaden
+     `playerVar` tego nie wylacza — `modestbranding`/`showinfo` sa martwe,
+     a `rel: 0` od 2018 tylko zaweza propozycje do tego samego kanalu.
+     Zaslona jest wiec jedynym skutecznym srodkiem (ADR-0019). */
+  background: #000;
+  opacity: 0;
+  /* Odslanianie jest POWOLNE i maskuje wlasna animacje zanikania YouTube'a,
+     ktora trwa jeszcze chwile po wejsciu w stan PLAYING. Za krotko = overlay
+     YouTube'a przebija w trakcie startu; za dlugo = czarny kadr po wznowieniu.
+     To jedyna wartosc do strojenia, gdyby cos jeszcze mrugalo. */
+  transition: opacity 800ms ease-out;
+}
+
+/* Zaslanianie jest NATYCHMIASTOWE — inaczej overlay YouTube'a zdazylby
+   mrugnac w trakcie przejscia. */
+.shield.is-covering {
+  opacity: 1;
+  transition: none;
 }
 
 /* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny
