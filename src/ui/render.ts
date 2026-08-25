@@ -62,6 +62,7 @@ export function createUi(
       <main class="stage" id="stage">
         <div class="player" id="player"></div>
         <div class="shield" id="shield"></div>
+        <div class="chrome-mask" id="chrome-mask"></div>
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
           <button class="gate-button" id="start" type="button">Graj</button>
@@ -103,6 +104,7 @@ export function createUi(
   const hudScore = byId('hud-score');
   const hudFrozen = byId('hud-frozen');
   const shield = byId('shield');
+  const chromeMask = byId('chrome-mask');
 
   const transportPlay = byId<HTMLButtonElement>('transport-play');
   const transportSeek = byId<HTMLInputElement>('transport-seek');
@@ -200,6 +202,11 @@ export function createUi(
     // a `rel: 0` od 2018 tylko zawezaja propozycje. Zaslaniamy wiec kadr
     // wlasna warstwa dokladnie wtedy, gdy silnik jest zamrozony (ADR-0019).
     shield.classList.toggle('is-covering', view.frozen);
+    // Maska duzego przycisku play/pauza. Trzyma sie tego samego stanu co
+    // tarcza, ale w CSS znika z opoznieniem — YouTube pokazuje swoj przycisk
+    // jeszcze przez chwile PO wejsciu w PLAYING, a geometria go nie usunie,
+    // bo jest wysrodkowany razem z obrazem (ADR-0019).
+    chromeMask.classList.toggle('is-covering', view.frozen);
 
     if (transportControls) {
       lastFrozen = view.frozen;

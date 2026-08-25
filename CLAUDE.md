@@ -16,10 +16,14 @@ pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w pełnym ek
 unieważnia mitygację z ADR-0008). Sama blokada wskaźnika **nie ukrywa** brandingu
 YouTube'a — poza stanem `PLAYING` player rysuje własny overlay (tytuł, avatar, logo,
 miniatury, duży przycisk), którego nie wyłącza żaden `playerVar` (`modestbranding`
-i `showinfo` są martwe, `rel: 0` tylko zawęża propozycje). Dlatego warstwa `.shield`
-między `.player` a `.overlay` przechwytuje dotyk **i zasłania kadr na czarno dokładnie
-wtedy, gdy silnik jest zamrożony** (`is-covering` ↔ `view.frozen`): zasłania
-natychmiast, odsłania przez `800ms` (maskuje animację zanikania YouTube'a).
+i `showinfo` są martwe, `rel: 0` tylko zawęża propozycje). Branding jest widoczny też
+**w trakcie odtwarzania**, więc potrzebne są trzy środki naraz: `--player-overscan: 15%`
+robi `.player` wyższym niż scena, przez co pasek tytułu i dolny rząd wyjeżdżają poza
+`overflow: hidden` (wideo, ograniczone szerokością, zostaje na miejscu — **beatmapa bez
+migracji**); `.chrome-mask` zakrywa duży przycisk na środku, którego geometria nie ruszy;
+`.shield` przechwytuje dotyk i zasłania kadr na czarno, gdy silnik jest zamrożony
+(`is-covering` ↔ `view.frozen`). Założenie letterboxu wideo jest **niezweryfikowane** —
+gdyby obraz był przybliżony, `--player-overscan: 0%` cofa zmianę.
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.
@@ -28,7 +32,7 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 212 testów, zielone.
+`npm test` — 213 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

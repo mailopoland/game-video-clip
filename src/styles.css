@@ -66,9 +66,28 @@ html.has-pseudo-fullscreen body {
   overflow: hidden;
   touch-action: manipulation; /* brak 300 ms opoznienia i double-tap-zoom */
   container-type: inline-size;
+  /* Ile playera wystaje poza scene u gory i u dolu — patrz `.player` (ADR-0019). */
+  --player-overscan: 15%;
+  /* Srednica maski duzego przycisku YouTube'a. Sam przycisk ma ok. 50-70 px
+     niezaleznie od rozmiaru sceny, stad clamp zamiast czystych procentow. */
+  --chrome-mask-size: clamp(60px, 10%, 96px);
 }
 
-.player,
+/* Player jest CELOWO wyzszy niz scena. YouTube kotwiczy pasek tytulu (gora)
+   oraz ikony udostepniania / "More videos" / logo (dol) do krawedzi PLAYERA,
+   a wideo 16:9 wpisuje w niego z letterboxem. Przy nadmiarze `--player-overscan`
+   u gory i u dolu branding wyjezdza poza `.stage` (`overflow: hidden`), a samo
+   wideo — ograniczone szerokoscia — laduje dokladnie tam, gdzie bylo. Dzieki
+   temu wspolrzedne beatmapy zostaja nietkniete (ADR-0019).
+   ⚠️ Gdyby obraz wygladal na przyblizony, ustaw `--player-overscan: 0%`. */
+.player {
+  position: absolute;
+  left: 0;
+  top: calc(-1 * var(--player-overscan));
+  width: 100%;
+  height: calc(100% + 2 * var(--player-overscan));
+}
+
 .player iframe {
   width: 100%;
   height: 100%;
@@ -113,6 +132,31 @@ html.has-pseudo-fullscreen body {
 /* Zaslanianie jest NATYCHMIASTOWE — inaczej overlay YouTube'a zdazylby
    mrugnac w trakcie przejscia. */
 .shield.is-covering {
+  opacity: 1;
+  transition: none;
+}
+
+/* Maska duzego przycisku play/pauza. Osobny element, NIE pseudoelement tarczy:
+   krycie pseudoelementu mnozy sie przez krycie rodzica, wiec zniknalby razem
+   z nia. Musi zyc dluzej — YouTube trzyma swoj przycisk jeszcze chwile PO
+   wejsciu w PLAYING, a geometria (`--player-overscan`) go nie usunie, bo jest
+   wysrodkowany razem z obrazem. Stad OPOZNIENIE w `transition` (ADR-0019).
+   To drugie pokretlo, gdyby przycisk zdazyl mrugnac: zwieksz opoznienie. */
+.chrome-mask {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: var(--chrome-mask-size);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease-out 2600ms;
+}
+
+.chrome-mask.is-covering {
   opacity: 1;
   transition: none;
 }

@@ -64,6 +64,32 @@ w pelnym ekranie (ADR-0010):
    wlasna animacje zanikania YouTube'a, ktora trwa jeszcze chwile po
    wejsciu w `PLAYING`. `800ms` to jedyna wartosc do strojenia, gdyby cos
    jeszcze przebijalo.
+1c. **`--player-overscan: 15%` — player wyzszy niz scena.** Zaslona z punktu (1b)
+   dziala tylko poza stanem `PLAYING`; zweryfikowane w przegladarce, ze branding
+   **jest widoczny takze w trakcie odtwarzania** (zrzut uzytkownika: `0:01 / 2:30`,
+   przycisk „Pauza", pelny branding na ekranie). Zadne opoznienie zanikania tego
+   nie rozwiaze.
+
+   YouTube kotwiczy pasek tytulu (gora) oraz ikony udostepniania, „More videos"
+   i logo (dol) do krawedzi **playera**, a wideo 16:9 wpisuje w niego z
+   letterboxem. Jesli wiec `.player` jest o `--player-overscan` wyzszy u gory
+   i u dolu, branding wyjezdza poza `.stage` (`overflow: hidden`), a samo wideo —
+   ograniczone szerokoscia — laduje **dokladnie tam, gdzie bylo**. Kluczowa
+   konsekwencja: **wspolrzedne beatmapy zostaja nietkniete**, wiec 73 nagrane
+   pozycje reki nie wymagaja migracji.
+
+   Zmierzone w przegladarce: scena 426 px → player 554 px (`+30%`), przesuniecie
+   `-64 px` (`-15%`); pasek tytulu, avatar, ikony i logo znikaja ze sceny.
+
+1d. **`.chrome-mask` — maska duzego przycisku play/pauza.** Geometria z (1c) nie
+   usunie przycisku na srodku, bo jest on wysrodkowany **razem z obrazem** —
+   zadne przesuniecie playera ich nie rozdzieli. Zostaje zakrycie: osobny
+   element (nie pseudoelement tarczy — krycie pseudoelementu mnozy sie przez
+   krycie rodzica, wiec znikalby razem z nia), okrag o srednicy
+   `clamp(60px, 10%, 96px)`, miedzy `.shield` a `.overlay`. Trzyma sie tego
+   samego stanu co tarcza, ale znika z **opoznieniem `2600ms`**, bo YouTube
+   pokazuje swoj przycisk jeszcze chwile po wejsciu w `PLAYING`.
+
 2. **`controls: 0` i `disablekb: 1`** w `playerVars` (`src/ui/youtube.ts`) —
    YouTube nie renderuje wlasnych kontrolek ani nie reaguje na klawiature.
 3. **`.transport`** — nowy pasek w `src/ui/render.ts`: play/pauza, suwak
@@ -98,12 +124,22 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   (`.overlay` maluje sie nad tarcza) na czarnym tle, a nie zatrzymana klatke
   wideo. To swiadomy koszt: alternatywa to pokazywanie brandingu YouTube'a,
   ktorego nie da sie ukryc inaczej.
+- **⚠️ Zalozenie niezweryfikowane: `--player-overscan` opiera sie na tym, ze
+  YouTube wpisuje wideo w player z letterboxem (`contain`), nie kadruje go
+  (`cover`).** Miniatura stanu `cued` demonstracyjnie uzywa `cover` (przy
+  nadmiarze wyglada na przyblizona), ale ta jest i tak zakryta bramka
+  i zaslona. Samego **odtwarzania nie udalo sie zweryfikowac** — w instancji
+  Chrome sterowanej przez rozszerzenie zadne wideo YouTube nie wychodzi poza
+  `BUFFERING` (sprawdzone na dwoch filmach i na osobnej stronie testowej poza
+  projektem, wiec to srodowisko, nie kod). Gdyby obraz okazal sie przyblizony
+  i cele przestaly pasowac do wideo — `--player-overscan: 0%` przywraca
+  poprzedni stan jedna linia.
 - Nietestowalne w jsdom (jak `cqw` w ADR-0014): rzeczywiste blokowanie dotyku,
-  realne krycie tarczy, dobor `800ms` i `--hud-height` — jsdom nie liczy
-  layoutu, nie animuje i nie renderuje prawdziwego iframe'a. Pokryte testami
-  sa wylacznie obecnosc i kolejnosc `.shield` w DOM oraz przelaczanie klasy
-  `is-covering` na `view.frozen` (`tests/smoke.test.ts`); reszta wymaga
-  recznej weryfikacji w przegladarce.
+  realne krycie tarczy, dobor `800ms`/`2600ms`, `--player-overscan` i
+  `--hud-height` — jsdom nie liczy layoutu, nie animuje i nie renderuje
+  prawdziwego iframe'a. Pokryte testami sa wylacznie obecnosc i kolejnosc
+  `.shield` oraz `.chrome-mask` w DOM i przelaczanie klasy `is-covering` na
+  `view.frozen` (`tests/smoke.test.ts`); reszta wymaga recznej weryfikacji.
 
 ## Odrzucone warianty
 
@@ -120,8 +156,13 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   `iv_load_policy`)** — nie ma czym ukryc tego overlaya. `modestbranding`
   i `showinfo` sa oficjalnie martwe (odpowiednio 2023 i 2018), a `rel: 0`
   od 2018 nie wylacza propozycji, tylko zaweza je do tego samego kanalu.
-- **Powiekszenie iframe'a i przyciecie kadru (`overflow: hidden`)** — klasyczny
-  trik wypychajacy chrome poza widoczny obszar. Dziala na elementy przy
-  krawedziach (pasek tytulu, logo), ale **nie na duzy przycisk na srodku**,
-  ktory jest wysrodkowany razem z obrazem; zeby go wyciac, trzeba by przyciac
-  takze sam kadr wideo.
+- **Sama zaslona na `view.frozen`, bez geometrii** — pierwsza wersja tej
+  decyzji. Niewystarczajaca: branding jest widoczny takze w stanie `PLAYING`,
+  gdzie zaslona jest juz zdjeta. Stad (1c) i (1d).
+- **SKALOWANIE iframe'a (zoom) z przycieciem** — wypycha branding poza kadr,
+  ale powieksza i kadruje obraz, przez co wszystkie 73 nagrane pozycje reki
+  przestaja pasowac do wideo. Odrzucone na rzecz (1c), ktore zwieksza player
+  bez skalowania obrazu, wiec geometria beatmapy zostaje.
+- **Nieprzezroczyste pasy na gorze i dole sceny** — zero ryzyka geometrycznego,
+  ale kasuje ok. 28% obrazu wideo na stale. Odrzucone: (1c) osiaga to samo
+  bez straty obrazu.
