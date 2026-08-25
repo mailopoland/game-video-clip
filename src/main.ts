@@ -98,6 +98,14 @@ async function bootstrap(): Promise<void> {
   game.ui.playerHost.append(host);
   player = await createPlayer(host, beatmap.videoId);
   game.ui.setStartEnabled(true);
+  game.ui.enableTransport({
+    play: () => player?.play(),
+    pause: () => player?.pause(),
+    seekTo: (sec) => player?.seekTo(sec),
+    getDuration: () => player?.getDuration() ?? 0,
+    isMuted: () => player?.isMuted() ?? false,
+    setMuted: (muted) => player?.setMuted(muted),
+  });
 }
 
 bootstrap().catch((error: unknown) => {

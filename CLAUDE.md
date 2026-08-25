@@ -7,8 +7,13 @@ Obiekty beatmapy mają wyłącznie `path` (min. 2 punkty `t/x/y/size`, interpola
 w silniku) — `path[0].t`/`path[ostatni].t` to spawn/despawn, bez osobnych pól czasowych.
 Reka jest klikalna przez cały czas trwania ścieżki: klik w tym oknie = trafienie, brak
 kliku do despawnu = pudło. Approach circle i `is-armed` zostały usunięte (ADR-0015).
-Pas kontrolek YouTube pod sceną jest wyrażony w procentach (`8%`), nie w `rem`, więc
-pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014).
+Pas dawnych kontrolek YouTube pod sceną jest wyrażony w procentach (`8%`), nie w `rem`, więc
+pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014); zostaje mimo utraty
+uzasadnienia po ADR-0019 (koszt migracji beatmapy).
+Kontrolki YouTube są wyłączone (`controls: 0`, `disablekb: 1`) i player nie reaguje na
+wskaźnik — całe sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez własny
+pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w pełnym ekranie (ADR-0019,
+unieważnia mitygację z ADR-0008).
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.
@@ -17,7 +22,7 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 197 testów, zielone.
+`npm test` — 210 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -153,3 +158,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0016 — Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)
 - [ADR-0017 — Dźwięk trafienia przez Web Audio na zdekodowanym buforze](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md)
 - [ADR-0018 — Tryb deweloperski edycji punktów ścieżki](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md)
+- [ADR-0019 — Własne kontrolki zamiast kontrolek YouTube](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md)

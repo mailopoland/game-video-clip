@@ -21,9 +21,12 @@ body {
 /* Ramka = scena + HUD. To ona idzie na pelny ekran, zeby warstwa gry i HUD
    trafily tam razem z odtwarzaczem (ADR-0010). */
 .frame {
-  /* Jedno zrodlo szerokosci dla sceny i HUD-u — HUD ma konczyc sie rowno
-     z krawedzia wideo, takze po wejsciu w pelny ekran. */
-  --stage-width: min(100vw, calc((100dvh - 3.5rem) * 16 / 9), 1280px);
+  /* Jedno zrodlo szerokosci dla sceny, paska transportu i HUD-u — maja
+     konczyc sie rowno z krawedzia wideo, takze po wejsciu w pelny ekran.
+     --hud-height = HUD (3.5rem) + transport (3rem): bez tego w pelnym
+     ekranie scena + oba paski nie zmiescilyby sie w viewport (ADR-0019). */
+  --hud-height: 6.5rem;
+  --stage-width: min(100vw, calc((100dvh - var(--hud-height)) * 16 / 9), 1280px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -71,6 +74,13 @@ html.has-pseudo-fullscreen body {
   height: 100%;
   border: 0;
   display: block;
+}
+
+/* Odtwarzacz nie reaguje na wskaznik — kontrolki YouTube sa wylaczone
+   (`controls: 0`), a bez tego klik obok celu wciaz trafialby do dokumentu
+   YouTube'a i pauzowal wideo. Cale sterowanie zyje w .transport (ADR-0019). */
+.player iframe {
+  pointer-events: none;
 }
 
 /* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny
@@ -231,6 +241,68 @@ html.has-pseudo-fullscreen body {
   margin: 0;
   text-align: left;
   font-weight: 700;
+}
+
+/* --- Pasek transportu: wlasne sterowanie zamiast kontrolek YouTube (ADR-0019) --- */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: var(--stage-width);
+  height: 3rem;
+  padding: 0 0.75rem;
+  touch-action: manipulation;
+}
+
+.transport-button {
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  flex: none;
+  padding: 0.4rem 0.9rem;
+  min-height: 2.25rem;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.transport-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.transport-seek {
+  flex: 1;
+  min-width: 0;
+}
+
+.transport-seek::-webkit-slider-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: #6ef58f;
+  cursor: pointer;
+}
+
+.transport-seek::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border: 0;
+  border-radius: 50%;
+  background: #6ef58f;
+  cursor: pointer;
+}
+
+.transport-time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8rem;
+  opacity: 0.85;
 }
 
 /* --- HUD --- */

@@ -9,11 +9,15 @@ interface YtPlayer {
   getPlayerState(): number;
   getVolume(): number;
   isMuted(): boolean;
+  mute(): void;
+  unMute(): void;
+  setVolume(volume: number): void;
   playVideo(): void;
   pauseVideo(): void;
   getPlaybackRate(): number;
   setPlaybackRate(rate: number): void;
   getAvailablePlaybackRates(): number[];
+  getDuration(): number;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
 }
 
@@ -60,6 +64,13 @@ export interface PlayerHandle extends TimeSource {
   getAvailablePlaybackRates(): number[];
   /** Trybu deweloperskiego: przesuniecie czasu wideo o `deltaSec` (moze byc ujemne). */
   seekBy(deltaSec: number): void;
+  /** Absolutne przewiniecie — pasek transportu (ADR-0019). */
+  seekTo(sec: number): void;
+  /** Dlugosc wideo w sekundach; `0` do czasu, gdy YouTube dostarczy metadane. */
+  getDuration(): number;
+  isMuted(): boolean;
+  /** `false` odcisza i ustawia glosnosc na 100% (ADR-0019). */
+  setMuted(muted: boolean): void;
 }
 
 /**
@@ -75,7 +86,11 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
       // fs: 0 usuwa przycisk pelnego ekranu YouTube. Rozszerzalby sam iframe,
       // ktory w top layer zaslonilby cala warstwe gry (ADR-0010) — pelny ekran
       // obsluguje wlasny przycisk w HUD.
-      playerVars: { playsinline: 1, rel: 0, modestbranding: 1, fs: 0 },
+      // controls: 0 i disablekb: 1 wylaczaja wlasne kontrolki playera —
+      // klik w kadr obok celu psul rozgrywke (kontrolki YT + pauza na dotyku).
+      // Sterowanie przenosi sie w calosci do paska transportu pod scena
+      // (ADR-0019).
+      playerVars: { playsinline: 1, rel: 0, modestbranding: 1, fs: 0, controls: 0, disablekb: 1 },
       events: { onReady: () => resolve(instance) },
     });
   });
@@ -95,6 +110,17 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
       if (!wasPlaying) {
         player.playVideo();
         player.pauseVideo();
+      }
+    },
+    seekTo: (sec) => player.seekTo(sec, true),
+    getDuration: () => player.getDuration(),
+    isMuted: () => player.isMuted(),
+    setMuted: (muted) => {
+      if (muted) {
+        player.mute();
+      } else {
+        player.unMute();
+        player.setVolume(100);
       }
     },
     sample: (): TimeSample => {

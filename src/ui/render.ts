@@ -1,6 +1,15 @@
 import { SPRITES, preloadSprites } from '../sprites.js';
 import type { GameView, VisibleObject } from '../engine/types.js';
 
+export interface TransportControls {
+  play(): void;
+  pause(): void;
+  seekTo(sec: number): void;
+  getDuration(): number;
+  isMuted(): boolean;
+  setMuted(muted: boolean): void;
+}
+
 export interface Ui {
   /** Element, w ktorym IFrame Player API osadza odtwarzacz. */
   playerHost: HTMLElement;
@@ -21,6 +30,16 @@ export interface Ui {
   setRecordingPreview(pos: { x: number; y: number } | null): void;
   /** Pierscien zaznaczenia + uchwyt rozmiaru dla trybu dev-edit-hand; `null` usuwa go. */
   setHandSelection(sel: { x: number; y: number; size: number } | null): void;
+  /** Odblokowuje pasek transportu i podpina go pod kontrolki playera (ADR-0019). */
+  enableTransport(controls: TransportControls): void;
+}
+
+/** `M:ss`, lokalny helper — nie reuzywac `formatClock` z `src/dev/record.ts` (kod dev, ADR-0016). */
+function formatTime(sec: number): string {
+  const total = Math.max(0, Math.floor(sec));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 /**
@@ -57,6 +76,14 @@ export function createUi(
           </dl>
         </section>
       </main>
+      <div class="transport" id="transport">
+        <button class="transport-button" id="transport-play" type="button" disabled>Odtwarzaj</button>
+        <input class="transport-seek" id="transport-seek" type="range"
+               min="0" max="0" step="0.1" value="0" disabled aria-label="Przewijanie" />
+        <span class="transport-time" id="transport-time">0:00 / 0:00</span>
+        <button class="transport-button" id="transport-mute" type="button"
+                aria-pressed="false" disabled>Wycisz</button>
+      </div>
       <div class="hud">
         <span class="hud-score" id="hud-score">0</span>
         <span class="hud-frozen" id="hud-frozen" hidden>pauza</span>
@@ -74,6 +101,16 @@ export function createUi(
   const results = byId('results');
   const hudScore = byId('hud-score');
   const hudFrozen = byId('hud-frozen');
+
+  const transportPlay = byId<HTMLButtonElement>('transport-play');
+  const transportSeek = byId<HTMLInputElement>('transport-seek');
+  const transportTime = byId('transport-time');
+  const transportMute = byId<HTMLButtonElement>('transport-mute');
+  let transportControls: TransportControls | null = null;
+  let durationKnown = false;
+  let durationSec = 0;
+  let scrubbing = false;
+  let lastFrozen = true;
 
   const startButton = byId<HTMLButtonElement>('start');
   startButton.addEventListener('pointerdown', (event) => {
@@ -154,6 +191,21 @@ export function createUi(
 
     hudScore.textContent = String(view.stats.score);
     hudFrozen.hidden = !view.frozen;
+
+    if (transportControls) {
+      lastFrozen = view.frozen;
+      if (!durationKnown) {
+        const duration = transportControls.getDuration();
+        if (duration > 0) {
+          durationSec = duration;
+          transportSeek.max = String(duration);
+          durationKnown = true;
+        }
+      }
+      if (!scrubbing) transportSeek.value = String(view.timeSec);
+      transportTime.textContent = `${formatTime(view.timeSec)} / ${formatTime(durationSec)}`;
+      transportPlay.textContent = view.frozen ? 'Odtwarzaj' : 'Pauza';
+    }
 
     results.hidden = !view.showResults;
     if (view.showResults) {
@@ -251,6 +303,36 @@ export function createUi(
     setFullscreenActive: (active) => {
       fullscreenButton.setAttribute('aria-pressed', String(active));
       fullscreenButton.textContent = active ? 'Zamknij pelny ekran' : 'Pelny ekran';
+    },
+    enableTransport: (controls) => {
+      transportControls = controls;
+      transportPlay.disabled = false;
+      transportSeek.disabled = false;
+      transportMute.disabled = false;
+
+      transportPlay.addEventListener('click', () => {
+        if (lastFrozen) controls.play();
+        else controls.pause();
+      });
+
+      transportSeek.addEventListener('input', () => {
+        scrubbing = true;
+      });
+      transportSeek.addEventListener('change', () => {
+        controls.seekTo(Number(transportSeek.value));
+        scrubbing = false;
+      });
+
+      const updateMuteLabel = (): void => {
+        const muted = controls.isMuted();
+        transportMute.setAttribute('aria-pressed', String(muted));
+        transportMute.textContent = muted ? 'Wlacz dzwiek' : 'Wycisz';
+      };
+      transportMute.addEventListener('click', () => {
+        controls.setMuted(!controls.isMuted());
+        updateMuteLabel();
+      });
+      updateMuteLabel();
     },
   };
 }

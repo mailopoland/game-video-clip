@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 197 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 210 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -381,9 +381,9 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
 ## Warstwa gry i DOM
 
 ```html
-<div class="frame">           <!-- cel requestFullscreen: scena + HUD razem -->
+<div class="frame">           <!-- cel requestFullscreen: scena + transport + HUD razem -->
   <main class="stage">        <!-- aspect-ratio: 16/9, wspólne dla playera i gry -->
-    <div class="player">…</div> <!-- iframe wstawiany przez IFrame API -->
+    <div class="player">…</div> <!-- iframe wstawiany przez IFrame API, pointer-events: none -->
     <div class="overlay">     <!-- pointer-events: none -->
       <button class="obj">    <!-- pointer-events: auto -->
         <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
@@ -391,14 +391,22 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
     <div class="gate">…</div> <!-- bramka startowa "Graj" -->
     <section class="results">… <!-- ekran wyniku -->
   </main>
+  <div class="transport">…</div> <!-- play/pauza, suwak, czas, wyciszenie (ADR-0019) -->
   <div class="hud">…</div>    <!-- licznik + "pauza" + przycisk pełnego ekranu -->
 </div>
 ```
 
 Istotne szczegóły:
 
-- **`.overlay` kończy się 8% wysokości sceny nad dołem**, żeby pasek kontrolek YouTube
-  pozostał widoczny i klikalny (mitygacja z ADR-0008). W konsekwencji `y%` z beatmapy
+- **Odtwarzacz nie reaguje na wskaźnik** (`.player iframe { pointer-events: none; }`)
+  i nie renderuje własnych kontrolek (`controls: 0`, `disablekb: 1` w `playerVars`,
+  `src/ui/youtube.ts`) — klik obok celu nic nie robi, wideo się nie pauzuje. Całe
+  sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez pasek
+  `.transport` pod sceną, wewnątrz `.frame`, więc działa też w pełnym ekranie
+  (ADR-0010, ADR-0019). Patrz sekcja [Pasek transportu](#pasek-transportu).
+- **`.overlay` kończy się 8% wysokości sceny nad dołem** mimo że kontrolki YouTube
+  już nie istnieją — usunięcie tego pasa przesunęłoby wszystkie nagrane `y` o ~8%
+  w beatmapie, więc zostaje bez zmian (ADR-0019). W konsekwencji `y%` z beatmapy
   jest liczone względem **warstwy gry**, nie całej sceny. Wartość jest w **procentach**,
   nie w `rem` — poprzednia stała `3,5rem` dawała inny udział wysokości sceny na
   telefonie (27%) niż w pełnym ekranie (5%), więc ten sam `y` z beatmapy lądował
@@ -422,6 +430,46 @@ Istotne szczegóły:
 
 ---
 
+## Pasek transportu
+
+Własne sterowanie odtwarzaniem zamiast kontrolek YouTube (ADR-0019). Player nie
+reaguje na wskaźnik (`.player iframe { pointer-events: none; }`) i nie renderuje
+własnych kontrolek (`controls: 0`, `disablekb: 1` w `playerVars`) — klik obok celu
+w kadrze nic nie robi, wideo się nie pauzuje i nie pokazuje paska YouTube.
+
+Pasek `.transport` (`src/ui/render.ts`, między `.stage` a `.hud`, wewnątrz `.frame`)
+ma cztery elementy: guzik play/pauza, suwak przewijania (`<input type="range">`),
+wyświetlacz czasu `M:ss / M:ss` i guzik wyciszenia. Wszystkie trzy interaktywne są
+`disabled` w szkielecie DOM od razu przy montażu i odblokowują się dopiero przez
+`Ui.enableTransport(controls: TransportControls)` — wołane w `main.ts` po
+`await createPlayer(...)`, dokładnie jak `enableFullscreen`. `TransportControls` to
+`play()`, `pause()`, `seekTo(sec)`, `getDuration()`, `isMuted()`, `setMuted(muted)`.
+
+- **Stan czasu bierze `render()` z `GameView`** (`view.timeSec`, `view.frozen`), nie
+  z osobnego odczytu playera per klatka.
+- **`durationSec` jest memoizowane**: `controls.getDuration()` jest odpytywane co
+  klatkę tylko dopóki zwraca `0` (YouTube oddaje `0` do czasu metadanych); po
+  pierwszej dodatniej wartości `seek.max` jest ustawiony i pytanie ustaje.
+- **Scrub:** `input` na suwaku ustawia flagę `scrubbing` i wstrzymuje nadpisywanie
+  `seek.value` przez `render()` (bez tego kciuk „ucieka" spod palca); `change` woła
+  `controls.seekTo(Number(seek.value))` i kasuje flagę. Przewinięcie własnym suwakiem
+  wpada w zwykły `resync()` silnika (`SEEK_THRESHOLD_SEC`) — bez żadnej nowej ścieżki
+  w silniku.
+- **Play/pauza:** `click` (nie `pointerdown` — ten sam argument co przy
+  `enableFullscreen`, guzik nie jest elementem rozgrywki) woła `play()`/`pause()`
+  na podstawie ostatnio wyrenderowanego `view.frozen`.
+- **Wyciszenie:** `click` woła `controls.setMuted(!controls.isMuted())`, potem
+  aktualizuje `aria-pressed` i etykietę („Wycisz” / „Wlacz dzwiek”) — tylko na
+  kliknięciu i przy `enableTransport`, nie co klatkę, bo nic innego nie zmienia
+  stanu wyciszenia po ukryciu kontrolek YT. `setMuted(false)` w adapterze
+  (`src/ui/youtube.ts`) woła `unMute()` **i** `setVolume(100)` — nie przywraca
+  poprzedniej głośności, YouTube API jej nie ujawnia.
+
+Pas `8%` na dole `.overlay` (dawna rezerwa na kontrolki YouTube) zostaje bez zmian
+mimo utraty uzasadnienia — patrz sekcja [Warstwa gry i DOM](#warstwa-gry-i-dom).
+
+---
+
 ## Pełny ekran
 
 Przycisk pełnego ekranu YouTube rozszerza **sam element `<iframe>`**, a ten trafia do
@@ -431,9 +479,11 @@ pod wideo, przestawały być klikalne, a gra tykała dalej i zamieniała niewido
 w pudła. Stąd (ADR-0010):
 
 - **`fs: 0`** w `playerVars` — przycisk YouTube jest wyłączony.
-- **Pełny ekran bierze `.frame`** (scena + HUD), nie iframe. Geometria w procentach,
-  więc skalowanie jest darmowe; w pełnym ekranie `100dvh` odnosi się do ekranu, więc
-  `--stage-width` sam dobiera rozmiar sceny.
+- **Pełny ekran bierze `.frame`** (scena + transport + HUD), nie iframe. Geometria
+  w procentach, więc skalowanie jest darmowe; w pełnym ekranie `100dvh` odnosi się
+  do ekranu, więc `--stage-width` sam dobiera rozmiar sceny. `--stage-width` liczy
+  się od `--hud-height` (`3.5rem` HUD + `3rem` transport = `6.5rem`, ADR-0019) —
+  bez tego scena i oba paski nie zmieściłyby się w viewport w pełnym ekranie.
 - **Własny przycisk w HUD** — zawsze widoczny, w dwóch trybach (`FullscreenMode`).
 - **Strażnik przejęcia** (`src/ui/fullscreen.ts`): jeśli element pełnoekranowy znajdzie
   się mimo wszystko wewnątrz `.player` (klawisz `f`, dwuklik), wychodzimy i żądamy
@@ -475,6 +525,9 @@ iOS użyje wtedy zrzutu strony zamiast ikony.
 - **Prawy przycisk myszy nigdy nie liczy się jako trafienie** (`event.button !== 0` w
   `src/ui/render.ts` przerywa obsługę `onHit` przed `preventDefault()`) — prawy przycisk
   jest zarezerwowany dla trybu deweloperskiego (patrz niżej).
+- **Tap/klik w puste miejsce kadru (obok celu) nic nie robi** — odtwarzacz nie
+  reaguje na wskaźnik i nie ma własnych kontrolek (ADR-0019). Całe sterowanie jest
+  w pasku `.transport` pod sceną, patrz sekcja [Pasek transportu](#pasek-transportu).
 
 ---
 
@@ -654,7 +707,7 @@ zamiast być zablokowane (patrz wyżej).
 
 ## Testy
 
-`npm test` — **197 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **210 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -664,8 +717,9 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i HUD, przycisk pełnego ekranu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę. |
 | `tests/fullscreen.test.ts` | jsdom + atrapa Fullscreen API (jsdom go nie implementuje): pełny ekran bierze `.frame`, toggle w obie strony, odebranie pełnego ekranu przejętego przez iframe, `onLost` gdy odzyskanie zawiedzie, brak API → tryb zastępczy `css` w obie strony. |
+| `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
 | `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
@@ -738,6 +792,17 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   względem rozmiaru sceny wymaga jednego ręcznego sprawdzenia w `npm run dev`:
   ten sam cel na telefonie i w pełnym ekranie musi lądować w tym samym miejscu
   kadru.
+- **`.player iframe { pointer-events: none; }` i `--hud-height` (ADR-0019) nie są
+  pokryte testami** — `jsdom` nie liczy layoutu ani nie renderuje prawdziwego
+  iframe'a. Wymaga ręcznej weryfikacji: klik/tap obok celu nie wywołuje kontrolek
+  YouTube ani nie pauzuje wideo, a w pełnym ekranie scena + pasek transportu + HUD
+  mieszczą się w viewport.
+- **Zachowanie playera na pauzie/końcu przy `controls: 0` (ADR-0019) jest
+  niezweryfikowane z prawdziwym YouTube** — nie wiadomo z pewnością, czy wtedy
+  nie pojawia się własna nakładka YouTube („Watch on YouTube”, propozycje
+  filmów). `rel: 0` już jest ustawione; gdyby nakładka się pojawiała, mitygacją
+  jest niepauzowanie playera na końcu klipu i własny ekran wyniku nad kadrem
+  (już istnieje).
 
 ---
 
@@ -753,6 +818,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić zasady trafiania/punktacji | `src/engine/engine.ts` |
 | zmienić wygląd | `src/styles.css` |
 | zmienić układ DOM / HUD / ekran wyniku / podmianę grafiki na trafieniu | `src/ui/render.ts` |
+| zmienić pasek transportu / kontrolki wideo | `src/ui/render.ts` + `src/ui/youtube.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
 | zmienić zachowanie pełnego ekranu | `src/ui/fullscreen.ts` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
@@ -785,3 +851,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md) | Tryb deweloperski nagrywania ścieżki ręki na osi czasu wideo |
 | [0017](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md) | Dźwięk trafienia przez Web Audio na zdekodowanym buforze (naprawa ciszy na iOS) |
 | [0018](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md) | Tryb deweloperski edycji punktów ścieżki, `BeatmapStore` i koalescencja zapisu |
+| [0019](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md) | Własne kontrolki zamiast kontrolek YouTube (unieważnia mitygację z ADR-0008) |

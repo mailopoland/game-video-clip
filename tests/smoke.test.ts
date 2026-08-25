@@ -267,3 +267,152 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(root.querySelector('#r-accuracy')!.textContent).toBe('50%');
   });
 });
+
+describe('pasek transportu (ADR-0019)', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="app"></div>';
+    root = document.querySelector<HTMLElement>('#app')!;
+  });
+
+  function makeControls(overrides: Partial<{
+    play: () => void;
+    pause: () => void;
+    seekTo: (sec: number) => void;
+    getDuration: () => number;
+    isMuted: () => boolean;
+    setMuted: (muted: boolean) => void;
+  }> = {}) {
+    return {
+      play: vi.fn(),
+      pause: vi.fn(),
+      seekTo: vi.fn(),
+      getDuration: vi.fn(() => 0),
+      isMuted: vi.fn(() => false),
+      setMuted: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('guziki i suwak sa disabled przed enableTransport', () => {
+    const clock = new FakeClock();
+    mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+
+    expect(root.querySelector<HTMLButtonElement>('#transport-play')!.disabled).toBe(true);
+    expect(root.querySelector<HTMLInputElement>('#transport-seek')!.disabled).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('#transport-mute')!.disabled).toBe(true);
+  });
+
+  it('enableTransport odblokowuje guziki i suwak', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+
+    game.ui.enableTransport(makeControls());
+
+    expect(root.querySelector<HTMLButtonElement>('#transport-play')!.disabled).toBe(false);
+    expect(root.querySelector<HTMLInputElement>('#transport-seek')!.disabled).toBe(false);
+    expect(root.querySelector<HTMLButtonElement>('#transport-mute')!.disabled).toBe(false);
+  });
+
+  it('klik w play przy zamrozonym silniku wola play(), a w trakcie odtwarzania wola pause()', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const controls = makeControls();
+    game.ui.enableTransport(controls);
+
+    clock.playing = false;
+    game.frame(); // renderuje frozen === true
+    root.querySelector<HTMLButtonElement>('#transport-play')!.click();
+    expect(controls.play).toHaveBeenCalledTimes(1);
+    expect(controls.pause).not.toHaveBeenCalled();
+
+    clock.playing = true;
+    game.frame(); // renderuje frozen === false
+    root.querySelector<HTMLButtonElement>('#transport-play')!.click();
+    expect(controls.pause).toHaveBeenCalledTimes(1);
+  });
+
+  it('render ustawia wartosc suwaka i etykiete czasu z view.timeSec i getDuration()', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const controls = makeControls({ getDuration: vi.fn(() => 60) });
+    game.ui.enableTransport(controls);
+
+    playTo(clock, game.frame, 5);
+
+    const seek = root.querySelector<HTMLInputElement>('#transport-seek')!;
+    expect(Number(seek.value)).toBeCloseTo(5, 1);
+    expect(seek.max).toBe('60');
+    expect(root.querySelector('#transport-time')!.textContent).toBe('0:05 / 1:00');
+  });
+
+  it('getDuration() zwracajace najpierw 0 jest odpytywane az do pierwszej dodatniej wartosci, potem juz nie', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const getDuration = vi.fn(() => 0);
+    const controls = makeControls({ getDuration });
+    game.ui.enableTransport(controls);
+
+    game.frame();
+    game.frame();
+    expect(getDuration).toHaveBeenCalledTimes(2);
+    expect(root.querySelector<HTMLInputElement>('#transport-seek')!.max).toBe('0');
+
+    getDuration.mockReturnValue(30);
+    game.frame();
+    expect(root.querySelector<HTMLInputElement>('#transport-seek')!.max).toBe('30');
+
+    game.frame();
+    expect(getDuration).toHaveBeenCalledTimes(3); // nie pytamy juz po ustaleniu dlugosci
+  });
+
+  it('input na suwaku nie wola seekTo i wstrzymuje aktualizacje z render; change wola seekTo', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const controls = makeControls({ getDuration: vi.fn(() => 60) });
+    game.ui.enableTransport(controls);
+
+    playTo(clock, game.frame, 5);
+    const seek = root.querySelector<HTMLInputElement>('#transport-seek')!;
+
+    seek.value = '20';
+    seek.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(controls.seekTo).not.toHaveBeenCalled();
+
+    playTo(clock, game.frame, 6); // render nie powinien nadpisac suwaka podczas scrub
+    expect(seek.value).toBe('20');
+
+    seek.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(controls.seekTo).toHaveBeenCalledWith(20);
+
+    playTo(clock, game.frame, 6.5); // po change render znow aktualizuje suwak
+    expect(Number(seek.value)).toBeCloseTo(6.5, 1);
+  });
+
+  it('mute: klik przelacza setMuted i aktualizuje aria-pressed oraz etykiete', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    let muted = false;
+    const controls = makeControls({
+      isMuted: vi.fn(() => muted),
+      setMuted: vi.fn((next: boolean) => {
+        muted = next;
+      }),
+    });
+    game.ui.enableTransport(controls);
+
+    const muteButton = root.querySelector<HTMLButtonElement>('#transport-mute')!;
+    expect(muteButton.getAttribute('aria-pressed')).toBe('false');
+
+    muteButton.click();
+    expect(controls.setMuted).toHaveBeenCalledWith(true);
+    expect(muteButton.getAttribute('aria-pressed')).toBe('true');
+    expect(muteButton.textContent).toBe('Wlacz dzwiek');
+
+    muteButton.click();
+    expect(controls.setMuted).toHaveBeenCalledWith(false);
+    expect(muteButton.getAttribute('aria-pressed')).toBe('false');
+    expect(muteButton.textContent).toBe('Wycisz');
+  });
+});

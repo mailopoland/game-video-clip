@@ -79,3 +79,8 @@ beatmapy. Nie budujemy pod to żadnej abstrakcji ani przełącznika z góry.
   co jest zresztą wymagane przez wymaganie #5.
 - Wymaganie #7 (bez backendu, logowania, analityki) jest niezależne od tej decyzji
   i pozostaje spełnione.
+
+> ⚠️ **Uniewaznione przez [ADR-0019](ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md).**
+> Mitygacja „kontrolki YouTube pozostaja dostepne" powyzej juz nie obowiazuje —
+> `controls: 0` wylacza je, a wlasny pasek transportu przejmuje sterowanie.
+> Ryzyko niezgodnosci z ToS rosnie i zostaje swiadomie przyjete.
