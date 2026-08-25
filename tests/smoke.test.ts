@@ -154,50 +154,79 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(shieldPos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it('tarcza zakrywa kadr, gdy silnik jest zamrozony, i odslania go przy odtwarzaniu', () => {
-    // YouTube rysuje overlay stanu "pauza" (tytul, avatar, udostepnianie,
-    // miniatury powiazane, logo, duzy przycisk) niezaleznie od `controls: 0`;
-    // `modestbranding`/`showinfo` sa martwe, a `rel: 0` nie wylacza propozycji.
-    // Jedyne skuteczne wyjscie to zaslonic kadr wlasna warstwa (ADR-0019).
+  it('tarcza nie zaslania kadru — na pauzie wideo zostaje widoczne', () => {
+    // Zaslona miala ukrywac branding stanu "pauza", ale duzy przycisk YouTube'a
+    // i tak zostaje widoczny (nie da sie go usunac: jest wysrodkowany razem
+    // z obrazem, a iframe jest cross-origin). Czernienie kadru nic wiec nie
+    // kupowalo, a kosztowalo podglad wideo na pauzie — tarcza jest teraz
+    // wylacznie blokada wskaznika i nie ma stanu (ADR-0019).
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
     const shield = root.querySelector<HTMLElement>('#shield')!;
 
     clock.playing = false;
     game.frame();
-    expect(shield.classList.contains('is-covering')).toBe(true);
+    expect(shield.className).toBe('shield');
 
     clock.playing = true;
     playTo(clock, game.frame, 1);
-    expect(shield.classList.contains('is-covering')).toBe(false);
+    expect(shield.className).toBe('shield');
   });
 
-  it('maska srodkowego przycisku lezy miedzy tarcza a warstwa gry i NIE zalezy od stanu', () => {
-    // Gorny pasek tytulu i dolny rzad YouTube'a wyjezdzaja poza kadr dzieki
-    // nadmiarowej wysokosci `.player` (--player-overscan), ale duzy przycisk
-    // play/pauza jest wysrodkowany razem z obrazem — geometria go nie usunie.
-    // Ikona pauzy NIE znika sama w trakcie odtwarzania (zweryfikowane na
-    // urzadzeniu: widoczna na 0:03, gdy maska czasowa juz zgasla), wiec maska
-    // musi byc STALA, a nie sterowana `view.frozen` (ADR-0019).
+  it('przezroczysty przycisk lezy tam, gdzie YouTube rysuje swoj, i jest nieaktywny do enableTransport', () => {
+    // Duzego przycisku YouTube'a nie da sie usunac (wysrodkowany razem
+    // z obrazem, iframe cross-origin), wiec zostaje widoczny — ale zdarzen
+    // NIE przepuszczamy do iframe'a, bo pudlo obok dloni znowu pauzowaloby
+    // wideo. Zamiast tego wlasny przezroczysty przycisk w tym samym miejscu,
+    // spiety z transportem: wyglad YouTube'a, dzialanie nasze (ADR-0019).
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
 
-    const mask = root.querySelector<HTMLElement>('#chrome-mask')!;
-    expect(mask).not.toBeNull();
+    const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
+    expect(proxy).not.toBeNull();
+    expect(proxy.disabled).toBe(true);
 
-    // Nad tarcza (zakrywa ja), ale pod warstwa gry — cele musza zostac widoczne.
+    // Nad tarcza, ale pod warstwa gry — klik w dlon musi wygrac z przyciskiem.
     const shield = root.querySelector<HTMLElement>('#shield')!;
     const overlay = root.querySelector<HTMLElement>('#overlay')!;
-    expect(shield.compareDocumentPosition(mask) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(mask.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(shield.compareDocumentPosition(proxy) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(proxy.compareDocumentPosition(overlay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    game.ui.enableTransport({
+      play: vi.fn(),
+      pause: vi.fn(),
+      seekTo: vi.fn(),
+      getDuration: vi.fn(() => 0),
+      isMuted: vi.fn(() => false),
+      setMuted: vi.fn(),
+    });
+    expect(proxy.disabled).toBe(false);
+  });
+
+  it('klik w przezroczysty przycisk przelacza odtwarzanie tak jak pasek transportu', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const controls = {
+      play: vi.fn(),
+      pause: vi.fn(),
+      seekTo: vi.fn(),
+      getDuration: vi.fn(() => 0),
+      isMuted: vi.fn(() => false),
+      setMuted: vi.fn(),
+    };
+    game.ui.enableTransport(controls);
+    const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
 
     clock.playing = false;
     game.frame();
-    expect(mask.className).toBe('chrome-mask');
+    proxy.click();
+    expect(controls.play).toHaveBeenCalledTimes(1);
+    expect(controls.pause).not.toHaveBeenCalled();
 
     clock.playing = true;
-    playTo(clock, game.frame, 1);
-    expect(mask.className).toBe('chrome-mask');
+    game.frame();
+    proxy.click();
+    expect(controls.pause).toHaveBeenCalledTimes(1);
   });
 
   it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {

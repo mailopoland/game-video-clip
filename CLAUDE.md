@@ -20,12 +20,14 @@ i `showinfo` są martwe, `rel: 0` tylko zawęża propozycje). Branding jest wido
 **w trakcie odtwarzania**, więc potrzebne są trzy środki naraz: `--player-overscan: 15%`
 robi `.player` wyższym niż scena, przez co pasek tytułu i dolny rząd wyjeżdżają poza
 `overflow: hidden` (wideo, ograniczone szerokością, zostaje na miejscu — **beatmapa bez
-migracji**); `.chrome-mask` **rozmywa** (`backdrop-filter`, działa też na iframe cross-origin) duży
-przycisk na środku, którego geometria nie ruszy, bo jest wyśrodkowany razem z obrazem —
-maska jest **stała**, bo YouTube nie chowa przycisku sam (widoczny na `0:03`);
-`.shield` przechwytuje dotyk i zasłania kadr na czarno, gdy silnik jest zamrożony
-(`is-covering` ↔ `view.frozen`). Letterbox potwierdzony na urządzeniu — obraz nie jest
-przybliżony, cele pokrywają się z wideo; w razie czego `--player-overscan: 0%` cofa zmianę.
+migracji**); Duży przycisk play/pauza na środku **zostaje widoczny** — jest wyśrodkowany razem
+z obrazem, a iframe jest cross-origin, więc każdy sposób jego ukrycia (czarna maska,
+`backdrop-filter`) ukrywa tam też wideo; oba wdrożono i odrzucono. W zamian jest
+klikalny przez `.yt-button-proxy` — przezroczysty przycisk w tym samym miejscu, spięty
+z `TransportControls` (zdarzeń nie wpuszczamy do iframe'a, bo pudło obok dłoni znów
+pauzowałoby wideo). `.shield` jest przezroczystą, **bezstanową** blokadą wskaźnika —
+kadr nie jest już czerniony na pauzie. Letterbox potwierdzony na urządzeniu — obraz nie
+jest przybliżony, cele pokrywają się z wideo; w razie czego `--player-overscan: 0%` cofa.
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
 myszy przy zwolnionym tempie i zapisuje `beatmap.json` na dysku bez przeładowania
 strony (ADR-0016); wycięty z buildu produkcyjnego.
@@ -34,7 +36,7 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 213 testów, zielone.
+`npm test` — 214 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

@@ -68,9 +68,10 @@ html.has-pseudo-fullscreen body {
   container-type: inline-size;
   /* Ile playera wystaje poza scene u gory i u dolu — patrz `.player` (ADR-0019). */
   --player-overscan: 15%;
-  /* Srednica maski duzego przycisku YouTube'a. Przycisk skaluje sie z playerem,
-     ale nie liniowo, stad clamp: dol chroni telefon, gora — duzy ekran. */
-  --chrome-mask-size: clamp(72px, 15%, 132px);
+  /* Rozmiar przezroczystego przycisku nad duzym przyciskiem YouTube'a. Ten
+     skaluje sie z playerem, ale nie liniowo, stad clamp: dol chroni telefon,
+     gora — duzy ekran. Za duzy zabieralby kliki obok dloni w srodku kadru. */
+  --yt-button-size: clamp(72px, 15%, 132px);
 }
 
 /* Player jest CELOWO wyzszy niz scena. YouTube kotwiczy pasek tytulu (gora)
@@ -114,57 +115,37 @@ html.has-pseudo-fullscreen body {
   position: absolute;
   inset: 0;
   pointer-events: auto;
-  /* Druga robota tarczy: ZASLANIA kadr, gdy player nie odtwarza. Poza stanem
-     PLAYING YouTube rysuje wlasny overlay (tytul, avatar kanalu, ikona
-     udostepniania, miniatury powiazane, logo, duzy przycisk pauzy) i zaden
-     `playerVar` tego nie wylacza — `modestbranding`/`showinfo` sa martwe,
-     a `rel: 0` od 2018 tylko zaweza propozycje do tego samego kanalu.
-     Zaslona jest wiec jedynym skutecznym srodkiem (ADR-0019). */
-  background: #000;
-  opacity: 0;
-  /* Odslanianie jest POWOLNE i maskuje wlasna animacje zanikania YouTube'a,
-     ktora trwa jeszcze chwile po wejsciu w stan PLAYING. Za krotko = overlay
-     YouTube'a przebija w trakcie startu; za dlugo = czarny kadr po wznowieniu.
-     To jedyna wartosc do strojenia, gdyby cos jeszcze mrugalo. */
-  transition: opacity 800ms ease-out;
 }
 
-/* Zaslanianie jest NATYCHMIASTOWE — inaczej overlay YouTube'a zdazylby
-   mrugnac w trakcie przejscia. */
-.shield.is-covering {
-  opacity: 1;
-  transition: none;
-}
+/* Duzego przycisku play/pauza YouTube'a NIE da sie usunac: jest wysrodkowany
+   RAZEM z obrazem (wideo jest w playerze wycentrowane, wiec srodek playera to
+   zawsze srodek obrazu), a iframe jest cross-origin, wiec nie siegniemy do
+   jego stylow. Zostaje wiec widoczny — ale zdarzen NIE przepuszczamy do
+   iframe'a, bo pudlo obok dloni znowu pauzowaloby wideo (pierwotny blad).
 
-/* Maska duzego przycisku play/pauza YouTube'a. Geometria (`--player-overscan`)
-   go nie usunie, bo jest wysrodkowany RAZEM z obrazem — przesuniecie playera
-   przesuwa oba, wiec nigdy sie nie rozjada.
-
-   Maska jest STALA, nie sterowana `view.frozen`: ikona pauzy nie znika sama
-   w trakcie odtwarzania (zweryfikowane na urzadzeniu — widoczna na 0:03, gdy
-   wczesniejsza maska czasowa juz zgasla), wiec kazdy wariant czasowy tylko
-   odsuwa problem.
-
-   Zamiast czarnej dziury ROZMYWAMY tlo pod spodem: `backdrop-filter` dziala
-   takze na tresc iframe'a cross-origin (nie czyta pikseli, wiec nie narusza
-   origin) — zweryfikowane w przegladarce. Ikona rozplywa sie w nieczytelna
-   plame, a wideo zostaje widoczne. Lekka zaslonka zbija jej kontrast, a
-   `mask-image` daje miekka krawedz zamiast ostrego kola (ADR-0019).
-
-   Pokretla: `--chrome-mask-size` (srednica) i `blur()` ponizej. */
-.chrome-mask {
+   Zamiast tego wlasny PRZEZROCZYSTY przycisk dokladnie w tym miejscu, spiety
+   z tym samym `TransportControls` co pasek pod scena: wyglad jest YouTube'a,
+   dzialanie nasze. Lezy nad `.shield`, ale pod `.overlay`, wiec klik w dlon
+   zawsze wygrywa z nim (ADR-0019). */
+.yt-button-proxy {
   position: absolute;
   left: 50%;
   top: 50%;
   translate: -50% -50%;
-  width: var(--chrome-mask-size);
+  width: var(--yt-button-size);
   aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.yt-button-proxy:disabled {
+  cursor: default;
   pointer-events: none;
-  background: rgb(0 0 0 / 0.35);
-  -webkit-backdrop-filter: blur(26px);
-  backdrop-filter: blur(26px);
-  -webkit-mask-image: radial-gradient(circle, #000 62%, transparent 88%);
-  mask-image: radial-gradient(circle, #000 62%, transparent 88%);
 }
 
 /* Warstwa gry konczy sie nad paskiem kontrolek YouTube, ktory zostaje klikalny

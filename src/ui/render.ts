@@ -62,7 +62,8 @@ export function createUi(
       <main class="stage" id="stage">
         <div class="player" id="player"></div>
         <div class="shield" id="shield"></div>
-        <div class="chrome-mask" id="chrome-mask"></div>
+        <button class="yt-button-proxy" id="yt-button-proxy" type="button" disabled
+                aria-label="Odtwarzaj lub wstrzymaj"></button>
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
           <button class="gate-button" id="start" type="button">Graj</button>
@@ -103,7 +104,7 @@ export function createUi(
   const results = byId('results');
   const hudScore = byId('hud-score');
   const hudFrozen = byId('hud-frozen');
-  const shield = byId('shield');
+  const ytButtonProxy = byId<HTMLButtonElement>('yt-button-proxy');
 
   const transportPlay = byId<HTMLButtonElement>('transport-play');
   const transportSeek = byId<HTMLInputElement>('transport-seek');
@@ -194,13 +195,6 @@ export function createUi(
 
     hudScore.textContent = String(view.stats.score);
     hudFrozen.hidden = !view.frozen;
-
-    // Poza stanem PLAYING YouTube rysuje wlasny overlay (tytul, avatar kanalu,
-    // udostepnianie, miniatury powiazane, logo, duzy przycisk) i zadne
-    // `playerVars` tego nie wylaczaja — `modestbranding`/`showinfo` sa martwe,
-    // a `rel: 0` od 2018 tylko zawezaja propozycje. Zaslaniamy wiec kadr
-    // wlasna warstwa dokladnie wtedy, gdy silnik jest zamrozony (ADR-0019).
-    shield.classList.toggle('is-covering', view.frozen);
 
     if (transportControls) {
       lastFrozen = view.frozen;
@@ -320,10 +314,19 @@ export function createUi(
       transportSeek.disabled = false;
       transportMute.disabled = false;
 
-      transportPlay.addEventListener('click', () => {
+      const togglePlayback = (): void => {
         if (lastFrozen) controls.play();
         else controls.pause();
-      });
+      };
+      transportPlay.addEventListener('click', togglePlayback);
+
+      // Duzego przycisku YouTube'a nie da sie usunac (jest wysrodkowany razem
+      // z obrazem, a iframe jest cross-origin), wiec zostaje widoczny. Zdarzen
+      // NIE przepuszczamy jednak do iframe'a — pudlo obok dloni znowu
+      // pauzowaloby wideo. Zamiast tego wlasny przezroczysty przycisk dokladnie
+      // w tym miejscu: wyglad YouTube'a, dzialanie nasze (ADR-0019).
+      ytButtonProxy.disabled = false;
+      ytButtonProxy.addEventListener('click', togglePlayback);
 
       transportSeek.addEventListener('input', () => {
         scrubbing = true;

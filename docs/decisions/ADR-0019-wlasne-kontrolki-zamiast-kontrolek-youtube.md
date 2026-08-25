@@ -35,7 +35,7 @@ w pelnym ekranie (ADR-0010):
    na urzadzeniu: dotkniecie mimo tego przebijalo sie do natywnych kontrolek
    YouTube, w tym duzej ikony pauzy na srodku ekranu). Dlatego dochodzi:
 1b. **`.shield`** — warstwa `position: absolute; inset: 0` miedzy `.player`
-   a `.overlay` w DOM, z `pointer-events: auto`, pelniaca **dwie** role.
+   a `.overlay` w DOM, z `pointer-events: auto`. Przezroczysta i BEZSTANOWA.
    Malowana NAD playerem, ale POD `.overlay`/`.gate`/`.results` (kolejnosc
    w DOM), wiec cele, bramka startowa i ekran wyniku zostaja klikalne bez
    zmian. Zdarzenia `pointerdown`/`contextmenu` trybu dev nadal dzialaja —
@@ -45,25 +45,13 @@ w pelnym ekranie (ADR-0010):
    poziomie hit-testu DOM, zanim dotrze do iframe'a; nie polega na
    `pointer-events` dzialajacym poprawnie wewnatrz zagniezdzonego dokumentu.
 
-   **Rola 2 — zaslanianie kadru poza stanem `PLAYING`.** To jest wlasciwa
-   naprawa widocznosci kontrolek. Blokada wskaznika **nie ukrywa niczego
-   wizualnie**: poza stanem `PLAYING` YouTube rysuje wlasny overlay (pasek
-   tytulu, avatar kanalu, ikona udostepniania, miniatury powiazanych filmow,
-   logo, duzy przycisk na srodku) i **zaden `playerVar` tego nie wylacza** —
-   `controls: 0` usuwa wylacznie dolny pasek kontrolek, `modestbranding`
-   jest martwe od sierpnia 2023, `showinfo` od 2018, a `rel: 0` od 2018 tylko
-   zaweza propozycje do tego samego kanalu, zamiast je wylaczac. Dlatego
-   `render()` przelacza `.shield.is-covering` dokladnie na `view.frozen`
-   (czyli wszystko poza `PLAYING`: cued, buffering, pauza, ended), a klasa
-   daje `background: #000; opacity: 1`.
+   **Rola 2 — nie ma.** Wczesniejsza wersja tej decyzji kazala tarczy
+   ZASLANIAC kadr na czarno poza stanem `PLAYING` (`is-covering` ↔
+   `view.frozen`), zeby ukryc overlay stanu „pauza". Usuniete: skoro duzego
+   przycisku i tak nie da sie usunac (1d), czernienie kadru nie ukrywalo juz
+   niczego istotnego, a kosztowalo podglad wideo na pauzie. Tarcza jest wiec
+   BEZSTANOWA i przezroczysta — wylacznie blokada wskaznika.
 
-   **Asymetria czasowa jest celowa:** zaslanianie jest natychmiastowe
-   (`transition: none` na `.is-covering`) — inaczej overlay YouTube'a
-   zdazylby mrugnac przy przejsciu w pauze; odslanianie jest powolne
-   (`transition: opacity 800ms ease-out` na stanie bazowym), bo maskuje
-   wlasna animacje zanikania YouTube'a, ktora trwa jeszcze chwile po
-   wejsciu w `PLAYING`. `800ms` to jedyna wartosc do strojenia, gdyby cos
-   jeszcze przebijalo.
 1c. **`--player-overscan: 15%` — player wyzszy niz scena.** Zaslona z punktu (1b)
    dziala tylko poza stanem `PLAYING`; zweryfikowane w przegladarce, ze branding
    **jest widoczny takze w trakcie odtwarzania** (zrzut uzytkownika: `0:01 / 2:30`,
@@ -81,27 +69,30 @@ w pelnym ekranie (ADR-0010):
    Zmierzone w przegladarce: scena 426 px → player 554 px (`+30%`), przesuniecie
    `-64 px` (`-15%`); pasek tytulu, avatar, ikony i logo znikaja ze sceny.
 
-1d. **`.chrome-mask` — maska duzego przycisku play/pauza.** Geometria z (1c) nie
-   usunie przycisku na srodku, bo jest on wysrodkowany **razem z obrazem**:
+1d. **Duzy przycisk play/pauza ZOSTAJE widoczny — i staje sie klikalny.**
+   Geometria z (1c) go nie usunie, bo jest wysrodkowany **razem z obrazem**:
    wideo jest wycentrowane w playerze, wiec srodek playera zawsze pokrywa sie
-   ze srodkiem obrazu i zadne przesuniecie ich nie rozdzieli. Zostaje zakrycie.
+   ze srodkiem obrazu i zadne przesuniecie ani skalowanie ich nie rozdzieli.
+   Stylami tez nie — iframe jest cross-origin. Kazdy CSS ukrywajacy ten obszar
+   ukrywa tam rowniez **wideo**, wiec do wyboru byly tylko trzy warianty:
+   widoczna ikona, zakryty fragment albo znieksztalcony fragment.
 
-   **Maska jest STALA, nie sterowana `view.frozen`.** Pierwsza wersja gasla
-   z opoznieniem `2600ms`, w zalozeniu ze YouTube sam chowa przycisk po starcie.
-   Obalone na urzadzeniu: ikona pauzy jest widoczna na `0:03`, dokladnie gdy
-   maska zgasla. Kazdy wariant czasowy tylko odsuwa problem.
+   Zakrycie (czarny krazek) i znieksztalcenie (`backdrop-filter: blur`) zostaly
+   wdrozone i **odrzucone przez wlasciciela produktu** — patrz „Odrzucone
+   warianty". Zostaje wariant pierwszy: ikona jest widoczna.
 
-   **Zamiast czarnej dziury — rozmycie tla.** Nieprzezroczysta plama byla
-   rownie zla jak sama ikona („czarna dziura"). `backdrop-filter: blur(26px)`
-   dziala takze na tresc iframe'a **cross-origin** — nie czyta pikseli, wiec
-   nie narusza origin — co zweryfikowano w przegladarce: przycisk rozplywa sie
-   w nieczytelna plame, a wideo pod spodem zostaje widoczne. Lekka zaslonka
-   `rgb(0 0 0 / 0.35)` zbija kontrast ikony, a `mask-image` z gradientem
-   radialnym daje miekka krawedz zamiast ostrego kola.
+   Skoro jest widoczna, ma **dzialac**. Zdarzen NIE przepuszczamy jednak do
+   iframe'a (np. dziura w tarczy przez `clip-path`), bo to przywrociloby
+   pierwotny blad: pudlo obok dloni znowu pauzowaloby wideo, a YouTube
+   pokazalby swoje chrome. Zamiast tego **wlasny przezroczysty przycisk**
+   `.yt-button-proxy` dokladnie w tym miejscu, spiety z tym samym
+   `TransportControls` co pasek pod scena: wyglad jest YouTube'a, dzialanie
+   nasze. Lezy miedzy `.shield` a `.overlay`, wiec klik w dlon zawsze z nim
+   wygrywa; jest `disabled` do `enableTransport`, tak jak reszta transportu.
 
-   Osobny element, nie pseudoelement tarczy: krycie pseudoelementu mnozy sie
-   przez krycie rodzica, wiec znikalby razem z zaslona. Lezy miedzy `.shield`
-   a `.overlay`, wiec cele rysuja sie nad nim i pozostaja ostre.
+   Zweryfikowane w przegladarce (`elementFromPoint`): srodek sceny trafia
+   w `yt-button-proxy`, a kazdy inny punkt kadru — w `shield`, czyli nadal
+   nic nie dociera do iframe'a.
 
 2. **`controls: 0` i `disablekb: 1`** w `playerVars` (`src/ui/youtube.ts`) —
    YouTube nie renderuje wlasnych kontrolek ani nie reaguje na klawiature.
@@ -133,10 +124,6 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   prawdopodobnie zbedny, skoro iframe juz nie przechwytuje wskaznika —
   zostaje bez zmian do czasu recznej weryfikacji i ewentualnego usuniecia
   osobnym krokiem.
-- **Kadr jest czarny poza stanem `PLAYING`.** Na pauzie widac wylacznie cele
-  (`.overlay` maluje sie nad tarcza) na czarnym tle, a nie zatrzymana klatke
-  wideo. To swiadomy koszt: alternatywa to pokazywanie brandingu YouTube'a,
-  ktorego nie da sie ukryc inaczej.
 - **`--player-overscan` potwierdzone na urzadzeniu.** Zalozenie, ze YouTube
   wpisuje wideo w player z letterboxem (`contain`), a nie kadruje go (`cover`),
   sprawdzilo sie: przy nadmiarze obraz nie jest przyblizony, a cele nadal
@@ -144,9 +131,13 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   (Miniatura stanu `cued` faktycznie uzywa `cover` i wyglada na przyblizona,
   ale jest zakryta bramka i zaslona, wiec nie ma to znaczenia.)
   Gdyby kiedys przestalo — `--player-overscan: 0%` cofa zmiane jedna linia.
-- **Srodek kadru ma staly, delikatnie rozmyty krazek.** Cena za brak ikony
-  pauzy: maska nie moze byc czasowa, bo YouTube nie chowa przycisku sam.
-  Cele rysuja sie nad maska, wiec pozostaja ostre.
+- **Duzy przycisk play/pauza YouTube'a zostaje widoczny na srodku kadru.**
+  Swiadomie przyjete: kazdy sposob jego ukrycia ukrywa tam takze wideo.
+  W zamian jest klikalny i robi to, czego sie po nim spodziewac — przez
+  `.yt-button-proxy`, nie przez YouTube.
+- **Srodek kadru (ok. `--yt-button-size`) reaguje na klik play/pauza.** Pudlo
+  dokladnie w tym miejscu wstrzyma wideo zamiast policzyc sie jako chybienie.
+  Cena za klikalnosc przycisku; poza tym krazkiem kadr nadal nie reaguje.
 - Nietestowalne w jsdom (jak `cqw` w ADR-0014): rzeczywiste blokowanie dotyku,
   realne krycie tarczy, dobor `800ms`/`2600ms`, `--player-overscan` i
   `--hud-height` — jsdom nie liczy layoutu, nie animuje i nie renderuje
@@ -181,7 +172,19 @@ wszystkie nagrane `y` o ~8%. Osobny krok w przyszlosci, jesli w ogole.
   bez straty obrazu.
 - **Czasowa maska srodkowego przycisku** (gasnaca po `2600ms`) — wdrozona
   i obalona na urzadzeniu: ikona pauzy jest widoczna na `0:03`. YouTube nie
-  chowa przycisku sam, wiec maska musi byc stala.
-- **Nieprzezroczysta (czarna) maska srodka** — wdrozona i odrzucona po
-  opinii uzytkownika: „czarna dziura" w srodku kadru jest rownie zla jak
-  sama ikona. Stad rozmycie tla zamiast zakrycia go.
+  chowa przycisku sam, wiec zaden wariant czasowy nie wystarczy.
+- **Nieprzezroczysta (czarna) maska srodka** — wdrozona i odrzucona przez
+  wlasciciela produktu: „czarna dziura" w srodku kadru jest rownie zla jak
+  sama ikona.
+- **Rozmycie srodka (`backdrop-filter: blur`)** — wdrozone i rowniez
+  odrzucone. Dziala technicznie (filtruje tez tresc cross-origin, bo operuje
+  na zlozonym backdropie, a nie czyta pikseli), ale rozmazana plama w srodku
+  kadru byla nie do przyjecia.
+- **Dziura w tarczy (`clip-path`) przepuszczajaca kliki do iframe'a** —
+  pozwolilaby klikac prawdziwy przycisk YouTube'a, ale otwiera droga powrotna
+  dla pierwotnego bledu (pudlo w tym miejscu = chrome YouTube'a) i opiera sie
+  na `polygon(evenodd)` w hit-tescie. Zastapione wlasnym przyciskiem, ktory
+  daje ten sam efekt bez wpuszczania czegokolwiek do iframe'a.
+- **Zaslanianie kadru na czarno poza `PLAYING`** — wdrozone i wycofane.
+  Mialo ukrywac overlay stanu „pauza", ale skoro duzy przycisk i tak zostaje,
+  nie ukrywalo juz niczego istotnego, a kosztowalo podglad wideo na pauzie.
