@@ -139,6 +139,72 @@ export async function createPlayer(
   /** Ostatni czas *tresci* — reklama ma wlasny zegar, ktorego silnik nie moze zobaczyc. */
   let lastContentTimeSec = 0;
 
+  // === TEMP-DIAGNOSTYKA (do usuniecia po rozstrzygnieciu, ADR-0022) ===========
+  // Wykrywanie reklam opiera sie na zalozeniu, ze getDuration() zwraca dlugosc
+  // kreacji. Zalozenie nie bylo sprawdzone na zywym playerze, a reka pojawia sie
+  // nad reklama mimo detekcji. Reklamy widac tylko na iOS Safari, gdzie nie ma
+  // dostepu do konsoli — dlatego odczyty ida na EKRAN, z historia ostatnich
+  // zmian, zeby wystarczyl jeden zrzut ekranu zrobiony w trakcie reklamy.
+  const probe =
+    import.meta.env.DEV && import.meta.env.MODE !== 'test'
+      ? (() => {
+          const MAX_LINES = 8;
+          const lines: string[] = [];
+          let last = '';
+          const startMs = Date.now();
+
+          const box = document.createElement('pre');
+          box.style.cssText = [
+            'position: fixed',
+            'top: 0',
+            'left: 0',
+            'z-index: 2147483647',
+            'margin: 0',
+            'padding: 4px 6px',
+            'max-width: 100vw',
+            'background: rgba(0, 0, 0, 0.75)',
+            'color: #0f0',
+            'font: 700 11px/1.25 ui-monospace, monospace',
+            'white-space: pre-wrap',
+            'pointer-events: none',
+          ].join(';');
+          document.body.append(box);
+
+          const videoIdOf = (): string => {
+            try {
+              const data = (player as unknown as { getVideoData?: () => { video_id?: string } })
+                .getVideoData?.();
+              return data?.video_id ?? '?';
+            } catch {
+              return '?';
+            }
+          };
+
+          const push = (line: string): void => {
+            lines.push(line);
+            if (lines.length > MAX_LINES) lines.shift();
+            box.textContent = lines.join('\n');
+            console.info(`[reklamy] ${line}`);
+          };
+
+          push(
+            `start dur=${player.getDuration()} oczek=${expected || 'BRAK'} vid=${videoIdOf()}`,
+          );
+
+          return (state: number, duration: number, timeSec: number, ad: boolean): void => {
+            const key = `${state}|${Math.round(duration)}|${ad ? 'AD' : 'TR'}`;
+            if (key === last) return;
+            last = key;
+            const at = ((Date.now() - startMs) / 1000).toFixed(1);
+            push(
+              `${at}s st=${state} dur=${duration} t=${timeSec.toFixed(1)} ` +
+                `vid=${videoIdOf()} => ${ad ? 'REKLAMA' : 'TRESC'}`,
+            );
+          };
+        })()
+      : undefined;
+  // === KONIEC TEMP-DIAGNOSTYKI ==============================================
+
   return {
     play: () => player.playVideo(),
     pause: () => player.pauseVideo(),
@@ -171,8 +237,10 @@ export async function createPlayer(
     },
     sample: (): TimeSample => {
       const state = player.getPlayerState();
+      const ad = isAd();
+      probe?.(state, player.getDuration(), player.getCurrentTime(), ad);
 
-      if (isAd()) {
+      if (ad) {
         // Reklama to dla API zwykle PLAYING. Meldujemy zamrozenie (silnik nie
         // spawnuje ani nie ocenia niczego) i **ostatni czas tresci** — podanie
         // czasu reklamy zresynchronizowaloby silnik do zera i przy mid-rollu
