@@ -1,4 +1,3 @@
-import { createAdProbe } from '../debug-probe.js'; // ⚠️ tymczasowe (ADR-0022)
 import type { TimeSample, TimeSource } from '../engine/types.js';
 
 /** Stany odtwarzacza wg IFrame Player API. */
@@ -123,23 +122,6 @@ export async function createPlayer(
   /** Czy film w ogole ruszyl. Do tego czasu kazdy odczyt zegara jest podejrzany. */
   let contentStarted = false;
 
-  // ⚠️ TYMCZASOWA SONDA DIAGNOSTYCZNA (ADR-0024) — usuwana razem z
-  // `src/debug-probe.ts`; instrukcja w naglowku tamtego pliku.
-  const probe = createAdProbe({
-    expected,
-    getDuration: () => player.getDuration(),
-    getVideoId: () => {
-      try {
-        return (
-          (player as unknown as { getVideoData?: () => { video_id?: string } }).getVideoData?.()
-            ?.video_id ?? '?'
-        );
-      } catch {
-        return '?';
-      }
-    },
-  });
-
   return {
     play: () => player.playVideo(),
     pause: () => player.pauseVideo(),
@@ -181,8 +163,6 @@ export async function createPlayer(
       // mimo poprawnego zamrozenia. Zegar tresci jest wiarygodny dopiero, gdy
       // film raz ruszyl i player nie jest w UNSTARTED.
       const contentClock = contentStarted && state !== UNSTARTED;
-
-      probe?.(state, player.getDuration(), player.getCurrentTime(), !contentClock);
 
       if (!contentClock) {
         return { timeSec: lastContentTimeSec, playing: false, ended: false, rate: 1 };

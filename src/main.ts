@@ -3,7 +3,6 @@ import { validateBeatmap } from './engine/beatmap.js';
 import { mountGame } from './game.js';
 import { SPRITE_KEYS } from './sprites.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
-import { setProbeStatus } from './debug-probe.js'; // ⚠️ tymczasowe (ADR-0022)
 import type { Beatmap, TimeSource } from './engine/types.js';
 import type { DevHandEditorHandle } from './dev/hand-editor.js';
 
@@ -78,24 +77,9 @@ async function bootstrap(): Promise<void> {
     };
   }
 
-  // ⚠️ TYMCZASOWE (ADR-0022): licznik klatek + czas zycia. Zywa petla ma ~60
-  // klatek na sekunde dzialania; duzo mniej = rAF stanal (wyjatek w klatce).
-  let frames = 0;
-  const startedMs = performance.now();
-
   const loop = (): void => {
     game.frame();
     dev?.onFrame();
-    // ⚠️ TYMCZASOWA SONDA (ADR-0022) — stan gry obok odczytow playera,
-    // zeby dalo sie odroznic reke spawnowana przez silnik od grafiki bramki.
-    frames++;
-    const view = game.engine.getView();
-    setProbeStatus(
-      `gra t=${view.timeSec.toFixed(1)} ${view.frozen ? 'ZAMROZONA' : 'idzie'} ` +
-        `obiekty=${view.visible.length} bramka=${
-          document.getElementById('gate')?.hidden ? 'ukryta' : 'WIDOCZNA'
-        } klatki=${frames} zyje=${((performance.now() - startedMs) / 1000).toFixed(0)}s`,
-    );
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);

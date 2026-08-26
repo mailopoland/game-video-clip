@@ -55,10 +55,7 @@ a `getDuration()`/`video_id` dotyczą filmu (zmierzone na iOS). Adapter wpuszcza
 do silnika tylko gdy film raz ruszył i player nie jest w UNSTARTED — inaczej melduje
 freeze z ostatnim czasem treści (ADR-0024, zastępuje ADR-0022; detekcja po długości
 usunięta). `videoDurationSec` służy już tylko suwakowi transportu.
-⚠️ W kodzie siedzi tymczasowa sonda diagnostyczna (`src/debug-probe.ts`), jedyny kod
-dev-owy jadący celowo na produkcję — usuń po potwierdzeniu poprawki na urządzeniu;
-instrukcja w nagłówku tego pliku i w README.
-`npm test` — 230 testów, zielone.
+`npm test` — 224 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
