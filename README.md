@@ -888,6 +888,18 @@ uruchamiaj go tylko po zmianie wyglądu ikony.
 ⚠️ **Niezweryfikowane na urządzeniu:** faktyczne zniknięcie pasków Safari po
 dodaniu do ekranu początkowego i wygląd ikony na iOS.
 
+### Favikona karty przeglądarki
+
+Tytuł karty to `Music Video Slap Game` (`<title>` w `index.html`). Favikona
+(`public/favicon.png`, 64×64, RGBA) to sprite ręki w stanie **po trafieniu**
+(`public/sprites/hand-hit.gif`, ADR-0011) — zamiast celu, żeby ikona karty
+kojarzyła się z akcją gry, a nie z abstrakcyjnym symbolem. Wygenerowana przez
+`scripts/make-favicon.mjs`: własny dekoder GIF (LZW) + downscale ważony alfą +
+ten sam enkoder PNG na `node:zlib` co `make-icons.mjs`, więc bez nowej
+zależności i bez pobierania niczego z internetu. Skrypt jest jednorazowy —
+`public/favicon.png` jest w repo; uruchamiaj go ponownie tylko po zmianie
+`hand-hit.gif`.
+
 ---
 
 ## Wejście i mobile
@@ -1279,6 +1291,7 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
 | zmienić zachowanie zmaksymalizowanej ramki / obrót w portrecie | `src/styles.css` (`.frame`, ADR-0021) |
 | zmienić szerokość pionowego paska transportu | `src/styles.css` (`--hud-width` na `.frame`, ADR-0023) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
+| zmienić tytuł karty przeglądarki / favikonę | `<title>` w `index.html` / `public/favicon.png` (`scripts/make-favicon.mjs`) |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
 | zmienić projekt / klucz Supabase | `src/telemetry/config.ts` (+ `.github/workflows/supabase-keepalive.yml`) |
 | dodać albo zmienić zdarzenie telemetrii | `src/telemetry/telemetry.ts` (+ `CHECK` w [`docs/SUPABASE.md`](docs/SUPABASE.md)) |
