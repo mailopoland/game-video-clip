@@ -49,14 +49,19 @@ body {
     inset: auto;
     top: 0;
     left: 100%;
-    width: 100vh;
-    height: 100vw;
+    /* 100dvh, nie 100vh: na iOS Safari `100vh` to wysokosc BEZ paskow
+       przegladarki (large viewport), a po obrocie ta wartosc staje sie
+       pionowym rozmiarem ramki — nadmiar chowal prawa krawedz (pasek
+       transportu) pod dolnym paskiem Safari. `dvh` liczy realnie widoczna
+       wysokosc, wiec nic nie wystaje. */
+    width: 100dvh;
+    height: 100dvw;
     transform-origin: 0 0;
     transform: rotate(90deg);
     /* Ramka jest obrocona, wiec JEJ szerokosc to 100vh, a wysokosc 100vw —
        bez zamiany jednostek scena dostawala szerokosc portretu (390 px zamiast
        ~690 px na 390x844) i wideo bylo bez potrzeby male (ADR-0023). */
-    --stage-width: min(calc(100vh - var(--hud-width)), calc(100vw * 16 / 9), 1280px);
+    --stage-width: min(calc(100dvh - var(--hud-width)), calc(100dvw * 16 / 9), 1280px);
   }
 }
 

@@ -662,9 +662,12 @@ viewport od pierwszej klatki strony — zanim ktokolwiek kliknie bramkę startow
   scenę i pasek transportu za darmo — `--stage-width` liczy się z `100dvh`.
 - **Wymuszona orientacja pozioma na dotyku:** `@media (orientation: portrait) and
   (pointer: coarse)` obraca `.frame` o 90° (`transform: rotate(90deg)`, `width:
-  100vh`, `height: 100vw`, zakotwiczone w `top: 0; left: 100%`; w tej regule
-  `--stage-width` **zamienia jednostki** — `min(100vh - var(--hud-width), 100vw * 16 / 9,
-  1280px)`, bo obrócona ramka ma szerokość `100vh`; bez tego scena dostawała szerokość
+  100dvh`, `height: 100dvw`, zakotwiczone w `top: 0; left: 100%`; w tej regule
+  `--stage-width` **zamienia jednostki** — `min(100dvh - var(--hud-width), 100dvw * 16 / 9,
+  1280px)`, bo obrócona ramka ma szerokość `100dvh`; jednostki **dynamiczne**, bo
+  `100vh` na iOS Safari to wysokość bez pasków przeglądarki — po obrocie stawała się
+  pionowym rozmiarem ramki i chowała prawą krawędź (pasek transportu) pod dolnym
+  paskiem Safari; bez tego scena dostawała szerokość
   portretu i wideo było bez potrzeby małe, ADR-0023) — telefon trzymany
   pionowo i tak dostaje układ poziomy, wideo zajmuje maksimum ekranu bez czekania,
   aż ktoś fizycznie obróci urządzenie. `pointer: coarse` ogranicza to do ekranów
