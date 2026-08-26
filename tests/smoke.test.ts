@@ -404,6 +404,37 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(controls.seekTo).toHaveBeenCalledWith(0);
     expect(controls.play).toHaveBeenCalledTimes(1);
   });
+
+  // Punkt zaczepienia telemetrii (ADR-0026): obserwator ma dostac dokladnie
+  // ten `GameView`, ktory poszedl do DOM — bez drugiego `getView()` obok.
+  it('onFrame dostaje ten sam view, ktory poszedl do render()', () => {
+    const clock = new FakeClock();
+    const seen: unknown[] = [];
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)], 20), clock, {
+      now: clock.now,
+      onFrame: (view) => seen.push(view),
+    });
+
+    // Montaz renderuje pierwsza klatke, wiec obserwator juz cos widzial.
+    expect(seen).toHaveLength(1);
+
+    playTo(clock, game.frame, 10.0);
+    tap(root.querySelector('.obj[data-id="o1"]')!);
+    game.frame();
+
+    const last = seen[seen.length - 1] as { timeSec: number; stats: { score: number } };
+    expect(last.timeSec).toBeCloseTo(10.0, 2);
+    expect(last.stats.score).toBe(1);
+    expect(root.querySelector('#hud-score')!.textContent).toContain('1');
+  });
+
+  it('brak onFrame nie zmienia niczego w petli', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)], 20), clock, { now: clock.now });
+
+    expect(() => playTo(clock, game.frame, 10.5)).not.toThrow();
+  });
+
 });
 
 describe('pasek transportu (ADR-0019)', () => {

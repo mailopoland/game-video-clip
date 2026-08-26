@@ -2,7 +2,7 @@ import { Engine } from './engine/engine.js';
 import { createUi, type Ui } from './ui/render.js';
 import { createHitSound, type HitSound } from './ui/sound.js';
 import { HIT_SOUND_SRC, preloadResultImages } from './sprites.js';
-import type { Beatmap, TimeSource } from './engine/types.js';
+import type { Beatmap, GameView, TimeSource } from './engine/types.js';
 
 export interface GameHandle {
   engine: Engine;
@@ -28,6 +28,9 @@ export function mountGame(
     sound?: HitSound;
     /** Aktualna glosnosc playera, 0–1 — skaluje dzwiek trafienia (ADR-0013). */
     getReferenceVolume?: () => number;
+    /** Ten sam `GameView`, ktory poszedl do DOM — obserwator po renderze.
+        Uzywane przez telemetrie (ADR-0026); spoiwo nie wie, kto slucha. */
+    onFrame?: (view: GameView) => void;
   } = {},
 ): GameHandle {
   const engine = new Engine(beatmap, timeSource, options.now);
@@ -56,7 +59,9 @@ export function mountGame(
 
   const frame = (): void => {
     engine.tick();
-    ui.render(engine.getView());
+    const view = engine.getView();
+    ui.render(view);
+    options.onFrame?.(view);
   };
 
   frame();
