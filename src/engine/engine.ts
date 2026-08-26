@@ -112,6 +112,9 @@ export class Engine {
       hits,
       misses,
       accuracy: judged === 0 ? 0 : (hits / judged) * 100,
+      // Czytane przy kazdym wywolaniu, wiec `setObjects()` z trybu dev
+      // (ADR-0018) od razu przesuwa mianownik ekranu wyniku.
+      total: this.beatmap.objects.length,
     };
   }
 

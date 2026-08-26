@@ -340,7 +340,8 @@ describe('smoke: render i wejscie dotykowe', () => {
     vi.unstubAllGlobals();
   });
 
-  it('na koncu klipu pokazuje ekran wyniku z liczbami', () => {
+  /** Gra rozegrana do konca klipu: 1 trafienie z 2 celow → ekran wyniku. */
+  function playToResults(): { game: ReturnType<typeof mountGame> } {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10), obj('o2', 12)], 15);
     const game = mountGame(root, beatmap, clock, { now: clock.now });
@@ -349,12 +350,59 @@ describe('smoke: render i wejscie dotykowe', () => {
     tap(root.querySelector('.obj[data-id="o1"]')!);
     playTo(clock, game.frame, 15.0); // o2 przepuszczone
 
+    return { game };
+  }
+
+  it('na koncu klipu pokazuje wynik jako X / Y, procent i grafike', () => {
+    playToResults();
+
     const results = root.querySelector<HTMLElement>('#results')!;
     expect(results.hidden).toBe(false);
     expect(root.querySelector('#r-score')!.textContent).toBe('1');
-    expect(root.querySelector('#r-hits')!.textContent).toBe('1');
-    expect(root.querySelector('#r-misses')!.textContent).toBe('1');
-    expect(root.querySelector('#r-accuracy')!.textContent).toBe('50%');
+    expect(root.querySelector('#r-total')!.textContent).toBe('2');
+    expect(root.querySelector('#r-percent')!.textContent).toBe('50%');
+    expect(root.querySelector<HTMLImageElement>('#r-image')!.src).toMatch(
+      /results\/score2\.gif$/,
+    );
+  });
+
+  it('ekran wyniku nie ma polskich napisow (ADR-0025)', () => {
+    playToResults();
+
+    const text = root.querySelector<HTMLElement>('#results')!.textContent!;
+    for (const word of ['Koniec', 'pkt', 'Trafienia', 'Pudla', 'Celnosc']) {
+      expect(text).not.toContain(word);
+    }
+    expect(text).toContain('PLAY AGAIN');
+  });
+
+  it('PLAY AGAIN ma ikone SVG, nie glif Unicode (regresja iOS)', () => {
+    playToResults();
+
+    const again = root.querySelector<HTMLButtonElement>('#r-again')!;
+    expect(again.querySelector('svg.icon')).not.toBeNull();
+    expect(again.textContent).not.toContain('⟳');
+  });
+
+  it('PLAY AGAIN jest disabled przed enableTransport, a po nim przewija na 0 i gra', () => {
+    const { game } = playToResults();
+    const again = root.querySelector<HTMLButtonElement>('#r-again')!;
+    expect(again.disabled).toBe(true);
+
+    const controls = {
+      play: vi.fn(),
+      pause: vi.fn(),
+      seekTo: vi.fn(),
+      getDuration: vi.fn(() => 20),
+      isMuted: vi.fn(() => false),
+      setMuted: vi.fn(),
+    };
+    game.ui.enableTransport(controls);
+    expect(again.disabled).toBe(false);
+
+    again.click();
+    expect(controls.seekTo).toHaveBeenCalledWith(0);
+    expect(controls.play).toHaveBeenCalledTimes(1);
   });
 });
 

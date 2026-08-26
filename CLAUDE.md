@@ -55,7 +55,14 @@ a `getDuration()`/`video_id` dotyczą filmu (zmierzone na iOS). Adapter wpuszcza
 do silnika tylko gdy film raz ruszył i player nie jest w UNSTARTED — inaczej melduje
 freeze z ostatnim czasem treści (ADR-0024, zastępuje ADR-0022; detekcja po długości
 usunięta). `videoDurationSec` służy już tylko suwakowi transportu.
-`npm test` — 224 testy, zielone.
+Ekran wyniku jest bez polskich napisów (ADR-0025): `X / Y`, procent i grafika
+`public/results/scoreN.gif` dobrana do progu, plus przycisk `PLAY AGAIN`. Procent
+liczy się z **całej** beatmapy (`hits / Stats.total`), nie z `accuracy` — ta pomija
+obiekty `skipped`, więc po przewinięciu w przód pokazywałaby 100% przy jednym
+trafieniu; `accuracy` zostaje w modelu, ale UI jej nie używa. Progi i wybór grafiki
+to czyste funkcje w `src/ui/result-image.ts`. `PLAY AGAIN` nie ma własnego API
+w silniku: `seekTo(0)` + `play()`, a zerowanie punktacji robi istniejący `resync(0)`.
+`npm test` — 239 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -113,6 +120,7 @@ src/
     path.ts              # samplePath — interpolacja pozycji/rozmiaru wzdluz path
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
+    result-image.ts      # czyste funkcje ekranu wyniku: procent i wybor grafiki
     youtube.ts           # IFrame API + adapter TimeSource
     sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
   dev/                   # tryb deweloperski — wycinany z buildu produkcyjnego (ADR-0016)
@@ -125,7 +133,9 @@ tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
+  result-image.test.ts
 public/
+  results/               # scoreN.gif — grafiki ekranu wyniku (ADR-0025)
   manifest.webmanifest   # PWA — jedyna droga do pelnego ekranu bez paskow Safari (iOS)
   icons/                 # ikony PWA, generowane przez scripts/make-icons.mjs
 scripts/
@@ -201,3 +211,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0022 — Wykrywanie reklam po długości wideo i zamrażanie gry](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md)
 - [ADR-0023 — Pionowy pasek transportu po prawej stronie sceny](docs/decisions/ADR-0023-pionowy-pasek-transportu.md)
 - [ADR-0024 — Zegar treści kontra zegar reklamy](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) — zastępuje ADR-0022
+- [ADR-0025 — Bezsłowny ekran wyniku, procent z całej beatmapy i restart przez seek](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md)

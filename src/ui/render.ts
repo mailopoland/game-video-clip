@@ -1,4 +1,5 @@
 import { SPRITES, preloadSprites } from '../sprites.js';
+import { resultImageSrc, resultPercent } from './result-image.js';
 import type { GameView, VisibleObject } from '../engine/types.js';
 
 export interface TransportControls {
@@ -49,6 +50,10 @@ const ICONS = {
   'sound-off':
     '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" />' +
     '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />',
+  // Strzalka „od nowa" przy PLAY AGAIN — z tego samego powodu co reszta:
+  // iOS nie ma `⟳` w foncie i rysowalby pusty kwadrat.
+  replay:
+    '<path d="M17.65 6.35A7.96 7.96 0 0 0 12 4a8 8 0 1 0 7.73 10h-2.08A6 6 0 1 1 12 6c1.66 0 3.14.69 4.22 1.78L13 11h7V4z" />',
 } as const;
 
 type IconName = keyof typeof ICONS;
@@ -104,13 +109,14 @@ export function createUi(
           </button>
         </div>
         <section class="results" id="results" hidden>
-          <h1>Koniec</h1>
-          <p class="results-score"><span id="r-score">0</span> pkt</p>
-          <dl class="results-detail">
-            <dt>Trafienia</dt><dd id="r-hits">0</dd>
-            <dt>Pudla</dt><dd id="r-misses">0</dd>
-            <dt>Celnosc</dt><dd id="r-accuracy">0%</dd>
-          </dl>
+          <div class="results-panel">
+            <p class="results-score"><span id="r-score">0</span> / <span id="r-total">0</span></p>
+            <p class="results-percent" id="r-percent">0%</p>
+            <button class="results-again" id="r-again" type="button" disabled aria-label="Play again">
+              <span>PLAY AGAIN</span>${iconMarkup('replay')}
+            </button>
+          </div>
+          <img class="results-image" id="r-image" alt="" />
         </section>
       </main>
       <div class="transport" id="transport">
@@ -133,6 +139,11 @@ export function createUi(
   const overlay = byId('overlay');
   const gate = byId('gate');
   const results = byId('results');
+  const resultsScore = byId('r-score');
+  const resultsTotal = byId('r-total');
+  const resultsPercent = byId('r-percent');
+  const resultsImage = byId<HTMLImageElement>('r-image');
+  const resultsAgain = byId<HTMLButtonElement>('r-again');
   const hudScore = byId('hud-score');
   const hudHand = byId('hud-hand');
   const ytButtonProxy = byId<HTMLButtonElement>('yt-button-proxy');
@@ -279,10 +290,15 @@ export function createUi(
 
     results.hidden = !view.showResults;
     if (view.showResults) {
-      byId('r-score').textContent = String(view.stats.score);
-      byId('r-hits').textContent = String(view.stats.hits);
-      byId('r-misses').textContent = String(view.stats.misses);
-      byId('r-accuracy').textContent = `${Math.round(view.stats.accuracy)}%`;
+      // Procent liczony z calej beatmapy, nie z celow ocenionych (ADR-0025).
+      const percent = resultPercent(view.stats.hits, view.stats.total);
+      resultsScore.textContent = String(view.stats.score);
+      resultsTotal.textContent = String(view.stats.total);
+      resultsPercent.textContent = `${percent}%`;
+      // Idempotentnie, bo render() leci co klatke — tak samo jak podmiana
+      // sprite'a na `hitSrc` wyzej.
+      const src = resultImageSrc(percent);
+      if (!resultsImage.src.endsWith(src)) resultsImage.src = src;
     }
   }
 
@@ -386,6 +402,16 @@ export function createUi(
       // w tym miejscu: wyglad YouTube'a, dzialanie nasze (ADR-0019).
       ytButtonProxy.disabled = false;
       ytButtonProxy.addEventListener('click', togglePlayback);
+
+      // PLAY AGAIN nie potrzebuje zadnego nowego API silnika: przewiniecie do 0
+      // to zwykly seek, ktory `Engine.tick()` rozpozna jako rozjazd wiekszy niz
+      // SEEK_THRESHOLD_SEC i wyczysci wyniki wszystkich obiektow przez
+      // `resync(0)` — dokladnie tak samo jak przewiniecie suwakiem (ADR-0025).
+      resultsAgain.disabled = false;
+      resultsAgain.addEventListener('click', () => {
+        controls.seekTo(0);
+        controls.play();
+      });
 
       transportSeek.addEventListener('input', () => {
         scrubbing = true;

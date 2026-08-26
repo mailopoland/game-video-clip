@@ -1,7 +1,7 @@
 import { Engine } from './engine/engine.js';
 import { createUi, type Ui } from './ui/render.js';
 import { createHitSound, type HitSound } from './ui/sound.js';
-import { HIT_SOUND_SRC } from './sprites.js';
+import { HIT_SOUND_SRC, preloadResultImages } from './sprites.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
 
 export interface GameHandle {
@@ -42,6 +42,9 @@ export function mountGame(
       // Wewnatrz gestu uzytkownika: `AudioContext` rodzi sie `suspended`
       // i tylko gest pozwala go wznowic (ADR-0017).
       sound.unlock();
+      // Grafiki ekranu wyniku dopiero teraz — przed startem nie moga
+      // konkurowac o pasmo z buforowaniem wideo (ADR-0025).
+      preloadResultImages();
       ui.hideGate();
       options.onStart?.();
     },

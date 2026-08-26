@@ -266,6 +266,15 @@ body {
   padding: 1rem;
 }
 
+/* Liczby po lewej, grafika po prawej. Scena jest 16:9, a grafika 2:3, wiec
+   obrazek zajmuje ok. 45% szerokosci i zostaje miejsce na kolumne z wynikiem. */
+.results {
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  gap: 4cqw;
+}
+
 .gate {
   /* Grafika bramki pokrywa cala scene — zaden padding nie moze jej odsunac. */
   padding: 0;
@@ -306,35 +315,63 @@ body {
   background: rgb(0 0 0 / 0.5);
 }
 
-.results h1 {
-  margin: 0;
-  font-size: clamp(1.2rem, 5vw, 2rem);
+/* Rozmiary w `cqw`, nie w `vw`/`rem`: `.stage` jest kontenerem zapytan
+   (`container-type: inline-size`), wiec ekran wyniku skaluje sie razem ze scena
+   tak samo jak reszta warstwy gry (ADR-0014). */
+.results-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2cqw;
 }
 
 .results-score {
   margin: 0;
-  font-size: clamp(2rem, 10vw, 4rem);
+  font-size: 9cqw;
+  line-height: 1;
   font-weight: 700;
   color: #6ef58f;
 }
 
-.results-detail {
-  display: grid;
-  grid-template-columns: auto auto;
-  gap: 0.25rem 1.5rem;
+.results-percent {
   margin: 0;
-  font-size: clamp(0.9rem, 3.5vw, 1.1rem);
-}
-
-.results-detail dt {
-  text-align: right;
-  opacity: 0.7;
-}
-
-.results-detail dd {
-  margin: 0;
-  text-align: left;
+  font-size: 5cqw;
+  line-height: 1;
   font-weight: 700;
+  opacity: 0.85;
+}
+
+.results-again {
+  display: inline-flex;
+  align-items: center;
+  gap: 1cqw;
+  padding: 1.4cqw 3cqw;
+  border: 0.3cqw solid #6ef58f;
+  border-radius: 1cqw;
+  background: rgb(110 245 143 / 0.12);
+  color: #eaf7ee;
+  font: inherit;
+  font-size: 3cqw;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.results-again .icon {
+  width: 3.4cqw;
+  height: 3.4cqw;
+}
+
+.results-again:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.results-image {
+  height: 100%;
+  max-width: 45%;
+  object-fit: contain;
 }
 
 /* --- Pasek transportu: wlasne sterowanie zamiast kontrolek YouTube (ADR-0019) --- */

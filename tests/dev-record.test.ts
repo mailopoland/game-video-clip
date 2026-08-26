@@ -148,7 +148,9 @@ describe('Engine.setObjects', () => {
 
     expect(engine.getView().visible.find((v) => v.object.id === 'dev-5000')).toBeUndefined();
     expect(engine.getOutcome('dev-5000')?.outcome).toBe('skipped');
-    expect(engine.getStats()).toEqual(statsBefore);
+    // Punktacja bez zmian; rosnie tylko `total` — mianownik ekranu wyniku
+    // jest zawsze liczba obiektow aktualnej beatmapy (ADR-0025).
+    expect(engine.getStats()).toEqual({ ...statsBefore, total: statsBefore.total + 1 });
 
     // Klikalny przez seek wstecz do jego okna:
     clock.seekTo(5.5);
@@ -167,7 +169,7 @@ describe('Engine.setObjects', () => {
     expect(engine.getStats().hits).toBe(1);
 
     engine.setObjects([]);
-    expect(engine.getStats()).toEqual({ score: 0, hits: 0, misses: 0, accuracy: 0 });
+    expect(engine.getStats()).toEqual({ score: 0, hits: 0, misses: 0, accuracy: 0, total: 0 });
     expect(engine.getOutcome('o1')).toBeUndefined();
   });
 });

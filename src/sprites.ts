@@ -41,3 +41,22 @@ export function preloadSprites(): void {
 
 /** Sciezka dzwieku trafienia (ADR-0011) — liczona tak samo od BASE_URL jak sprite'y. */
 export const HIT_SOUND_SRC = `${import.meta.env.BASE_URL}sounds/clap.mp3`;
+
+const resultAsset = (file: string) => `${import.meta.env.BASE_URL}results/${file}`;
+
+/**
+ * Grafiki ekranu wyniku (ADR-0025). Indeks = kubelek procentowy:
+ * 0 -> 0%, 1 -> 1-25%, 2 -> 26-50%, 3 -> 51-75%, 4 -> 76-99%, 5 -> 100%.
+ * Kolejnosc jest kontraktem — `resultImageSrc` indeksuje ta tablice wprost.
+ */
+export const RESULT_IMAGES = [0, 1, 2, 3, 4, 5].map((i) => resultAsset(`score${i}.gif`));
+
+/**
+ * Sciaga grafiki wyniku do cache. Wolane dopiero w `onStart` (nie przy montazu
+ * UI): ~0,5 MB nie ma konkurowac z buforowaniem wideo przed startem, a przez
+ * caly czas trwania klipu zdazy sie pobrac z duzym zapasem.
+ */
+export function preloadResultImages(): void {
+  if (typeof Image === 'undefined') return;
+  for (const src of RESULT_IMAGES) new Image().src = src;
+}

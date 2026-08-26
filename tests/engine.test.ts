@@ -224,6 +224,22 @@ describe('punktacja i ekran wyniku', () => {
     expect(engine.getStats().accuracy).toBeCloseTo(75, 5);
   });
 
+  it('total to liczba WSZYSTKICH celow beatmapy, niezalezna od trafien i pudel', () => {
+    const objects = [obj('o1', 10), obj('o2', 12), obj('o3', 14)];
+    const { clock, engine } = setup(objects);
+
+    // Mianownik ekranu wyniku jest staly od pierwszej klatki (ADR-0025):
+    // przewijanie i pomijanie celow nie moze go zmniejszyc.
+    expect(engine.getStats().total).toBe(3);
+
+    playTo(clock, engine, 10.0);
+    engine.hit('o1');
+    expect(engine.getStats().total).toBe(3);
+
+    playTo(clock, engine, 15.05); // o2 i o3 przepuszczone
+    expect(engine.getStats()).toMatchObject({ hits: 1, misses: 2, total: 3 });
+  });
+
   it('pokazuje ekran wyniku od endScreenAtSec', () => {
     const { clock, engine } = setup([obj('o1', 10)], 20);
     playTo(clock, engine, 19.0);

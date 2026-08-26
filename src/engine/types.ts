@@ -62,6 +62,8 @@ export interface Stats {
   misses: number;
   /** Procent 0–100. Obiekty `skipped` sa poza mianownikiem. */
   accuracy: number;
+  /** Liczba WSZYSTKICH celow beatmapy — mianownik ekranu wyniku (ADR-0025). */
+  total: number;
 }
 
 export interface VisibleObject {

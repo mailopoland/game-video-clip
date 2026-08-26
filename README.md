@@ -241,10 +241,45 @@ i „poza oknem" sprzed ADR-0015:
 `skipped` **nie wchodzi do mianownika celności** i nie jest renderowany (brak „duchów").
 
 Statystyki (`getStats()`): `score` = liczba trafień, `hits`, `misses`,
-`accuracy = hits / (hits + misses) × 100` (0 gdy nic nie oceniono).
+`accuracy = hits / (hits + misses) × 100` (0 gdy nic nie oceniono) oraz
+`total` = liczba **wszystkich** obiektów beatmapy. `total` jest czytane z beatmapy
+przy każdym wywołaniu, więc `setObjects()` z trybu dev od razu przesuwa mianownik.
 
 Ekran wyniku pokazuje się gdy `ended === true` **lub** `timeSec ≥ endScreenAtSec`.
 Przewinięcie z powrotem chowa go.
+
+### Ekran wyniku (ADR-0025)
+
+Bez polskich napisów: wynik `X / Y`, procent, grafika i przycisk `PLAY AGAIN`.
+
+**Procent liczy się z całej beatmapy — `hits / total`, nie z `accuracy`.** `accuracy`
+pomija obiekty `skipped`, więc po przewinięciu w przód jedno trafienie dawałoby 100%;
+mianownik `total` jest stały, więc wynik zawsze znaczy to samo. `accuracy` zostaje
+w modelu i w testach, ale UI jej nie pokazuje.
+
+`resultPercent(hits, total)` (`src/ui/result-image.ts`) zaokrągla do najbliższej
+całości, ale rezerwuje skrajne wartości: `1/1000 → 1%` (nie 0), `999/1000 → 99%`
+(nie 100). Dzięki temu grafika „Perfect" należy wyłącznie do kompletu trafień.
+`resultImageSrc(percent)` mapuje ten sam procent na kubełek — obie liczby pochodzą
+z jednego źródła, więc napis i obrazek nie mogą się rozjechać:
+
+| Procent | Grafika |
+|---|---|
+| 0% | `score0.gif` |
+| 1–25% | `score1.gif` |
+| 26–50% | `score2.gif` |
+| 51–75% | `score3.gif` |
+| 76–99% | `score4.gif` |
+| 100% | `score5.gif` |
+
+**`PLAY AGAIN` nie ma własnego API w silniku ani nie przeładowuje strony** — woła
+`controls.seekTo(0)` + `controls.play()` na tych samych `TransportControls`, które
+obsługują suwak. `Engine.tick()` widzi rozjazd większy niż `SEEK_THRESHOLD_SEC`
+i wywołuje `resync(0)`, a ten kasuje wyniki wszystkich obiektów (despawn ≥ 0) —
+zerowanie punktacji jest więc dokładnie tym samym, sprawdzonym mechanizmem co
+przewinięcie suwakiem. Ekran wyniku gaśnie sam, bo `timeSec < endScreenAtSec`,
+a `ended` wraca na `false`, gdy player wyjdzie ze stanu `ENDED`. Przycisk jest
+`disabled` do `enableTransport()`, tak samo jak reszta transportu.
 
 ---
 
@@ -319,6 +354,10 @@ export const SPRITES: Record<string, Sprite> = {
 };
 
 export const HIT_SOUND_SRC = `${import.meta.env.BASE_URL}sounds/clap.mp3`;
+
+/** Indeks = kubelek procentowy ekranu wyniku (ADR-0025). */
+export const RESULT_IMAGES = [0, 1, 2, 3, 4, 5]
+  .map((i) => `${import.meta.env.BASE_URL}results/score${i}.gif`);
 ```
 
 Wariant `kind: 'image'` ma opcjonalne `hitSrc` — grafikę pokazywaną wyłącznie w stanie
@@ -340,6 +379,28 @@ nie WebP: GIF ma 1-bitową przezroczystość (możliwa widoczna obwódka na kraw
 dłoni na tle wideo) i większy rozmiar (~200–224 kB zamiast ~20–60 kB), ale animowany
 WebP wymagałby narzędzia konwersji, którego projekt nie ma, i pobierania z internetu —
 poza ograniczeniami projektu. Świadomy kompromis, opisany w ADR-0011.
+
+### Grafiki ekranu wyniku
+
+`RESULT_IMAGES` (6 plików w `public/results/`, `score0.gif` … `score5.gif`) —
+kolejność tablicy jest kontraktem: `resultImageSrc()` indeksuje ją wprost.
+`preloadResultImages()` jest wołane **w `onStart` (`src/game.ts`), nie przy montażu
+UI** — ~0,5 MB nie ma konkurować z buforowaniem wideo przed startem, a przez czas
+trwania klipu pobiera się z dużym zapasem.
+
+Źródła to `images/score0.png` … `score5.png` (1024×1536, 32-bit ARGB, ~1,7 MB każdy).
+GIF-y powstały jednorazowo, lokalnie, przez `ffmpeg` — **nic nie jest pobierane
+z internetu i nie doszła żadna zależność npm**:
+
+```bash
+for i in 0 1 2 3 4 5; do
+  ffmpeg -i images/score$i.png -filter_complex     "scale=-1:768:flags=lanczos,split[a][b];     [a]palettegen=max_colors=255:reserve_transparent=1[p];     [b][p]paletteuse=alpha_threshold=128:dither=sierra2_4a"     -y public/results/score$i.gif
+done
+```
+
+`reserve_transparent=1` + `alpha_threshold=128` zachowują przezroczyste tło —
+1-bitowo, tak samo jak przy sprite'ach dłoni (ADR-0011). Wynik: ~83–96 kB na plik,
+540 kB łącznie.
 
 Rejestr wspiera też `kind: 'css'` (czyste CSS, `clip-path` + gradient, zero plików
 binarnych) — to ścieżka z v1 (ADR-0005), obecnie nieużywana, ale renderer (`render.ts`)
@@ -419,7 +480,13 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
         <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
         <span class="feedback">
     <div class="gate">…</div> <!-- bramka startowa: <button.gate-button> z <img.gate-image> (sprites/start-manual.gif) -->
-    <section class="results">… <!-- ekran wyniku -->
+    <section class="results">  <!-- ekran wyniku (ADR-0025): kolumna z liczbami + grafika -->
+      <div class="results-panel">
+        <p class="results-score"><span id="r-score">…</span> / <span id="r-total">…</span></p>
+        <p class="results-percent" id="r-percent">…</p>
+        <button class="results-again" id="r-again"><span>PLAY AGAIN</span><svg class="icon">…</svg></button>
+      </div>
+      <img class="results-image" id="r-image"> <!-- scoreN.gif wybrany z procentu -->
   </main>
   <div class="transport">     <!-- PIONOWA kolumna po PRAWEJ stronie sceny: play/pauza, pionowy suwak, (ukryty czas), wyciszenie, punkty, dlon (ADR-0023) -->
     <button id="transport-play" data-icon="play|pause"><svg class="icon">…</svg></button>
@@ -915,7 +982,7 @@ zamiast być zablokowane (patrz wyżej).
 
 ## Testy
 
-`npm test` — **214 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **239 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -923,15 +990,16 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/fake-clock.ts` | `FakeClock` — czas wideo i zegar ścienny sterowane **niezależnie**: `advance()` (odtwarzanie), `advanceWallOnly()` (pauza/buffering), `seekTo()` (przewinięcie), `advanceAtRate(sec, rate)` (odtwarzanie przy zadanym tempie — `sec` to sekundy wideo, zegar ścienny płynie proporcjonalnie). Fabryka `obj()` tworzy domyślnie dwupunktową `path` (spawn `t = time`, despawn `t = time + 1`). |
 | `tests/playback-rate.test.ts` | 4 testy tempa odtwarzania (`node`, ADR-0016): 0,25× i 2× przez kilka sekund wideo bez fałszywego `resync`, prawdziwy seek nadal wykrywany przy 0,25×, brak pola `rate` w próbce zachowuje się jak dotychczas (domyślnie 1×). |
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
-| `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
+| `tests/engine.test.ts` | 25 testów logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu), `total` w `getStats()` równe liczbie wszystkich obiektów beatmapy i niezależne od trafień oraz pudeł (ADR-0025). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa pokazuje `#gate-image` ze źródłem `sprites/start-manual.gif`, nie ma `.gate-hint` ani napisu w przycisku, a klik w grafikę chowa bramkę, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i pasek transportu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa pokazuje `#gate-image` ze źródłem `sprites/start-manual.gif`, nie ma `.gate-hint` ani napisu w przycisku, a klik w grafikę chowa bramkę, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), `.frame` obejmuje scenę i pasek transportu. **Ekran wyniku (ADR-0025):** `#r-score`/`#r-total`/`#r-percent` zgodne ze statystykami (1 trafienie z 2 celów → `1` / `2` / `50%`), `#r-image` ze źródłem `results/score2.gif` dla 50%, brak polskich napisów w `#results` (`Koniec`, `pkt`, `Trafienia`, `Pudla`, `Celnosc`) przy obecnym `PLAY AGAIN`, przycisk zawiera `svg.icon` a nie glif `⟳` (regresja iOS), `#r-again` jest `disabled` przed `enableTransport` i odblokowany po nim, a klik woła `seekTo(0)` **i** `play()`. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
 | `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
-| `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania statystyk, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
+| `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania punktacji — rośnie wyłącznie `total`, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 | `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, `+` między punktami wypełnia wiersz roboczy bieżącym czasem wideo i zinterpolowaną pozycją zaznaczonego obiektu i od razu dopisuje nowy punkt (posortowany po `t`), nowy punkt z `t` kolidującym z istniejącym (bieżący czas równy punktowi) jest odrzucany bez zmiany beatmapy, a pola wiersza roboczego zostają wypełnione bieżącymi wartościami do poprawki, `−` usuwa punkt natychmiast przy więcej niż 2 punktach, a na ścieżce z dokładnie 2 punktami usuwa cały obiekt zamiast być zablokowany, guzik `.dev-edit-panel-delete-point` ("Usuń punkt") pod nagłówkiem panelu jest ukryty bez wybranego punktu, widoczny i klikalny po wybraniu (usuwa punkt, a na ścieżce z 2 punktami cały obiekt — nigdy nie jest `disabled`), brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
+| `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr). |
 | `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
 | `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
 
@@ -981,6 +1049,11 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 - **Długość klipu `5OyTxEbT-fM` nie została programowo zweryfikowana** — YouTube nie
   oddaje `lengthSeconds` przez zwykły fetch. Jeśli klip jest krótszy niż ~54 s, ostatnie
   cele beatmapy nigdy się nie pojawią. Wymaga jednego ręcznego uruchomienia `npm run dev`.
+- **1-bitowa przezroczystość GIF-ów ekranu wyniku (ADR-0025)** — poświata wokół
+  postaci jest w źródłowych PNG-ach miękka, a GIF potrafi tylko „jest/nie ma".
+  Skrajna klatka `score5.gif` została obejrzana na ciemnym tle (bez czarnego
+  prostokąta i bez obwódki), ale **cały ekran wyniku na tle prawdziwego kadru wideo
+  nie był weryfikowany w przeglądarce** — wymaga jednego ręcznego `npm run dev`.
 - **Obwódka GIF-a na krawędziach dłoni** — 1-bitowa przezroczystość `hand-idle.gif` /
   `hand-hit.gif` może dać widoczną krawędź na tle konkretnego wideo. Niezweryfikowane
   wizualnie.
@@ -1042,6 +1115,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić momenty/ścieżkę/rozmiar celów | `src/data/beatmap.json` |
 | zmienić sposób interpolacji ścieżki (np. Catmull-Rom) | `src/engine/path.ts` |
 | podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ plik w `public/sprites/`) |
+| podmienić grafiki ekranu wyniku / zmienić progi procentowe | `src/sprites.ts` (`RESULT_IMAGES`) + pliki w `public/results/`; progi w `src/ui/result-image.ts` |
 | podmienić dźwięk trafienia | `src/sprites.ts` (`HIT_SOUND_SRC`) + plik w `public/sounds/` |
 | zmienić rozmiar puli / logikę odtwarzania dźwięku | `src/ui/sound.ts` |
 | zmienić zasady trafiania/punktacji | `src/engine/engine.ts` |
@@ -1089,3 +1163,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md) | ⛔ Wykrywanie reklam po długości wideo — zastąpione przez ADR-0024 (założenie obalone pomiarem) |
 | [0023](docs/decisions/ADR-0023-pionowy-pasek-transportu.md) | Pionowy pasek transportu po prawej stronie sceny (pionowy suwak, ukryty licznik czasu) |
 | [0024](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) | Zegar treści kontra zegar reklamy — adapter nie wpuszcza czasu reklamy do silnika (zastępuje ADR-0022) |
+| [0025](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md) | Bezsłowny ekran wyniku: procent z całej beatmapy, grafika zamiast napisów, restart przez `seekTo(0)` |
