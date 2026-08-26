@@ -1,6 +1,11 @@
 # ADR-0022 — Wykrywanie reklam po długości wideo i zamrażanie gry
 
-**Status:** przyjęty
+**Status:** ⛔ ZASTĄPIONY przez [ADR-0024](ADR-0024-zegar-tresci-kontra-zegar-reklamy.md).
+
+> Pomiar na urządzeniu obalił założenie tego ADR-a: w trakcie reklamy `getDuration()`
+> zwraca długość **filmu**, nie kreacji, więc opisana tu detekcja nie miała jak zadziałać.
+> Prawdziwą przyczyną rąk nad reklamą był zegar reklamy wpuszczany do silnika — patrz ADR-0024.
+> Dokument zostaje jako zapis rozważanych opcji i tego, co pomiar wykluczył.
 
 ## Kontekst
 

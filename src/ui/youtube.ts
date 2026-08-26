@@ -4,6 +4,8 @@ import type { TimeSample, TimeSource } from '../engine/types.js';
 /** Stany odtwarzacza wg IFrame Player API. */
 const PLAYING = 1;
 const ENDED = 0;
+/** „Film sie nie zaczal" — w tym stanie player leci reklame (ADR-0024). */
+const UNSTARTED = -1;
 
 interface YtPlayer {
   getCurrentTime(): number;
@@ -39,16 +41,6 @@ declare global {
     onYouTubeIframeAPIReady?: () => void;
   }
 }
-
-/**
- * O ile `getDuration()` moze sie roznic od dlugosci z beatmapy, zeby nadal
- * uchodzic za wlasciwy film. YouTube potrafi zwrocic wartosc zaokraglona
- * inaczej niz podana w beatmapie — reklamy roznia sie o dziesiatki sekund,
- * wiec margines jest hojny celowo: falszywe "to reklama" zamraza gre przy
- * lecacym filmie, a falszywe "to film" kosztuje tylko chwile rak nad reklama.
- * Przy `videoDurationSec: 150` (2:30) progiem jest 148 s, czyli 2:28.
- */
-const AD_DURATION_TOLERANCE_SEC = 2;
 
 const API_URL = 'https://www.youtube.com/iframe_api';
 
@@ -117,30 +109,21 @@ export async function createPlayer(
       : 0;
 
   if (expected === 0) {
-    // Bez odniesienia nie da sie odroznic reklamy od filmu — wypisujemy
-    // aktualna dlugosc, zeby dalo sie ja wpisac do beatmapy bez zgadywania.
+    // Nie wplywa juz na wykrywanie reklam (ADR-0024) — tylko na stabilnosc
+    // suwaka transportu. Wypisujemy realna dlugosc, zeby dalo sie ja wpisac
+    // do beatmapy bez zgadywania.
     console.warn(
-      `Beatmapa nie ma videoDurationSec — wykrywanie reklam wylaczone. ` +
-        `Dlugosc wg playera: ${player.getDuration()} s (ADR-0022).`,
+      `Beatmapa nie ma videoDurationSec — suwak transportu bierze dlugosc ` +
+        `z playera: ${player.getDuration()} s (ADR-0024).`,
     );
   }
 
-  /**
-   * W trakcie reklamy `getDuration()` zwraca dlugosc kreacji, a nie filmu —
-   * to jedyny sygnal reklamy dostepny w IFrame API (ADR-0022). `0` oznacza
-   * brak metadanych, nie reklame.
-   */
-  const isAd = (): boolean => {
-    if (expected === 0) return false;
-    const duration = player.getDuration();
-    if (!Number.isFinite(duration) || duration <= 0) return false;
-    return Math.abs(duration - expected) > AD_DURATION_TOLERANCE_SEC;
-  };
-
   /** Ostatni czas *tresci* — reklama ma wlasny zegar, ktorego silnik nie moze zobaczyc. */
   let lastContentTimeSec = 0;
+  /** Czy film w ogole ruszyl. Do tego czasu kazdy odczyt zegara jest podejrzany. */
+  let contentStarted = false;
 
-  // ⚠️ TYMCZASOWA SONDA DIAGNOSTYCZNA (ADR-0022) — usuwana razem z
+  // ⚠️ TYMCZASOWA SONDA DIAGNOSTYCZNA (ADR-0024) — usuwana razem z
   // `src/debug-probe.ts`; instrukcja w naglowku tamtego pliku.
   const probe = createAdProbe({
     expected,
@@ -189,14 +172,19 @@ export async function createPlayer(
     },
     sample: (): TimeSample => {
       const state = player.getPlayerState();
-      const ad = isAd();
-      probe?.(state, player.getDuration(), player.getCurrentTime(), ad);
+      if (state === PLAYING) contentStarted = true;
 
-      if (ad) {
-        // Reklama to dla API zwykle PLAYING. Meldujemy zamrozenie (silnik nie
-        // spawnuje ani nie ocenia niczego) i **ostatni czas tresci** — podanie
-        // czasu reklamy zresynchronizowaloby silnik do zera i przy mid-rollu
-        // skasowalo dotychczasowe wyniki (ADR-0022).
+      // Reklama ma WLASNY zegar: `getCurrentTime()` odlicza czas kreacji, a
+      // `getPlayerState()` siedzi na UNSTARTED i nigdy nie zwraca PLAYING
+      // (zmierzone na iOS Safari — ADR-0024). Wpuszczenie takiego odczytu do
+      // silnika przesuwalo czas gry po osi reklamy i renderowalo cele nad nia,
+      // mimo poprawnego zamrozenia. Zegar tresci jest wiarygodny dopiero, gdy
+      // film raz ruszyl i player nie jest w UNSTARTED.
+      const contentClock = contentStarted && state !== UNSTARTED;
+
+      probe?.(state, player.getDuration(), player.getCurrentTime(), !contentClock);
+
+      if (!contentClock) {
         return { timeSec: lastContentTimeSec, playing: false, ended: false, rate: 1 };
       }
 

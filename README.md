@@ -155,31 +155,30 @@ klatce, bez cichego rozjazdu. Dzięki temu 0,25×/2× nie wywołują fałszywych
 (wcześniej defekt: predykcja przy 0,25× uciekała 4× szybciej niż realny czas wideo i
 przekraczała `SEEK_THRESHOLD_SEC` po ~0,12 s zegara ściennego).
 
-### Reklamy — gra zamrożona, dopóki leci reklama (ADR-0022)
+### Reklamy — zegar reklamy nie dociera do silnika (ADR-0024)
 
-Dla IFrame API reklama jest **nieodróżnialna od filmu**: `getPlayerState()` zwraca
-`PLAYING`, `getCurrentTime()` liczy czas reklamy od zera, a `getDuration()` zwraca
-długość kreacji. Bez zaradzenia silnik spawnowałby ręce nad reklamą, a przy mid-rollu
-freeze-owe `adopt()` wzięłoby czas reklamy za przewinięcie na początek i **skasowało
-dotychczasowe wyniki**. Oficjalnego API reklam nie ma (`onAdStart`/`getAdState` nie
-istnieją, `.ad-showing` jest w cross-origin iframe, `youtube-nocookie` reklam nie wyłącza).
+Reklama YouTube ma **własny zegar**. Zmierzone na iOS Safari w trakcie pre-rolla:
+`getCurrentTime()` odlicza czas kreacji, `getPlayerState()` siedzi na `-1` (`UNSTARTED`)
+i **nigdy** nie zwraca `PLAYING`, a `getDuration()` oraz `getVideoData().video_id`
+przez cały czas dotyczą **filmu**, nie reklamy.
 
-Sygnałem jest **rozjazd `getDuration()` z `videoDurationSec` z beatmapy** o więcej niż
-`AD_DURATION_TOLERANCE_SEC = 2`. Przy `videoDurationSec: 150` (2:30) progiem jest
-**148 s (2:28)** — wszystko dłuższe to film. Margines jest hojny celowo: fałszywe
-„to reklama" zamraża grę przy lecącym filmie, a fałszywe „to film" kosztuje tylko
-chwilę rąk nad reklamą. Cała logika żyje w `src/ui/youtube.ts` — silnik nie
-wie o reklamach nic i nie wymagał żadnej zmiany. W trakcie reklamy `sample()` zwraca:
+Objaw był mylący: silnik był poprawnie **zamrożony**, a mimo to rysował cele nad reklamą.
+Powodem jest `adopt()` w gałęzi freeze (`Engine.tick`) — czas gry ma śledzić player także
+na pauzie, żeby przewinięcie było widać na ekranie (ADR-0003). Skoro player podawał czas
+reklamy, czas gry wędrował po jej osi i `getView()` zwracał cele, które o tej sekundzie
+istnieją. **Wadą był czas, nie flaga `playing`.**
 
-- **`playing: false`** — ten sam freeze co pauza i buffering: czas gry stoi, nic nie
-  spawnuje, nic nie jest oceniane, kliknięcia ignorowane;
-- **`timeSec` = ostatni czas treści**, nigdy czas reklamy — to chroni wyniki przed
-  `resync()` przy mid-rollu.
+Adapter (`src/ui/youtube.ts`) wpuszcza więc odczyt zegara do silnika tylko wtedy, gdy
+należy on do treści: film musiał raz ruszyć (`PLAYING` zaobserwowane przez `sample()`)
+**i** player nie może być w `UNSTARTED`. Inaczej `sample()` zwraca `playing: false`
+oraz **ostatni znany czas treści** (na starcie `0`) — pre-roll trzyma grę na zerze,
+mid-roll na ostatniej sekundzie filmu. Silnik nie wie o reklamach nic.
 
-`getDuration()` w `PlayerHandle` zwraca `videoDurationSec`, gdy jest znane, żeby suwak
-transportu nie skakał na długość reklamy. `getDuration() === 0` (brak metadanych) nie
-jest traktowane jako reklama. **Brak `videoDurationSec` wyłącza detekcję** i wypisuje
-`console.warn` z długością odczytaną z playera — gotową do wpisania w beatmapę.
+Wcześniejsza detekcja po rozjeździe `getDuration()` z `videoDurationSec`
+([ADR-0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md)) została
+**usunięta** — pomiar pokazał, że nie miała jak zadziałać, a zła wartość w beatmapie
+zamrażała grę na cały film. `videoDurationSec` zostaje wyłącznie jako stabilna
+długość suwaka transportu.
 
 ### ⚠️ Tymczasowa sonda diagnostyczna (do usunięcia)
 
@@ -297,7 +296,7 @@ Przewinięcie z powrotem chowa go.
 |---|---|
 | `id` | Unikalny, **stabilny** — to klucz wyników przy przewijaniu. Zmiana `id` = zerowanie wyniku celu. |
 | `sprite` | Klucz w rejestrze `src/sprites.ts`. |
-| `videoDurationSec` | **Opcjonalne, całe pole beatmapy** (nie obiektu): długość samego filmu w sekundach. Odniesienie do wykrywania reklam (ADR-0022) — brak pola wyłącza detekcję, zła wartość zamraża grę na cały film. Poprawną podpowiada `console.warn` przy starcie. |
+| `videoDurationSec` | **Opcjonalne, całe pole beatmapy** (nie obiektu): długość filmu w sekundach. Od ADR-0024 wpływa **tylko** na długość suwaka transportu — rozgrywki nie dotyka. Brak pola = suwak bierze długość z playera i leci `console.warn` z realną wartością. |
 | `path` | **Wymagane, min. 2 punkty** (start i koniec). Ścieżka ruchu — jedyne źródło prawdy o tym, kiedy i gdzie obiekt istnieje. Patrz niżej. |
 
 **`path` — jedyne źródło prawdy o obecności obiektu (ADR-0014, ADR-0015).** Lista
@@ -1075,7 +1074,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić układ DOM / HUD / ekran wyniku / podmianę grafiki na trafieniu | `src/ui/render.ts` |
 | zmienić pasek transportu / kontrolki wideo | `src/ui/render.ts` + `src/ui/youtube.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
-| zmienić tolerancję wykrywania reklam | `src/ui/youtube.ts` (`AD_DURATION_TOLERANCE_SEC`, ADR-0022) |
+| zmienić regułę odróżniania reklamy od treści | `src/ui/youtube.ts` (`contentClock` w `sample()`, ADR-0024) |
 | zmienić zachowanie zmaksymalizowanej ramki / obrót w portrecie | `src/styles.css` (`.frame`, ADR-0021) |
 | zmienić szerokość pionowego paska transportu | `src/styles.css` (`--hud-width` na `.frame`, ADR-0023) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
@@ -1112,5 +1111,6 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0019](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md) | Własne kontrolki zamiast kontrolek YouTube (unieważnia mitygację z ADR-0008) |
 | [0020](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) | Ikonowy pasek transportu i automatyczny pełny ekran zamiast osobnego przycisku |
 | [0021](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) | Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API, wymuszony obrót w portrecie na dotyku (unieważnia ADR-0010) |
-| [0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md) | Wykrywanie reklam po długości wideo i zamrażanie gry na czas reklamy |
+| [0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md) | ⛔ Wykrywanie reklam po długości wideo — zastąpione przez ADR-0024 (założenie obalone pomiarem) |
 | [0023](docs/decisions/ADR-0023-pionowy-pasek-transportu.md) | Pionowy pasek transportu po prawej stronie sceny (pionowy suwak, ukryty licznik czasu) |
+| [0024](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) | Zegar treści kontra zegar reklamy — adapter nie wpuszcza czasu reklamy do silnika (zastępuje ADR-0022) |

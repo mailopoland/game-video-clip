@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createPlayer } from '../src/ui/youtube.js';
+import { createPlayer, type PlayerHandle } from '../src/ui/youtube.js';
 
 /**
  * Atrapa window.YT.Player: zapamietuje opcje konstrukcyjne i wola onReady
@@ -114,82 +114,97 @@ describe('createPlayer — adapter YouTube IFrame API (ADR-0019)', () => {
   });
 });
 
-describe('createPlayer — wykrywanie reklamy po dlugosci wideo (ADR-0022)', () => {
+describe('createPlayer — zegar tresci kontra zegar reklamy (ADR-0024)', () => {
   afterEach(() => {
     delete (window as unknown as { YT?: unknown }).YT;
   });
 
-  const withExpected = async (expectedDurationSec: number) => {
+  const setup = async (expectedDurationSec?: number) => {
     installFakeYT();
     const player = await createPlayer(document.createElement('div'), 'abc123', expectedDurationSec);
     return { player, fake: FakePlayer.lastInstance };
   };
 
-  it('zamraza gre, gdy getDuration() nie zgadza sie z dlugoscia z beatmapy', async () => {
-    const { player, fake } = await withExpected(150);
-    fake.getDuration = vi.fn(() => 30); // reklama
-    fake.getCurrentTime = vi.fn(() => 12);
+  /** Reklama na iOS: state UNSTARTED, a getCurrentTime() odlicza czas kreacji. */
+  const playAd = (fake: FakePlayer, adTimeSec: number): void => {
+    fake.getPlayerState = vi.fn(() => -1);
+    fake.getCurrentTime = vi.fn(() => adTimeSec);
+  };
 
-    expect(player.sample().playing).toBe(false);
+  /** Tresc uznajemy za rozpoczeta dopiero, gdy petla ja PROBKOWALA — tak samo
+      jak w grze, gdzie stan poznajemy wylacznie przez `sample()`. */
+  const playContent = (player: PlayerHandle, fake: FakePlayer, timeSec: number): void => {
+    fake.getPlayerState = vi.fn(() => 1);
+    fake.getCurrentTime = vi.fn(() => timeSec);
+    player.sample();
+  };
+
+  it('pre-roll: nie wpuszcza zegara reklamy do silnika (czas zostaje na zerze)', async () => {
+    const { player, fake } = await setup(150);
+    playAd(fake, 4.3);
+
+    expect(player.sample()).toMatchObject({ timeSec: 0, playing: false });
   });
 
-  it('nie podaje silnikowi czasu reklamy — trzyma ostatni czas tresci', async () => {
-    const { player, fake } = await withExpected(150);
-    fake.getDuration = vi.fn(() => 150);
-    fake.getCurrentTime = vi.fn(() => 90); // tresc
+  it('mid-roll: trzyma ostatni czas tresci, nie czas kreacji', async () => {
+    const { player, fake } = await setup(150);
+    playContent(player, fake, 90);
     expect(player.sample().timeSec).toBe(90);
 
-    fake.getDuration = vi.fn(() => 30); // wchodzi mid-roll
-    fake.getCurrentTime = vi.fn(() => 5);
+    playAd(fake, 3);
 
-    expect(player.sample().timeSec).toBe(90);
+    expect(player.sample()).toMatchObject({ timeSec: 90, playing: false });
   });
 
-  it('wraca do normalnego odtwarzania, gdy dlugosc znow sie zgadza', async () => {
-    const { player, fake } = await withExpected(150);
+  it('po reklamie wraca do zegara tresci', async () => {
+    const { player, fake } = await setup(150);
+    playContent(player, fake, 12);
+    playAd(fake, 5);
+    expect(player.sample().timeSec).toBe(12);
+
+    playContent(player, fake, 13);
+
+    expect(player.sample()).toMatchObject({ timeSec: 13, playing: true });
+  });
+
+  it('pauza po starcie tresci nadal resynchronizuje (przewijanie suwakiem)', async () => {
+    const { player, fake } = await setup(150);
+    playContent(player, fake, 40);
+
+    fake.getPlayerState = vi.fn(() => 2); // PAUSED
+    fake.getCurrentTime = vi.fn(() => 80); // gracz przewinal suwakiem
+
+    expect(player.sample()).toMatchObject({ timeSec: 80, playing: false });
+  });
+
+  it('koniec filmu nadal melduje ended', async () => {
+    const { player, fake } = await setup(150);
+    playContent(player, fake, 149);
+
+    fake.getPlayerState = vi.fn(() => 0); // ENDED
+    fake.getCurrentTime = vi.fn(() => 150);
+
+    expect(player.sample()).toMatchObject({ ended: true, playing: false, timeSec: 150 });
+  });
+
+  it('sama rozbieznosc getDuration() nie zamraza juz gry (dur reklamy = dur filmu)', async () => {
+    const { player, fake } = await setup(150);
+    playContent(player, fake, 10);
     fake.getDuration = vi.fn(() => 30);
-    expect(player.sample().playing).toBe(false);
 
-    fake.getDuration = vi.fn(() => 150.4); // w granicach tolerancji
-    fake.getCurrentTime = vi.fn(() => 91);
-
-    expect(player.sample()).toMatchObject({ playing: true, timeSec: 91 });
+    expect(player.sample()).toMatchObject({ timeSec: 10, playing: true });
   });
 
-  it('nie uznaje za reklame filmu skroconego o mniej niz tolerancje (2:28 przy 2:30)', async () => {
-    const { player, fake } = await withExpected(150);
-    fake.getDuration = vi.fn(() => 148.5);
-    fake.getCurrentTime = vi.fn(() => 10);
-
-    expect(player.sample()).toMatchObject({ playing: true, timeSec: 10 });
-  });
-
-  it('uznaje za reklame odczyt krotszy o wiecej niz tolerancja', async () => {
-    const { player, fake } = await withExpected(150);
-    fake.getDuration = vi.fn(() => 147.5);
-
-    expect(player.sample().playing).toBe(false);
-  });
-
-  it('nie uznaje za reklame odczytu getDuration() === 0 (brak metadanych)', async () => {
-    const { player, fake } = await withExpected(150);
-    fake.getDuration = vi.fn(() => 0);
-
-    expect(player.sample().playing).toBe(true);
-  });
-
-  it('bez podanej dlugosci detekcja jest wylaczona', async () => {
-    installFakeYT();
-    const player = await createPlayer(document.createElement('div'), 'abc123');
-    FakePlayer.lastInstance.getDuration = vi.fn(() => 30);
-
-    expect(player.sample().playing).toBe(true);
-  });
-
-  it('getDuration() zwraca dlugosc z beatmapy, zeby suwak nie skakal na reklamie', async () => {
-    const { player, fake } = await withExpected(150);
+  it('getDuration() zwraca dlugosc z beatmapy, zeby suwak byl stabilny', async () => {
+    const { player, fake } = await setup(150);
     fake.getDuration = vi.fn(() => 30);
 
     expect(player.getDuration()).toBe(150);
+  });
+
+  it('bez videoDurationSec getDuration() proxuje na player', async () => {
+    const { player } = await setup();
+
+    expect(player.getDuration()).toBe(42);
   });
 });

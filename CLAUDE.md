@@ -49,14 +49,15 @@ w klikalnym, przezroczystym przycisku. Ikony transportu to
 inline SVG (`ICONS` + `setIcon` w `render.ts`, stan w `data-icon`), nie glify Unicode —
 iOS nie ma `❚❚`/`🕪` w foncie i rysował puste kwadraty; ikona dźwięku pokazuje stan
 (głośnik / przekreślony), nie akcję przycisku.
-Reklamy YouTube (pre-roll/mid-roll) są dla IFrame API nieodróżnialne od filmu, więc
-adapter wykrywa je po rozjeździe `getDuration()` z `videoDurationSec` w beatmapie
-i melduje silnikowi freeze (`playing: false`) z ostatnim czasem treści zamiast czasu
-reklamy — silnik nie wie o reklamach nic (ADR-0022). Brak `videoDurationSec` wyłącza
-detekcję i loguje podpowiedź z realną długością.
-⚠️ Wykrywanie reklam jeszcze NIE dziala poprawnie — w kodzie siedzi tymczasowa
-sonda diagnostyczna (`src/debug-probe.ts`), jedyny kod dev-owy jadacy celowo na
-produkcje; instrukcja usuniecia w naglowku tego pliku i w README.
+Reklamy YouTube mają **własny zegar**: w trakcie reklamy `getCurrentTime()` odlicza czas
+kreacji, `getPlayerState()` siedzi na `-1` (UNSTARTED) i nigdy nie zwraca PLAYING,
+a `getDuration()`/`video_id` dotyczą filmu (zmierzone na iOS). Adapter wpuszcza zegar
+do silnika tylko gdy film raz ruszył i player nie jest w UNSTARTED — inaczej melduje
+freeze z ostatnim czasem treści (ADR-0024, zastępuje ADR-0022; detekcja po długości
+usunięta). `videoDurationSec` służy już tylko suwakowi transportu.
+⚠️ W kodzie siedzi tymczasowa sonda diagnostyczna (`src/debug-probe.ts`), jedyny kod
+dev-owy jadący celowo na produkcję — usuń po potwierdzeniu poprawki na urządzeniu;
+instrukcja w nagłówku tego pliku i w README.
 `npm test` — 230 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
@@ -202,3 +203,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0021 — Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) — unieważnia ADR-0010
 - [ADR-0022 — Wykrywanie reklam po długości wideo i zamrażanie gry](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md)
 - [ADR-0023 — Pionowy pasek transportu po prawej stronie sceny](docs/decisions/ADR-0023-pionowy-pasek-transportu.md)
+- [ADR-0024 — Zegar treści kontra zegar reklamy](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) — zastępuje ADR-0022
