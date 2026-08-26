@@ -5,7 +5,10 @@ wyznacza, kiedy i gdzie pojawia się klikalna dłoń — klikalna przez cały cz
 jest widoczna. Klik w tym czasie daje punkt, brak kliku do końca ścieżki — pudło.
 Na końcu klipu pokazuje się ekran wyniku.
 
-Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
+Bez backendu i bez kont — gra działa w całości w przeglądarce, a wyniki nie są
+nigdzie zapisywane per gracz. Build produkcyjny wysyła **anonimową telemetrię**
+(pięć zdarzeń, zero danych osobowych) do Supabase — zob. [Telemetria](#telemetria).
+`npm run dev` nie wysyła nic.
 
 > **Ten plik jest źródłem kontekstu o działaniu aplikacji.** Musi zawsze odzwierciedlać
 > aktualny stan kodu — każda zmiana wpływająca na opisane tu zachowanie wymaga
@@ -18,7 +21,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 224 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 279 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -81,6 +84,10 @@ Wejdź pod link, który wypisze ngrok, dopisując ścieżkę: `https://<losowy-s
 
 Vanilla **TypeScript + Vite**, rendering w **DOM + CSS** (bez canvas), testy w
 **Vitest + jsdom**, hosting **GitHub Pages**. Zależności produkcyjne: **zero**.
+
+Telemetria (ADR-0026) tego nie zmienia: to gołe `fetch` do REST API Supabase,
+nie SDK — `@supabase/supabase-js` byłby pierwszą produkcyjną zależnością
+projektu i ~40 kB za jednego POST-a.
 
 Uzasadnienia w `docs/decisions/` — patrz sekcja [Decyzje](#decyzje).
 
@@ -714,6 +721,106 @@ mimo utraty uzasadnienia — patrz sekcja [Warstwa gry i DOM](#warstwa-gry-i-dom
 
 ---
 
+## Telemetria
+
+Build produkcyjny wysyła **pięć anonimowych zdarzeń** do Supabase, żeby dało się
+odpowiedzieć — z podziałem na daty — ile osób weszło, ile zaczęło grać, ile
+ukończyło, ile zagrało więcej niż raz i ile punktów padło w każdej rozgrywce
+osobno. Decyzja i alternatywy:
+[ADR-0026](docs/decisions/ADR-0026-telemetria-w-supabase.md). Schemat tabeli,
+polityki RLS i pięć zapisanych zapytań: [`docs/SUPABASE.md`](docs/SUPABASE.md).
+
+**`npm run dev` nie wysyła nic** — kod jest za `import.meta.env.PROD`, więc
+nagrywanie beatmapy nie zaśmieca statystyk. Weryfikacja telemetrii wymaga
+zbudowanego `dist/` (procedura wyżej, port 4174).
+
+### Pięć zdarzeń
+
+| Zdarzenie | Kiedy | Gdzie wpięte |
+|---|---|---|
+| `visit` | raz na załadowanie strony | `startTelemetry()` w `src/main.ts` |
+| `gate_click` | klik w bramkę startową | `onStart` przekazane do `mountGame` |
+| `play_start` | pierwsza klatka, w której gra **faktycznie żyje** | `onFrame` |
+| `finish` | pierwsza klatka z `showResults` dla danej rozgrywki | `onFrame` |
+| `abandon` | `pagehide`, gdy był `play_start`, a nie było `finish` | listener w `main.ts` |
+
+Każdy wiersz niesie `visitor_id` (stałe id przeglądarki z `localStorage`),
+a zdarzenia rozgrywki dodatkowo `play_id`, `play_no`, `score`, `hits`,
+`misses`, `accuracy` i `seeked`. Kolumny `id` i `ts` są **serwerowe** — rola
+`anon` nie ma do nich prawa zapisu.
+
+### Cykl życia rozgrywki
+
+```
+gate_click ──▶ [czekamy]  frozen === true  (pauza, buffering, PRE-ROLL)
+                  │
+                  ▼ pierwsza klatka frozen === false
+              play_start   (nowe play_id, play_no + 1)
+                  │
+     ┌────────────┼────────────┐
+     ▼            ▼            ▼
+  finish       abandon    (nic — gra trwa)
+ showResults   pagehide
+     │
+     ▼ PLAY AGAIN: seekTo(0) + play() → klatka bez ekranu wyniku
+  play_start   (kolejna rozgrywka)
+```
+
+`PLAY AGAIN` **nie ma własnego zdarzenia** — `seekTo(0)` + `play()` (ADR-0025)
+daje klatkę `frozen: false, showResults: false`, którą maszyna stanu widzi jako
+nową rozgrywkę. Ten sam wzorzec co w reszcie projektu: stan jest **wyliczany
+z widoku**, a nie zgłaszany osobnym API.
+
+### Cztery rzeczy, które łatwo policzyć źle
+
+- **Ekran wyniku miga.** Seek w tył gasi `showResults` i zapala go ponownie,
+  więc `finish` jest **deduplikowany per rozgrywkę** — inaczej jedna gra
+  dawałaby N ukończeń. Powrót do gry po seeku otwiera *nową* rozgrywkę.
+- **Suwakiem da się dojechać do końca bez grania.** Flaga `seeked` jest
+  ustawiana z opakowanego `TransportControls.seekTo` — w produkcji to **jedyne**
+  źródło przewinięć (tryb dev jest wycięty z buildu), więc nie potrzeba żadnej
+  heurystyki na skokach `timeSec`. Wyjątkiem jest `seekTo(0)` przy zamkniętej
+  rozgrywce: to restart przez `PLAY AGAIN`, nie przewijanie.
+- **Wynik potrafi zmaleć.** Punktacja jest funkcją mapy wyników, więc seek w tył
+  ją zmniejsza. `finish`/`abandon` niosą **snapshot z chwili zdarzenia**.
+- **Reklama to nie start gry.** `gate_click` i `play_start` są osobno celowo:
+  w trakcie pre-rolla adapter melduje `playing: false` (ADR-0024), więc `frozen`
+  zostaje `true`. Odpływ na reklamie widać jako `gate_click` bez `play_start`,
+  a nie jako brak zainteresowania.
+
+### Transport — dwie rzeczy, które nie są kosmetyką
+
+- **`fetch(…, { keepalive: true })`, nie `navigator.sendBeacon`.** Beacon nie
+  pozwala ustawić nagłówków, a PostgREST wymaga `apikey` i `Authorization`
+  (obejście `?apikey=` w URL wkłada klucz do logów pośredników bez zysku).
+  `keepalive` daje nagłówki **i** przetrwanie odładowania dokumentu — czyli to,
+  po co w ogóle sięga się po beacon.
+- **`Prefer: return=minimal`.** Bez tego PostgREST próbuje zwrócić wstawiony
+  wiersz, a `anon` nie ma SELECT: zapis się udaje, ale odpowiedź to błąd
+  uprawnień i czerwona linia w konsoli.
+
+### Awaria telemetrii nie może dotknąć rozgrywki
+
+To jest twarde wymaganie, nie życzenie, i jest wymuszone konstrukcyjnie:
+
+- `postEvent()` **nigdy nie rzuca i nie zwraca obietnicy** — brak sieci, bloker
+  treści, HTTP 500 i sukces wyglądają dla wołającego identycznie;
+- `createTelemetry()` dodatkowo opakowuje wysyłkę w `try/catch`, więc gwarancja
+  nie zależy od tego, kto wstrzyknie `send` (pokryte testem: `send` rzucający na
+  każdym zdarzeniu nie przerywa pętli gry ani nie psuje punktacji);
+- każdy dostęp do `localStorage` jest w `try/catch` (Safari w trybie prywatnym
+  potrafi rzucić na samym dostępie) — brak trwałości psuje statystykę, nie grę;
+- `frame()` na gorącej ścieżce robi **same porównania**; wysyłka leci wyłącznie
+  na przejściach stanu, nigdy co klatkę.
+
+Moduł jest importowany **statycznie**, w odróżnieniu od `src/dev/*` wycinanego
+dynamicznym importem (ADR-0016). Osobny chunk oznaczałby, że start gry czeka na
+żądanie o ścieżce zawierającej `telemetry` — czyli na coś, co filtry blokerów
+treści łapią wprost; przegrany wyścig gubiłby `gate_click`, a razem z nim
+`play_start` i cały lejek. Bramka jest więc runtime'owa, a nie build-time'owa.
+
+---
+
 ## Pełny ekran
 
 **Nie ma już Fullscreen API** (ADR-0021, unieważnia ADR-0010) — właściciel produktu
@@ -982,7 +1089,7 @@ zamiast być zablokowane (patrz wyżej).
 
 ## Testy
 
-`npm test` — **239 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **279 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -1000,6 +1107,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 | `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, `+` między punktami wypełnia wiersz roboczy bieżącym czasem wideo i zinterpolowaną pozycją zaznaczonego obiektu i od razu dopisuje nowy punkt (posortowany po `t`), nowy punkt z `t` kolidującym z istniejącym (bieżący czas równy punktowi) jest odrzucany bez zmiany beatmapy, a pola wiersza roboczego zostają wypełnione bieżącymi wartościami do poprawki, `−` usuwa punkt natychmiast przy więcej niż 2 punktach, a na ścieżce z dokładnie 2 punktami usuwa cały obiekt zamiast być zablokowany, guzik `.dev-edit-panel-delete-point` ("Usuń punkt") pod nagłówkiem panelu jest ukryty bez wybranego punktu, widoczny i klikalny po wybraniu (usuwa punkt, a na ścieżce z 2 punktami cały obiekt — nigdy nie jest `disabled`), brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
 | `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr). |
+| `tests/telemetry.test.ts` | jsdom, ADR-0026: **cykl zdarzeń** (`visit`/`gate_click` po jednym razie, klatki przed bramką bez skutku, zamrożone klatki po `gate_click` **nie** dają `play_start` — regresja pre-rolla, pierwsza żywa klatka daje `play_start` z `play_no = 1`, `showResults` daje `finish` **raz** mimo gaśnięcia i ponownego zapalenia ekranu wyniku, `finish` niesie snapshot statystyk odporny na późniejszą zmianę, `accuracy` zaokrąglone do dwóch miejsc, `showResults` bez `play_start` nie daje `finish`); **wiele rozgrywek** (`PLAY AGAIN` → nowy `play_id` i `play_no = 2`, druga rozgrywka ma własny `finish`, `play_no` rośnie między instancjami na wspólnym storage, `visitor_id` stabilny, storage rzucający przy każdym dostępie i brak storage w ogóle nie wywracają telemetrii); **flaga `seeked`** (przewinięcie w trakcie gry zapala ją, gra bez przewijania nie, `seek(0)` przy zamkniętej rozgrywce to restart i nie brudzi następnej gry, `seek(90)` przy zamkniętej przechodzi na następną, seek przed pierwszą rozgrywką przechodzi na nią); **`pagehide`** (porzucenie daje `abandon` ze snapshotem, po `finish` zero `abandon`, bez rozgrywki zero, dwa `pagehide` dają jeden); **tożsamości** (`getVisitorId` zapisuje i odczytuje, odrzuca wartość o złym kształcie, `nextPlayNo` liczy od 1 i ignoruje śmieci); **transport** (URL, `apikey`, `Authorization`, `Content-Type`, `Prefer: return=minimal`, `keepalive: true`, ciało jako tablica jednego wiersza, odrzucone `fetch` / rzucające synchronicznie / HTTP 500 / brak `fetch` w środowisku — żadne nie rzuca); **integracja** na `mountGame` + `FakeClock` (pełny przebieg daje `visit, gate_click, play_start, finish` z wynikiem, `gate_click` nie leci przed tapnięciem bramki, a `send` rzucający na każdym zdarzeniu **nie przerywa pętli gry ani nie psuje punktacji**). |
 | `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
 | `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
 
@@ -1021,6 +1129,22 @@ jeśli repozytorium nazywa się inaczej**, bo inaczej wyjdzie biała strona z 40
 Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchamia
 `npm ci` → `npm test` → `npm run build` → deploy. Instrukcja krok po kroku:
 [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+### Keepalive Supabase
+
+Drugi workflow, `.github/workflows/supabase-keepalive.yml`, raz dziennie
+POST-uje `rpc/keepalive` do projektu Supabase. Powód: **darmowy projekt pauzuje
+po 7 dniach bez żadnego zapytania do API**, a pauza cicho gubi telemetrię — gra
+działa dalej, POST-y wracają błędem, którego nikt nie widzi. Krok twardo
+fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
+
+> ⚠️ **GitHub wyłącza zaplanowane workflow po 60 dniach bez commitów w repo**
+> i wysyła o tym maila. Wtedy keepalive milknie, a 7 dni później pauzuje
+> Supabase. Workflow ma `workflow_dispatch`, więc włączenie go z powrotem to
+> jeden klik w zakładce Actions („Enable workflow" / „Run workflow").
+> Jeżeli repozytorium ma leżeć odłogiem dłużej, uczciwszym rozwiązaniem niż
+> bot commitujący pustkę jest zewnętrzny cron (cron-job.org, UptimeRobot)
+> na ten sam URL.
 
 ---
 
@@ -1099,6 +1223,30 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   media queries); wymaga ręcznego sprawdzenia na telefonie: telefon trzymany
   pionowo pokazuje układ poziomy wypełniający ekran, bez paska adresu wracającego
   przy przewijaniu (`overflow: hidden` na `html, body`).
+- **Telemetria: `visitor_id` identyfikuje przeglądarkę, nie człowieka
+  (ADR-0026).** Tryb prywatny, uruchomienie PWA z ekranu początkowego (osobny
+  storage!), drugie urządzenie i wyczyszczenie danych tworzą nowego „gracza".
+  Odpowiedź na pytanie „ile osób zagrało więcej niż raz" jest przez to
+  **dolnym oszacowaniem** — i tak trzeba ją czytać.
+- **Telemetria: endpoint jest publiczny.** Klucz jest w bundlu, więc ktokolwiek
+  może wstawiać wiersze. Mitygacja jest proporcjonalna, nie paranoiczna:
+  `CHECK`-i na kształt wiersza, grant **kolumnowy** (`anon` nie zapisze `ts`
+  ani `id`, więc znacznik czasu jest zawsze serwerowy), brak SELECT i zapytania
+  liczące `count(distinct visitor_id)` — zalanie tabeli jednym `visitor_id` nie
+  zawyży żadnej z pięciu odpowiedzi. **Świadomie nie ma** rate-limitera ani
+  Edge Function. Plan awaryjny: `delete` w panelu, rotacja klucza, deploy.
+- **Telemetria: `abandon` nie jest gwarantowany.** Twarde ubicie karty i bfcache
+  potrafią go zgubić. Wiarygodna jest różnica `play_start − finish`, nie sam
+  licznik porzuceń.
+- **Telemetria: realny zapis do Supabase nie jest pokryty testami** — testy
+  podstawiają `fetch` i `localStorage`. Lista rzeczy do jednorazowego
+  sprawdzenia w przeglądarce jest w sekcji 6
+  [`docs/SUPABASE.md`](docs/SUPABASE.md): m.in. HTTP 201 z pustym ciałem, RLS
+  faktycznie blokujący odczyt, `abandon` na iOS i zachowanie przy pre-rollu.
+- **Telemetria: darmowy projekt Supabase pauzuje po 7 dniach bez zapytań**,
+  a pauza **cicho gubi dane**. Zabezpieczeniem jest cron w GitHub Actions,
+  który sam GitHub wyłącza po 60 dniach bez aktywności w repo — patrz
+  [Keepalive Supabase](#keepalive-supabase).
 - **Zachowanie playera na pauzie/końcu przy `controls: 0` (ADR-0019) jest
   niezweryfikowane z prawdziwym YouTube** — nie wiadomo z pewnością, czy wtedy
   nie pojawia się własna nakładka YouTube („Watch on YouTube”, propozycje
@@ -1128,6 +1276,9 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić szerokość pionowego paska transportu | `src/styles.css` (`--hud-width` na `.frame`, ADR-0023) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
+| zmienić projekt / klucz Supabase | `src/telemetry/config.ts` (+ `.github/workflows/supabase-keepalive.yml`) |
+| dodać albo zmienić zdarzenie telemetrii | `src/telemetry/telemetry.ts` (+ `CHECK` w [`docs/SUPABASE.md`](docs/SUPABASE.md)) |
+| zmienić zapytania statystyczne | [`docs/SUPABASE.md`](docs/SUPABASE.md) + snippety w panelu Supabase |
 | zmienić tryb deweloperski nagrywania ścieżki (RDP, zapis, DOM) | `src/dev/*` (patrz [ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)) |
 | zmienić endpoint zapisu beatmapy dla trybu dev | `vite.config.ts` + `src/dev/beatmap-write-plugin.ts` |
 
@@ -1164,3 +1315,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0023](docs/decisions/ADR-0023-pionowy-pasek-transportu.md) | Pionowy pasek transportu po prawej stronie sceny (pionowy suwak, ukryty licznik czasu) |
 | [0024](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) | Zegar treści kontra zegar reklamy — adapter nie wpuszcza czasu reklamy do silnika (zastępuje ADR-0022) |
 | [0025](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md) | Bezsłowny ekran wyniku: procent z całej beatmapy, grafika zamiast napisów, restart przez `seekTo(0)` |
+| [0026](docs/decisions/ADR-0026-telemetria-w-supabase.md) | Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu, keepalive cronem |

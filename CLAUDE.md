@@ -62,7 +62,19 @@ obiekty `skipped`, więc po przewinięciu w przód pokazywałaby 100% przy jedny
 trafieniu; `accuracy` zostaje w modelu, ale UI jej nie używa. Progi i wybór grafiki
 to czyste funkcje w `src/ui/result-image.ts`. `PLAY AGAIN` nie ma własnego API
 w silniku: `seekTo(0)` + `play()`, a zerowanie punktacji robi istniejący `resync(0)`.
-`npm test` — 239 testów, zielone.
+Build produkcyjny wysyła pięć anonimowych zdarzeń telemetrii (`visit`,
+`gate_click`, `play_start`, `finish`, `abandon`) do Supabase gołym `fetch`-em
+z `keepalive` — bez SDK, więc zależności produkcyjnych **dalej jest zero**
+(ADR-0026). Bramka jest runtime'owa (`import.meta.env.PROD`) przy imporcie
+**statycznym**: osobny chunk o ścieżce z „telemetry" łapią filtry blokerów,
+a przegrany wyścig gubiłby `gate_click` i cały lejek. `npm run dev` nie wysyła
+nic. `finish` jest deduplikowany per rozgrywkę (ekran wyniku miga po seeku
+w tył), flaga `seeked` odsiewa dojazd suwakiem do końca, a statystyki idą jako
+snapshot z chwili zdarzenia. SQL (schemat, RLS wyłącznie na INSERT dla `anon`,
+pięć zapisanych zapytań) jest w `docs/SUPABASE.md`; keepalive to codzienny cron
+w `.github/workflows/supabase-keepalive.yml`, bo darmowy projekt Supabase
+pauzuje po 7 dniach bez zapytań.
+`npm test` — 279 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -118,6 +130,11 @@ src/
     beatmap.ts           # validateBeatmap
     engine.ts            # maszyna stanów, resync, punktacja
     path.ts              # samplePath — interpolacja pozycji/rozmiaru wzdluz path
+  telemetry/           # ADR-0026 — aktywne wylacznie przy import.meta.env.PROD
+    config.ts             # URL projektu + publishable key (publiczne z zalozenia)
+    transport.ts          # postEvent — fetch keepalive, nigdy nie rzuca
+    ids.ts                # visitor_id i licznik rozgrywek nad wstrzykiwanym Storage
+    telemetry.ts          # maszyna stanu piatki zdarzen (bez DOM, fetch, storage)
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     result-image.ts      # czyste funkcje ekranu wyniku: procent i wybor grafiki
@@ -133,7 +150,7 @@ tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
-  result-image.test.ts
+  result-image.test.ts  telemetry.test.ts
 public/
   results/               # scoreN.gif — grafiki ekranu wyniku (ADR-0025)
   manifest.webmanifest   # PWA — jedyna droga do pelnego ekranu bez paskow Safari (iOS)
@@ -143,8 +160,10 @@ scripts/
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
+  SUPABASE.md            # schemat, RLS i piec zapisanych zapytan statystyk (ADR-0026)
   decisions/ADR-*.md
 .github/workflows/deploy.yml
+.github/workflows/supabase-keepalive.yml   # codzienny ping, bo projekt pauzuje po 7 dniach
 ```
 
 ## Komendy
@@ -212,3 +231,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0023 — Pionowy pasek transportu po prawej stronie sceny](docs/decisions/ADR-0023-pionowy-pasek-transportu.md)
 - [ADR-0024 — Zegar treści kontra zegar reklamy](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) — zastępuje ADR-0022
 - [ADR-0025 — Bezsłowny ekran wyniku, procent z całej beatmapy i restart przez seek](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md)
+- [ADR-0026 — Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu](docs/decisions/ADR-0026-telemetria-w-supabase.md)
