@@ -419,7 +419,7 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
     <div class="gate">…</div> <!-- bramka startowa: <button.gate-button> z <img.gate-image> (sprites/start-manual.gif) -->
     <section class="results">… <!-- ekran wyniku -->
   </main>
-  <div class="transport">     <!-- jedna linia pod scena: play/pauza, suwak, czas, wyciszenie, punkty, dlon (ADR-0019/ADR-0020) -->
+  <div class="transport">     <!-- PIONOWA kolumna po PRAWEJ stronie sceny: play/pauza, pionowy suwak, (ukryty czas), wyciszenie, punkty, dlon (ADR-0023) -->
     <button id="transport-play" data-icon="play|pause"><svg class="icon">…</svg></button>
     <input id="transport-seek" type="range">
     <span id="transport-time">…</span>
@@ -435,9 +435,9 @@ Istotne szczegóły:
 - **Odtwarzacz nie reaguje na wskaźnik** (`.player iframe { pointer-events: none; }`)
   i nie renderuje własnych kontrolek (`controls: 0`, `disablekb: 1` w `playerVars`,
   `src/ui/youtube.ts`) — klik obok celu nic nie robi, wideo się nie pauzuje. Całe
-  sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez pasek
-  `.transport` pod sceną, wewnątrz `.frame`, więc działa też w trybie
-  zmaksymalizowanym na viewport (ADR-0021, ADR-0019). Patrz sekcja
+  sterowanie (play/pauza, przewijanie, wyciszenie) idzie przez pasek
+  `.transport` — pionową kolumnę po **prawej** stronie sceny, wewnątrz `.frame`,
+  więc działa też w trybie zmaksymalizowanym na viewport (ADR-0021, ADR-0019, ADR-0023). Patrz sekcja
   [Pasek transportu](#pasek-transportu).
 - **`.shield` (między `.player` a `.overlay` w DOM) jest przezroczystą, bezstanową
   blokadą wskaźnika.** Ma `pointer-events: auto` i jest malowana nad playerem, ale pod
@@ -459,7 +459,10 @@ Istotne szczegóły:
   w kontenerze, `cqw` tak (ADR-0014).
 - **`.frame` jest na stałe `position: fixed; inset: 0`**, żeby scena razem z paskiem
   transportu zawsze zajmowała cały viewport, od pierwszej klatki strony (ADR-0021).
-  Szerokość sceny i transportu pochodzi ze wspólnej zmiennej `--stage-width`.
+  `.frame` układa dzieci **w wiersz**: scena, a po jej prawej kolumna `.transport`
+  o szerokości `--hud-width` (ADR-0023). Szerokość sceny to `--stage-width`.
+  ⚠️ Konsekwencja dla trybu dev: `.dev-bar` jest pozycjonowany absolutnie na dole
+  ramki — jako zwykłe dziecko `.frame` stałby się trzecią kolumną.
 - **Nie ma już approach circle** (usunięty w ADR-0015; historia w ADR-0012/ADR-0013).
   `.obj` renderuje tylko `.sprite` i `.feedback` — sam sprite dłoni jest celem, klikalny
   przez cały czas trwania jego `path`.
@@ -590,8 +593,28 @@ Stan ikony jest **odczytywany z playera co klatkę** (`controls.isMuted()` w `re
 a nie wyprowadzany ze skutku ostatniego kliknięcia — YouTube potrafi zmienić wyciszenie
 sam (autoplay, iOS), więc ikona musi nadążać także za zmianą spoza przycisku.
 
-**Pokrętła** (w `src/styles.css`): `--player-overscan` (ile playera wystaje
-poza scenę) i `--yt-button-size` (jak duży jest klikalny środek).
+### Układ paska — pionowa kolumna po prawej (ADR-0023)
+
+Pasek nie leży pod sceną, tylko **po jej prawej stronie, jako jedna pionowa linia** —
+zawsze, także na desktopie (jeden układ zamiast dwóch). Powód: scena trzyma `16/9`
+i na telefonie jest ograniczona **wysokością**, więc pasek poziomy zabierał wysokość,
+a razem z nią — w proporcji 16:9 — także szerokość obrazu. Kolumna zabiera szerokość,
+której kadr i tak nie wykorzystywał:
+
+`--stage-width: min(100vw - var(--hud-width), 100dvh * 16 / 9, 1280px)`
+
+- **Suwak jest pionowy dwiema drogami naraz:** `writing-mode: vertical-lr` +
+  `direction: rtl` (standard, Safari 17.4+/Chrome 124+) **oraz**
+  `-webkit-appearance: slider-vertical` (zdeprecjonowany fallback dla starszego iOS
+  Safari). Starsze WebKity ignorują pierwszą drogę, nowe — drugą; podane razem dają
+  pion na obu. Wartość rośnie do góry.
+- **Licznik czasu jest ukryty** (`.transport-time { display: none }`) — w kolumnie
+  `3.5rem` nie mieści się „0:12 / 2:30", a postęp pokazuje suwak. Element zostaje
+  w DOM i `render()` nadal go aktualizuje.
+
+**Pokrętła** (w `src/styles.css`): `--hud-width` (szerokość kolumny transportu),
+`--player-overscan` (ile playera wystaje poza scenę) i `--yt-button-size`
+(jak duży jest klikalny środek).
 
 Pas `8%` na dole `.overlay` (dawna rezerwa na kontrolki YouTube) zostaje bez zmian
 mimo utraty uzasadnienia — patrz sekcja [Warstwa gry i DOM](#warstwa-gry-i-dom).
@@ -615,7 +638,10 @@ viewport od pierwszej klatki strony — zanim ktokolwiek kliknie bramkę startow
   scenę i pasek transportu za darmo — `--stage-width` liczy się z `100dvh`.
 - **Wymuszona orientacja pozioma na dotyku:** `@media (orientation: portrait) and
   (pointer: coarse)` obraca `.frame` o 90° (`transform: rotate(90deg)`, `width:
-  100vh`, `height: 100vw`, zakotwiczone w `top: 0; left: 100%`) — telefon trzymany
+  100vh`, `height: 100vw`, zakotwiczone w `top: 0; left: 100%`; w tej regule
+  `--stage-width` **zamienia jednostki** — `min(100vh - var(--hud-width), 100vw * 16 / 9,
+  1280px)`, bo obrócona ramka ma szerokość `100vh`; bez tego scena dostawała szerokość
+  portretu i wideo było bez potrzeby małe, ADR-0023) — telefon trzymany
   pionowo i tak dostaje układ poziomy, wideo zajmuje maksimum ekranu bez czekania,
   aż ktoś fizycznie obróci urządzenie. `pointer: coarse` ogranicza to do ekranów
   dotykowych — okno przeglądarki na desktopie zwężone do portretu nie jest obracane.
@@ -680,7 +706,7 @@ dodaniu do ekranu początkowego i wygląd ikony na iOS.
   jest zarezerwowany dla trybu deweloperskiego (patrz niżej).
 - **Tap/klik w puste miejsce kadru (obok celu) nic nie robi** — odtwarzacz nie
   reaguje na wskaźnik i nie ma własnych kontrolek (ADR-0019). Całe sterowanie jest
-  w pasku `.transport` pod sceną, patrz sekcja [Pasek transportu](#pasek-transportu).
+  w pasku `.transport` po prawej stronie sceny, patrz sekcja [Pasek transportu](#pasek-transportu).
 
 ---
 
@@ -996,6 +1022,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
 | zmienić tolerancję wykrywania reklam | `src/ui/youtube.ts` (`AD_DURATION_TOLERANCE_SEC`, ADR-0022) |
 | zmienić zachowanie zmaksymalizowanej ramki / obrót w portrecie | `src/styles.css` (`.frame`, ADR-0021) |
+| zmienić szerokość pionowego paska transportu | `src/styles.css` (`--hud-width` na `.frame`, ADR-0023) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
 | zmienić tryb deweloperski nagrywania ścieżki (RDP, zapis, DOM) | `src/dev/*` (patrz [ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)) |
@@ -1031,3 +1058,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0020](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) | Ikonowy pasek transportu i automatyczny pełny ekran zamiast osobnego przycisku |
 | [0021](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) | Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API, wymuszony obrót w portrecie na dotyku (unieważnia ADR-0010) |
 | [0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md) | Wykrywanie reklam po długości wideo i zamrażanie gry na czas reklamy |
+| [0023](docs/decisions/ADR-0023-pionowy-pasek-transportu.md) | Pionowy pasek transportu po prawej stronie sceny (pionowy suwak, ukryty licznik czasu) |

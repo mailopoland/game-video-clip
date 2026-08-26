@@ -12,7 +12,8 @@ pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014); zostaje mim
 uzasadnienia po ADR-0019 (koszt migracji beatmapy).
 Kontrolki YouTube są wyłączone (`controls: 0`, `disablekb: 1`) i player nie reaguje na
 wskaźnik — całe sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez własny
-pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w zmaksymalizowanej ramce
+pasek transportu — pionową kolumnę po prawej stronie sceny, wewnątrz `.frame` (ADR-0023),
+więc działa też w zmaksymalizowanej ramce
 (ADR-0019, unieważnia mitygację z ADR-0008). Sama blokada wskaźnika **nie ukrywa** brandingu
 YouTube'a — poza stanem `PLAYING` player rysuje własny overlay (tytuł, avatar, logo,
 miniatury, duży przycisk), którego nie wyłącza żaden `playerVar` (`modestbranding`
@@ -197,3 +198,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0020 — Ikonowy pasek transportu i automatyczny pełny ekran](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) — punkt 3 unieważniony przez ADR-0021
 - [ADR-0021 — Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) — unieważnia ADR-0010
 - [ADR-0022 — Wykrywanie reklam po długości wideo i zamrażanie gry](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md)
+- [ADR-0023 — Pionowy pasek transportu po prawej stronie sceny](docs/decisions/ADR-0023-pionowy-pasek-transportu.md)
