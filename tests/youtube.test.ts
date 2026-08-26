@@ -113,3 +113,68 @@ describe('createPlayer — adapter YouTube IFrame API (ADR-0019)', () => {
     expect(player.getDuration()).toBe(42);
   });
 });
+
+describe('createPlayer — wykrywanie reklamy po dlugosci wideo (ADR-0022)', () => {
+  afterEach(() => {
+    delete (window as unknown as { YT?: unknown }).YT;
+  });
+
+  const withExpected = async (expectedDurationSec: number) => {
+    installFakeYT();
+    const player = await createPlayer(document.createElement('div'), 'abc123', expectedDurationSec);
+    return { player, fake: FakePlayer.lastInstance };
+  };
+
+  it('zamraza gre, gdy getDuration() nie zgadza sie z dlugoscia z beatmapy', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 30); // reklama
+    fake.getCurrentTime = vi.fn(() => 12);
+
+    expect(player.sample().playing).toBe(false);
+  });
+
+  it('nie podaje silnikowi czasu reklamy — trzyma ostatni czas tresci', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 150);
+    fake.getCurrentTime = vi.fn(() => 90); // tresc
+    expect(player.sample().timeSec).toBe(90);
+
+    fake.getDuration = vi.fn(() => 30); // wchodzi mid-roll
+    fake.getCurrentTime = vi.fn(() => 5);
+
+    expect(player.sample().timeSec).toBe(90);
+  });
+
+  it('wraca do normalnego odtwarzania, gdy dlugosc znow sie zgadza', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 30);
+    expect(player.sample().playing).toBe(false);
+
+    fake.getDuration = vi.fn(() => 150.4); // w granicach tolerancji
+    fake.getCurrentTime = vi.fn(() => 91);
+
+    expect(player.sample()).toMatchObject({ playing: true, timeSec: 91 });
+  });
+
+  it('nie uznaje za reklame odczytu getDuration() === 0 (brak metadanych)', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 0);
+
+    expect(player.sample().playing).toBe(true);
+  });
+
+  it('bez podanej dlugosci detekcja jest wylaczona', async () => {
+    installFakeYT();
+    const player = await createPlayer(document.createElement('div'), 'abc123');
+    FakePlayer.lastInstance.getDuration = vi.fn(() => 30);
+
+    expect(player.sample().playing).toBe(true);
+  });
+
+  it('getDuration() zwraca dlugosc z beatmapy, zeby suwak nie skakal na reklamie', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 30);
+
+    expect(player.getDuration()).toBe(150);
+  });
+});

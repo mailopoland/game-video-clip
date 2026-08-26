@@ -7,6 +7,12 @@ import type { Beatmap } from './types.js';
 export function validateBeatmap(beatmap: Beatmap, spriteKeys: readonly string[]): Beatmap {
   if (!beatmap.videoId) throw new Error('Beatmapa: brak videoId.');
   if (beatmap.objects.length === 0) throw new Error('Beatmapa: pusta lista obiektow.');
+  if (beatmap.videoDurationSec !== undefined) {
+    const d = beatmap.videoDurationSec;
+    if (!Number.isFinite(d) || d <= 0) {
+      throw new Error('Beatmapa: videoDurationSec musi byc dodatnia, skonczona liczba.');
+    }
+  }
 
   const seen = new Set<string>();
   let previousSpawn = -Infinity;

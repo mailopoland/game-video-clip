@@ -86,7 +86,7 @@ async function bootstrap(): Promise<void> {
 
   const host = document.createElement('div');
   game.ui.playerHost.append(host);
-  player = await createPlayer(host, beatmap.videoId);
+  player = await createPlayer(host, beatmap.videoId, beatmap.videoDurationSec);
   game.ui.setStartEnabled(true);
   game.ui.enableTransport({
     play: () => player?.play(),

@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 211 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 222 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -155,6 +155,29 @@ klatce, bez cichego rozjazdu. Dzięki temu 0,25×/2× nie wywołują fałszywych
 (wcześniej defekt: predykcja przy 0,25× uciekała 4× szybciej niż realny czas wideo i
 przekraczała `SEEK_THRESHOLD_SEC` po ~0,12 s zegara ściennego).
 
+### Reklamy — gra zamrożona, dopóki leci reklama (ADR-0022)
+
+Dla IFrame API reklama jest **nieodróżnialna od filmu**: `getPlayerState()` zwraca
+`PLAYING`, `getCurrentTime()` liczy czas reklamy od zera, a `getDuration()` zwraca
+długość kreacji. Bez zaradzenia silnik spawnowałby ręce nad reklamą, a przy mid-rollu
+freeze-owe `adopt()` wzięłoby czas reklamy za przewinięcie na początek i **skasowało
+dotychczasowe wyniki**. Oficjalnego API reklam nie ma (`onAdStart`/`getAdState` nie
+istnieją, `.ad-showing` jest w cross-origin iframe, `youtube-nocookie` reklam nie wyłącza).
+
+Sygnałem jest **rozjazd `getDuration()` z `videoDurationSec` z beatmapy** o więcej niż
+`AD_DURATION_TOLERANCE_SEC = 1`. Cała logika żyje w `src/ui/youtube.ts` — silnik nie
+wie o reklamach nic i nie wymagał żadnej zmiany. W trakcie reklamy `sample()` zwraca:
+
+- **`playing: false`** — ten sam freeze co pauza i buffering: czas gry stoi, nic nie
+  spawnuje, nic nie jest oceniane, kliknięcia ignorowane;
+- **`timeSec` = ostatni czas treści**, nigdy czas reklamy — to chroni wyniki przed
+  `resync()` przy mid-rollu.
+
+`getDuration()` w `PlayerHandle` zwraca `videoDurationSec`, gdy jest znane, żeby suwak
+transportu nie skakał na długość reklamy. `getDuration() === 0` (brak metadanych) nie
+jest traktowane jako reklama. **Brak `videoDurationSec` wyłącza detekcję** i wypisuje
+`console.warn` z długością odczytaną z playera — gotową do wpisania w beatmapę.
+
 ---
 
 ## Maszyna stanów celu
@@ -230,6 +253,7 @@ Przewinięcie z powrotem chowa go.
 ```json
 {
   "videoId": "5OyTxEbT-fM",
+  "videoDurationSec": 154,
   "endScreenAtSec": 56,
   "objects": [
     { "id": "o1", "sprite": "hand",
@@ -245,6 +269,7 @@ Przewinięcie z powrotem chowa go.
 |---|---|
 | `id` | Unikalny, **stabilny** — to klucz wyników przy przewijaniu. Zmiana `id` = zerowanie wyniku celu. |
 | `sprite` | Klucz w rejestrze `src/sprites.ts`. |
+| `videoDurationSec` | **Opcjonalne, całe pole beatmapy** (nie obiektu): długość samego filmu w sekundach. Odniesienie do wykrywania reklam (ADR-0022) — brak pola wyłącza detekcję, zła wartość zamraża grę na cały film. Poprawną podpowiada `console.warn` przy starcie. |
 | `path` | **Wymagane, min. 2 punkty** (start i koniec). Ścieżka ruchu — jedyne źródło prawdy o tym, kiedy i gdzie obiekt istnieje. Patrz niżej. |
 
 **`path` — jedyne źródło prawdy o obecności obiektu (ADR-0014, ADR-0015).** Lista
@@ -270,7 +295,8 @@ Dzięki temu ruch zamarza na pauzie i resynchronizuje się po przewinięciu bez
 `validateBeatmap` (`src/engine/beatmap.ts`) rzuca czytelnym błędem przy: pustej liście,
 duplikacie `id`, celach nieposortowanych po `path[0].t`, nieznanym `sprite`, `path` z mniej
 niż dwoma punktami, punkcie `path` z `t` nieskończonym/nierosnącym względem poprzedniego,
-`x`/`y` punktu poza 0–100 lub niedodatnim `size` punktu. Błąd = komunikat na stronie
+`x`/`y` punktu poza 0–100, niedodatnim `size` punktu lub niedodatnim/nieskończonym
+`videoDurationSec` (gdy pole w ogóle jest). Błąd = komunikat na stronie
 zamiast cichego pominięcia.
 
 > ⚠️ **Obecne czasy i `endScreenAtSec` to wartości robocze** — nie były strojone do
@@ -968,6 +994,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić układ DOM / HUD / ekran wyniku / podmianę grafiki na trafieniu | `src/ui/render.ts` |
 | zmienić pasek transportu / kontrolki wideo | `src/ui/render.ts` + `src/ui/youtube.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
+| zmienić tolerancję wykrywania reklam | `src/ui/youtube.ts` (`AD_DURATION_TOLERANCE_SEC`, ADR-0022) |
 | zmienić zachowanie zmaksymalizowanej ramki / obrót w portrecie | `src/styles.css` (`.frame`, ADR-0021) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
@@ -1003,3 +1030,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0019](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md) | Własne kontrolki zamiast kontrolek YouTube (unieważnia mitygację z ADR-0008) |
 | [0020](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) | Ikonowy pasek transportu i automatyczny pełny ekran zamiast osobnego przycisku |
 | [0021](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) | Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API, wymuszony obrót w portrecie na dotyku (unieważnia ADR-0010) |
+| [0022](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md) | Wykrywanie reklam po długości wideo i zamrażanie gry na czas reklamy |

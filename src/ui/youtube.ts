@@ -39,6 +39,13 @@ declare global {
   }
 }
 
+/**
+ * O ile `getDuration()` moze sie roznic od dlugosci z beatmapy, zeby nadal
+ * uchodzic za wlasciwy film. YouTube potrafi zwrocic wartosc zaokraglona
+ * inaczej niz podana w beatmapie — reklamy roznia sie o dziesiatki sekund.
+ */
+const AD_DURATION_TOLERANCE_SEC = 1;
+
 const API_URL = 'https://www.youtube.com/iframe_api';
 
 function loadApi(): Promise<YtNamespace> {
@@ -77,7 +84,12 @@ export interface PlayerHandle extends TimeSource {
  * Adapter miedzy IFrame Player API a `TimeSource` silnika (ADR-0003).
  * To jedyne miejsce w projekcie, ktore wie o istnieniu YouTube.
  */
-export async function createPlayer(host: HTMLElement, videoId: string): Promise<PlayerHandle> {
+export async function createPlayer(
+  host: HTMLElement,
+  videoId: string,
+  /** Dlugosc filmu z beatmapy — odniesienie do wykrywania reklam (ADR-0022). */
+  expectedDurationSec?: number,
+): Promise<PlayerHandle> {
   const YT = await loadApi();
 
   const player = await new Promise<YtPlayer>((resolve) => {
@@ -94,6 +106,35 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
       events: { onReady: () => resolve(instance) },
     });
   });
+
+  const expected =
+    expectedDurationSec !== undefined && Number.isFinite(expectedDurationSec) && expectedDurationSec > 0
+      ? expectedDurationSec
+      : 0;
+
+  if (expected === 0) {
+    // Bez odniesienia nie da sie odroznic reklamy od filmu — wypisujemy
+    // aktualna dlugosc, zeby dalo sie ja wpisac do beatmapy bez zgadywania.
+    console.warn(
+      `Beatmapa nie ma videoDurationSec — wykrywanie reklam wylaczone. ` +
+        `Dlugosc wg playera: ${player.getDuration()} s (ADR-0022).`,
+    );
+  }
+
+  /**
+   * W trakcie reklamy `getDuration()` zwraca dlugosc kreacji, a nie filmu —
+   * to jedyny sygnal reklamy dostepny w IFrame API (ADR-0022). `0` oznacza
+   * brak metadanych, nie reklame.
+   */
+  const isAd = (): boolean => {
+    if (expected === 0) return false;
+    const duration = player.getDuration();
+    if (!Number.isFinite(duration) || duration <= 0) return false;
+    return Math.abs(duration - expected) > AD_DURATION_TOLERANCE_SEC;
+  };
+
+  /** Ostatni czas *tresci* — reklama ma wlasny zegar, ktorego silnik nie moze zobaczyc. */
+  let lastContentTimeSec = 0;
 
   return {
     play: () => player.playVideo(),
@@ -113,7 +154,9 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
       }
     },
     seekTo: (sec) => player.seekTo(sec, true),
-    getDuration: () => player.getDuration(),
+    // Dlugosc z beatmapy ma pierwszenstwo: inaczej suwak transportu skakalby
+    // do dlugosci reklamy i wracal (ADR-0022).
+    getDuration: () => (expected > 0 ? expected : player.getDuration()),
     isMuted: () => player.isMuted(),
     setMuted: (muted) => {
       if (muted) {
@@ -125,8 +168,18 @@ export async function createPlayer(host: HTMLElement, videoId: string): Promise<
     },
     sample: (): TimeSample => {
       const state = player.getPlayerState();
+
+      if (isAd()) {
+        // Reklama to dla API zwykle PLAYING. Meldujemy zamrozenie (silnik nie
+        // spawnuje ani nie ocenia niczego) i **ostatni czas tresci** — podanie
+        // czasu reklamy zresynchronizowaloby silnik do zera i przy mid-rollu
+        // skasowalo dotychczasowe wyniki (ADR-0022).
+        return { timeSec: lastContentTimeSec, playing: false, ended: false, rate: 1 };
+      }
+
+      lastContentTimeSec = player.getCurrentTime();
       return {
-        timeSec: player.getCurrentTime(),
+        timeSec: lastContentTimeSec,
         // PLAYING to jedyny stan, w ktorym czas gry plynie. Buffering, pauza,
         // cued i ended zamrazaja gre (wymaganie #5).
         playing: state === PLAYING,

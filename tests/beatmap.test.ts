@@ -12,6 +12,22 @@ describe('validateBeatmap', () => {
     expect(() => check(makeBeatmap([obj('o1', 1), obj('o2', 2)]))).not.toThrow();
   });
 
+  it('przepuszcza beatmape z videoDurationSec', () => {
+    expect(() => check({ ...makeBeatmap([obj('o1', 1)]), videoDurationSec: 150 })).not.toThrow();
+  });
+
+  it('odrzuca niedodatnie videoDurationSec', () => {
+    expect(() => check({ ...makeBeatmap([obj('o1', 1)]), videoDurationSec: 0 })).toThrow(
+      /videoDurationSec/,
+    );
+  });
+
+  it('odrzuca nieskonczone videoDurationSec', () => {
+    expect(() =>
+      check({ ...makeBeatmap([obj('o1', 1)]), videoDurationSec: Number.POSITIVE_INFINITY }),
+    ).toThrow(/videoDurationSec/);
+  });
+
   it('odrzuca zduplikowane id', () => {
     expect(() => check(makeBeatmap([obj('o1', 1), obj('o1', 2)]))).toThrow(/zduplikowane id/);
   });

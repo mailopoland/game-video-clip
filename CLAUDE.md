@@ -48,7 +48,12 @@ w klikalnym, przezroczystym przycisku. Ikony transportu to
 inline SVG (`ICONS` + `setIcon` w `render.ts`, stan w `data-icon`), nie glify Unicode —
 iOS nie ma `❚❚`/`🕪` w foncie i rysował puste kwadraty; ikona dźwięku pokazuje stan
 (głośnik / przekreślony), nie akcję przycisku.
-`npm test` — 213 testów, zielone.
+Reklamy YouTube (pre-roll/mid-roll) są dla IFrame API nieodróżnialne od filmu, więc
+adapter wykrywa je po rozjeździe `getDuration()` z `videoDurationSec` w beatmapie
+i melduje silnikowi freeze (`playing: false`) z ostatnim czasem treści zamiast czasu
+reklamy — silnik nie wie o reklamach nic (ADR-0022). Brak `videoDurationSec` wyłącza
+detekcję i loguje podpowiedź z realną długością.
+`npm test` — 222 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -191,3 +196,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0019 — Własne kontrolki zamiast kontrolek YouTube](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md)
 - [ADR-0020 — Ikonowy pasek transportu i automatyczny pełny ekran](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) — punkt 3 unieważniony przez ADR-0021
 - [ADR-0021 — Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) — unieważnia ADR-0010
+- [ADR-0022 — Wykrywanie reklam po długości wideo i zamrażanie gry](docs/decisions/ADR-0022-wykrywanie-reklam-po-dlugosci-wideo.md)

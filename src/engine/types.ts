@@ -24,6 +24,10 @@ export interface BeatmapObject {
 
 export interface Beatmap {
   videoId: string;
+  /** Dlugosc samego filmu w sekundach. Odniesienie do wykrywania reklam
+      (ADR-0022) — `getDuration()` w trakcie reklamy zwraca dlugosc kreacji.
+      Brak pola = detekcja wylaczona. */
+  videoDurationSec?: number;
   /** Sekunda, od ktorej pokazujemy ekran wyniku (poza tym: stan ENDED). */
   endScreenAtSec: number;
   objects: BeatmapObject[];
