@@ -603,11 +603,17 @@ której kadr i tak nie wykorzystywał:
 
 `--stage-width: min(100vw - var(--hud-width), 100dvh * 16 / 9, 1280px)`
 
-- **Suwak jest pionowy dwiema drogami naraz:** `writing-mode: vertical-lr` +
-  `direction: rtl` (standard, Safari 17.4+/Chrome 124+) **oraz**
-  `-webkit-appearance: slider-vertical` (zdeprecjonowany fallback dla starszego iOS
-  Safari). Starsze WebKity ignorują pierwszą drogę, nowe — drugą; podane razem dają
-  pion na obu. Wartość rośnie do góry.
+- **Suwak jest pionowy dwiema drogami naraz:** `writing-mode: vertical-lr`
+  (standard, Safari 17.4+/Chrome 124+) **oraz** `-webkit-appearance: slider-vertical`
+  (zdeprecjonowany fallback dla starszego iOS Safari). Starsze WebKity ignorują
+  pierwszą drogę, nowe — drugą; podane razem dają pion na obu.
+- **Czas leci z góry w dół** — góra to `0:00`, dół to koniec filmu (`direction: ltr`,
+  zapisane wprost przy suwaku). ⚠️ Na starym iOS Safari, gdzie działa wyłącznie
+  `slider-vertical`, kierunek jest odwrotny i CSS nie ma jak tego odwrócić bez
+  zepsucia drogi nowoczesnej — znane ograniczenie.
+- **Suwak jest żółty** (`#f5c518`): `accent-color` koloruje natywny suwak na obu
+  drogach, a tło kciuka w `::-webkit-slider-thumb` / `::-moz-range-thumb` dopasowuje
+  go tam, gdzie kciuk jest stylowany ręcznie.
 - **Licznik czasu jest ukryty** (`.transport-time { display: none }`) — w kolumnie
   `3.5rem` nie mieści się „0:12 / 2:30", a postęp pokazuje suwak. Element zostaje
   w DOM i `render()` nadal go aktualizuje.

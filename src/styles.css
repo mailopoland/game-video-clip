@@ -367,22 +367,29 @@ body {
 
 /* Suwak pionowy dwiema drogami naraz: `writing-mode` to droga nowoczesna
    (Safari 17.4+, Chrome 124+), `slider-vertical` — zdeprecjonowany fallback dla
-   starszego iOS Safari. Starsze WebKity ignoruja pierwsza, nowe druga. */
+   starszego iOS Safari. Starsze WebKity ignoruja pierwsza, nowe druga.
+   `direction: ltr` (domyslne, zapisane wprost) sprawia, ze czas leci Z GORY
+   W DOL: gora = 0:00, dol = koniec filmu. ⚠️ Na starym iOS Safari, gdzie dziala
+   wylacznie `slider-vertical`, kierunek jest odwrotny (dol = 0:00) — CSS nie ma
+   jak tego odwrocic bez zepsucia drogi nowoczesnej.
+   Zolty kolor idzie przez `accent-color` (natywny suwak, oba kierunki) i przez
+   tlo kciuka w pseudo-elementach. */
 .transport-seek {
   flex: 1;
   min-width: 0;
   min-height: 0;
   width: 1.25rem;
   writing-mode: vertical-lr;
-  direction: rtl; /* wartosc rosnie do gory */
+  direction: ltr;
   -webkit-appearance: slider-vertical;
+  accent-color: #f5c518;
 }
 
 .transport-seek::-webkit-slider-thumb {
   width: 1rem;
   height: 1rem;
   border-radius: 50%;
-  background: #6ef58f;
+  background: #f5c518;
   cursor: pointer;
 }
 
@@ -391,7 +398,7 @@ body {
   height: 1rem;
   border: 0;
   border-radius: 50%;
-  background: #6ef58f;
+  background: #f5c518;
   cursor: pointer;
 }
 
@@ -421,7 +428,8 @@ body {
 
 .hud-score {
   flex: none;
-  font-size: 1rem;
+  /* 150% wiekszy niz 1rem — punkty maja byc czytelne w waskiej kolumnie. */
+  font-size: 2.5rem;
   font-weight: 700;
   text-align: center;
 }
