@@ -163,6 +163,7 @@ docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
   SUPABASE.md            # schemat, RLS i piec zapisanych zapytan statystyk (ADR-0026)
+  SEO.md                 # tresci SEO (EN) + plan zmian: metatagi, OG, JSON-LD, alt, sitemap
   decisions/ADR-*.md
 .github/workflows/deploy.yml
 .github/workflows/supabase-keepalive.yml   # codzienny ping, bo projekt pauzuje po 7 dniach
