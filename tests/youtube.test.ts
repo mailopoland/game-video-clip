@@ -156,6 +156,21 @@ describe('createPlayer — wykrywanie reklamy po dlugosci wideo (ADR-0022)', () 
     expect(player.sample()).toMatchObject({ playing: true, timeSec: 91 });
   });
 
+  it('nie uznaje za reklame filmu skroconego o mniej niz tolerancje (2:28 przy 2:30)', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 148.5);
+    fake.getCurrentTime = vi.fn(() => 10);
+
+    expect(player.sample()).toMatchObject({ playing: true, timeSec: 10 });
+  });
+
+  it('uznaje za reklame odczyt krotszy o wiecej niz tolerancja', async () => {
+    const { player, fake } = await withExpected(150);
+    fake.getDuration = vi.fn(() => 147.5);
+
+    expect(player.sample().playing).toBe(false);
+  });
+
   it('nie uznaje za reklame odczytu getDuration() === 0 (brak metadanych)', async () => {
     const { player, fake } = await withExpected(150);
     fake.getDuration = vi.fn(() => 0);

@@ -54,7 +54,7 @@ adapter wykrywa je po rozjeździe `getDuration()` z `videoDurationSec` w beatmap
 i melduje silnikowi freeze (`playing: false`) z ostatnim czasem treści zamiast czasu
 reklamy — silnik nie wie o reklamach nic (ADR-0022). Brak `videoDurationSec` wyłącza
 detekcję i loguje podpowiedź z realną długością.
-`npm test` — 222 testy, zielone.
+`npm test` — 224 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

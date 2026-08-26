@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 222 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 224 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -165,7 +165,10 @@ dotychczasowe wyniki**. Oficjalnego API reklam nie ma (`onAdStart`/`getAdState` 
 istnieją, `.ad-showing` jest w cross-origin iframe, `youtube-nocookie` reklam nie wyłącza).
 
 Sygnałem jest **rozjazd `getDuration()` z `videoDurationSec` z beatmapy** o więcej niż
-`AD_DURATION_TOLERANCE_SEC = 1`. Cała logika żyje w `src/ui/youtube.ts` — silnik nie
+`AD_DURATION_TOLERANCE_SEC = 2`. Przy `videoDurationSec: 150` (2:30) progiem jest
+**148 s (2:28)** — wszystko dłuższe to film. Margines jest hojny celowo: fałszywe
+„to reklama" zamraża grę przy lecącym filmie, a fałszywe „to film" kosztuje tylko
+chwilę rąk nad reklamą. Cała logika żyje w `src/ui/youtube.ts` — silnik nie
 wie o reklamach nic i nie wymagał żadnej zmiany. W trakcie reklamy `sample()` zwraca:
 
 - **`playing: false`** — ten sam freeze co pauza i buffering: czas gry stoi, nic nie
@@ -253,7 +256,7 @@ Przewinięcie z powrotem chowa go.
 ```json
 {
   "videoId": "5OyTxEbT-fM",
-  "videoDurationSec": 154,
+  "videoDurationSec": 150,
   "endScreenAtSec": 56,
   "objects": [
     { "id": "o1", "sprite": "hand",

@@ -42,9 +42,12 @@ declare global {
 /**
  * O ile `getDuration()` moze sie roznic od dlugosci z beatmapy, zeby nadal
  * uchodzic za wlasciwy film. YouTube potrafi zwrocic wartosc zaokraglona
- * inaczej niz podana w beatmapie — reklamy roznia sie o dziesiatki sekund.
+ * inaczej niz podana w beatmapie — reklamy roznia sie o dziesiatki sekund,
+ * wiec margines jest hojny celowo: falszywe "to reklama" zamraza gre przy
+ * lecacym filmie, a falszywe "to film" kosztuje tylko chwile rak nad reklama.
+ * Przy `videoDurationSec: 150` (2:30) progiem jest 148 s, czyli 2:28.
  */
-const AD_DURATION_TOLERANCE_SEC = 1;
+const AD_DURATION_TOLERANCE_SEC = 2;
 
 const API_URL = 'https://www.youtube.com/iframe_api';
 

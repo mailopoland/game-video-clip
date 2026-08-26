@@ -38,7 +38,9 @@ a `youtube-nocookie` reklam nie wyłącza. Zostają heurystyki na tym, co API zw
 **Opcja 1.** Beatmapa dostaje opcjonalne `videoDurationSec`. Adapter
 (`src/ui/youtube.ts` — jedyne miejsce w projekcie znające YouTube) uznaje, że trwa
 reklama, gdy `getDuration()` różni się od tej wartości o więcej niż
-`AD_DURATION_TOLERANCE_SEC = 1`. `getDuration() === 0` (brak metadanych) **nie**
+`AD_DURATION_TOLERANCE_SEC = 2` (przy filmie 2:30 progiem jest 148 s, czyli 2:28 —
+margines celowo hojny, bo fałszywe „to reklama" zamraża grę przy lecącym filmie,
+a fałszywe „to film" kosztuje tylko chwilę rąk nad reklamą). `getDuration() === 0` (brak metadanych) **nie**
 jest reklamą, a brak pola w beatmapie wyłącza detekcję i wypisuje `console.warn`
 z aktualną długością odczytaną z playera — żeby dało się ją wpisać bez zgadywania.
 
@@ -58,6 +60,7 @@ inaczej suwak transportu skakałby na długość reklamy i wracał.
 - Reklama = zamrożona gra i czysty kadr; ręce pojawiają się dopiero, gdy leci film.
 - **`videoDurationSec` trzeba uzupełnić dla każdego nowego `videoId`.** Zła wartość
   = gra zamrożona przez cały film; poprawną podpowiada `console.warn` przy starcie.
+  Dla klipu `5OyTxEbT-fM` jest to `150` (2:30), potwierdzone przez właściciela produktu.
 - Film o długości reklamy z dokładnością do sekundy byłby nierozpoznawalny —
   w praktyce nie występuje.
 - Bramka startowa i pasek transportu działają bez zmian; użytkownik może pauzować
