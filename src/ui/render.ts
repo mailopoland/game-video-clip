@@ -151,6 +151,10 @@ export function createUi(
   let durationKnown = false;
   let durationSec = 0;
   let scrubbing = false;
+  // Ikona dzwieku pokazuje STAN playera, nie skutek ostatniego klikniecia —
+  // YouTube potrafi zmienic wyciszenie sam (autoplay, iOS), wiec odswiezamy ja
+  // co klatke z `controls.isMuted()`.
+  let lastMuted: boolean | null = null;
   let lastFrozen = true;
 
   const startButton = byId<HTMLButtonElement>('start');
@@ -207,6 +211,15 @@ export function createUi(
     return element;
   }
 
+  function syncMuteIcon(controls: TransportControls): void {
+    const muted = controls.isMuted();
+    if (muted === lastMuted) return;
+    lastMuted = muted;
+    transportMute.setAttribute('aria-pressed', String(muted));
+    transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
+    setIcon(transportMute, muted ? 'sound-off' : 'sound-on');
+  }
+
   function render(view: GameView): void {
     const seen = new Set<string>();
 
@@ -244,6 +257,7 @@ export function createUi(
     hudScore.textContent = String(view.stats.score);
 
     if (transportControls) {
+      syncMuteIcon(transportControls);
       lastFrozen = view.frozen;
       if (!durationKnown) {
         const duration = transportControls.getDuration();
@@ -376,17 +390,11 @@ export function createUi(
         scrubbing = false;
       });
 
-      const updateMuteLabel = (): void => {
-        const muted = controls.isMuted();
-        transportMute.setAttribute('aria-pressed', String(muted));
-        transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
-        setIcon(transportMute, muted ? 'sound-off' : 'sound-on');
-      };
       transportMute.addEventListener('click', () => {
         controls.setMuted(!controls.isMuted());
-        updateMuteLabel();
+        syncMuteIcon(controls);
       });
-      updateMuteLabel();
+      syncMuteIcon(controls);
     },
   };
 }

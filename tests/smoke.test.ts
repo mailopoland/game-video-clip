@@ -519,6 +519,27 @@ describe('pasek transportu (ADR-0019)', () => {
     expect(muteButton.dataset.icon).toBe('sound-on');
   });
 
+  it('ikona glosnosci nadaza za wyciszeniem zmienionym poza przyciskiem', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const muteButton = root.querySelector<HTMLButtonElement>('#transport-mute')!;
+
+    let muted = false;
+    game.ui.enableTransport(makeControls({ isMuted: vi.fn(() => muted) }));
+    expect(muteButton.dataset.icon).toBe('sound-on');
+
+    // Player wycisza sie sam (autoplay / iOS) — ikona musi to pokazac przy renderze.
+    muted = true;
+    playTo(clock, game.frame, 1);
+    expect(muteButton.dataset.icon).toBe('sound-off');
+    expect(muteButton.getAttribute('aria-pressed')).toBe('true');
+
+    muted = false;
+    playTo(clock, game.frame, 2);
+    expect(muteButton.dataset.icon).toBe('sound-on');
+    expect(muteButton.getAttribute('aria-pressed')).toBe('false');
+  });
+
   it('ikony transportu sa inline SVG, nie glifami zaleznymi od fontu systemowego', () => {
     // iOS nie ma w foncie ani `❚❚`, ani `🕪` — glify rysowaly sie jako puste kwadraty.
     const clock = new FakeClock();

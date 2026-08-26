@@ -555,6 +555,9 @@ w CSS (`1.25rem`), nie `font-size`.
 przekreślony = wyciszony. Statyczny HTML startuje z `sound-on`, bo wideo startuje
 z dźwiękiem — inaczej pierwsza klatka strony kłamałaby o stanie. `aria-pressed`
 i `aria-label` opisują natomiast akcję („Wycisz" / „Wlacz dzwiek").
+Stan ikony jest **odczytywany z playera co klatkę** (`controls.isMuted()` w `render`),
+a nie wyprowadzany ze skutku ostatniego kliknięcia — YouTube potrafi zmienić wyciszenie
+sam (autoplay, iOS), więc ikona musi nadążać także za zmianą spoza przycisku.
 
 **Pokrętła** (w `src/styles.css`): `--player-overscan` (ile playera wystaje
 poza scenę) i `--yt-button-size` (jak duży jest klikalny środek).

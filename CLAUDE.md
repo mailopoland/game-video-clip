@@ -46,7 +46,7 @@ nie steruje odtwarzaniem, tylko startuje grę tak samo jak „Graj". Ikony trans
 inline SVG (`ICONS` + `setIcon` w `render.ts`, stan w `data-icon`), nie glify Unicode —
 iOS nie ma `❚❚`/`🕪` w foncie i rysował puste kwadraty; ikona dźwięku pokazuje stan
 (głośnik / przekreślony), nie akcję przycisku.
-`npm test` — 211 testów, zielone.
+`npm test` — 212 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
