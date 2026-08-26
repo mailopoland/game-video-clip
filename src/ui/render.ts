@@ -99,8 +99,9 @@ export function createUi(
                 aria-label="Odtwarzaj lub wstrzymaj"></button>
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
-          <button class="gate-button" id="start" type="button">Graj</button>
-          <p class="gate-hint">Klikaj dlonie, gdy sie pojawia.</p>
+          <button class="gate-button" id="start" type="button" aria-label="Graj">
+            <img class="gate-image" id="gate-image" alt="Klikaj dlonie, gdy sie pojawia" />
+          </button>
         </div>
         <section class="results" id="results" hidden>
           <h1>Koniec</h1>
@@ -158,6 +159,10 @@ export function createUi(
   let lastFrozen = true;
 
   const startButton = byId<HTMLButtonElement>('start');
+  // Instrukcja + "tap to start" sa jedna grafika (public/sprites/), wiec sciezka
+  // musi liczyc sie od BASE_URL tak samo jak sprite'y (ADR-0007).
+  byId<HTMLImageElement>('gate-image').src =
+    `${import.meta.env.BASE_URL}sprites/start-manual.gif`;
 
   // Bramka startowa ma dwa wejscia: wlasny przycisk "Graj" i przycisk play
   // paska transportu (oraz proxy duzego przycisku YouTube'a) — pierwsze
@@ -354,7 +359,7 @@ export function createUi(
     },
     setStartEnabled: (enabled) => {
       startButton.disabled = !enabled;
-      startButton.textContent = enabled ? 'Graj' : 'Ladowanie…';
+      startButton.setAttribute('aria-label', enabled ? 'Graj' : 'Ladowanie…');
     },
     enableTransport: (controls) => {
       transportControls = controls;

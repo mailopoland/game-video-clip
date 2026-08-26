@@ -336,7 +336,7 @@ jest darmowe.
   tworzy `AudioContext` (ten wymaga gestu). Bez tego pobranie startowałoby dopiero
   w `unlock()` i pierwsze trafienie mogło wypaść, zanim bufor był gotowy — czyli
   w ciszę. Nieudane pobranie zeruje się, więc `unlock()` ponawia próbę.
-- **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu „Graj",
+- **`unlock()`** — wywoływane raz w `onStart` (`src/game.ts`), w obrębie gestu startowego,
   bo `AudioContext` rodzi się `suspended` i tylko gest pozwala go wznowić. Dekoduje
   **kopię** pobranych bajtów (`decodeAudioData` bywa destrukcyjne dla przekazanego
   `ArrayBuffer`, a ponowna próba nie miałaby wtedy czego dekodować). Powtórne
@@ -390,7 +390,7 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
       <button class="obj">    <!-- pointer-events: auto -->
         <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
         <span class="feedback">
-    <div class="gate">…</div> <!-- bramka startowa "Graj" -->
+    <div class="gate">…</div> <!-- bramka startowa: <button.gate-button> z <img.gate-image> (sprites/start-manual.gif) -->
     <section class="results">… <!-- ekran wyniku -->
   </main>
   <div class="transport">     <!-- jedna linia pod scena: play/pauza, suwak, czas, wyciszenie, punkty, dlon (ADR-0019/ADR-0020) -->
@@ -531,7 +531,7 @@ ukrywało już niczego istotnego, a kosztowało podgląd wideo na pauzie.
 ### Przycisk play jako drugie wejście bramki startowej
 
 Dopóki `.gate` jest widoczna, **klik w `#transport-play` (i w `.yt-button-proxy`)
-nie woła `play()`, tylko robi dokładnie to samo co przycisk „Graj"**: odblokowuje
+nie woła `play()`, tylko robi dokładnie to samo co klik w grafikę bramki**: odblokowuje
 dźwięk trafienia, chowa bramkę i startuje odtwarzanie. Bez tego kliknięcie play
 uruchamiałoby wideo pod wciąż widoczną bramką, a `AudioContext` zostałby
 zablokowany — gest użytkownika przepadłby (patrz „Dźwięk trafienia").
@@ -539,7 +539,7 @@ zablokowany — gest użytkownika przepadłby (patrz „Dźwięk trafienia").
 Warunkiem jest `gate.hidden`, nie osobna flaga, więc `hideGate()` zamyka bramkę
 raz na zawsze i od drugiego kliknięcia play działa jak zwykły przełącznik
 play/pauza. Jeśli player nie jest jeszcze gotowy (`setStartEnabled(false)`,
-przycisk „Ladowanie…”), klik w play **nie robi nic** — tak samo jak klik w „Graj".
+przygaszona grafika bramki), klik w play **nie robi nic** — tak samo jak klik w bramkę.
 
 ### Ikony transportu — inline SVG, nie glify Unicode
 
@@ -578,7 +578,7 @@ mimo utraty uzasadnienia — patrz sekcja [Warstwa gry i DOM](#warstwa-gry-i-dom
 nie chciał prawdziwego trybu pełnoekranowego przeglądarki (pasek adresu w Chrome na
 Androidzie potrafi wrócić, wymaga gestu użytkownika, na iPhonie nie istnieje wcale).
 Zamiast tego `.frame` jest **zawsze** `position: fixed; inset: 0`, czyli zajmuje cały
-viewport od pierwszej klatki strony — zanim ktokolwiek kliknie „Graj", nie tylko po.
+viewport od pierwszej klatki strony — zanim ktokolwiek kliknie bramkę startową, nie tylko po.
 `html, body { overflow: hidden }` na stałe, bo strona nigdy nie ma nic poza `.frame`.
 
 - **`fs: 0`** w `playerVars` — przycisk pełnego ekranu YouTube jest wyłączony;
@@ -636,14 +636,18 @@ dodaniu do ekranu początkowego i wygląd ikony na iOS.
 - Nasłuchujemy **`pointerdown`** — jedno zdarzenie dla myszy, dotyku i pióra. Nie
   `click`, bo po dotyku odpaliłby się drugi raz.
 - `touch-action: manipulation` na scenie → brak 300 ms opóźnienia i brak double-tap-zoom.
-- **Bramka startowa „Graj" jest wymuszona technicznie:** przeglądarki blokują
+- **Bramka startowa jest wymuszona technicznie:** przeglądarki blokują
   odtwarzanie z dźwiękiem bez gestu użytkownika, a `autoplay=1` tego nie omija.
-  Przycisk jest wyłączony („Ladowanie…") do `onReady` playera.
+  Bramka nie ma napisu ani osobnej podpowiedzi — całą treść (instrukcja „klik →
+  +1" i „tap to start") niesie jedna grafika `public/sprites/start-manual.gif`
+  w `<img class="gate-image">`, a `<button class="gate-button">` jest tylko
+  przezroczystym obszarem klikalnym wokół niej. Przycisk jest wyłączony
+  (przygaszony, `aria-label="Ladowanie…"`) do `onReady` playera.
 - **Bramkę otwiera też przycisk play paska transportu** (i `.yt-button-proxy`) —
   patrz [Pasek transportu](#pasek-transportu).
 - Gra rusza dopiero gdy player wejdzie w `PLAYING` — nie w momencie kliknięcia. Dzięki
   temu buforowanie i ewentualna reklama nie zjadają pierwszych celów.
-- Ten sam gest „Graj" odblokowuje dźwięk trafienia (`sound.unlock()` w `src/game.ts`) —
+- Ten sam gest startowy odblokowuje dźwięk trafienia (`sound.unlock()` w `src/game.ts`) —
   patrz sekcja „Dźwięk trafienia" w sekcji [Sprite'y](#sprite-y).
 - **Prawy przycisk myszy nigdy nie liczy się jako trafienie** (`event.button !== 0` w
   `src/ui/render.ts` przerywa obsługę `onHit` przed `preventDefault()`) — prawy przycisk
@@ -665,7 +669,7 @@ warunkiem — Rollup eliminuje całą gałąź razem z importem przy `vite build
 kod dev (razem z endpointem zapisu) do bundla produkcyjnego. Szczegóły:
 [ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md).
 
-**Jak używać:** `npm run dev`, kliknij „Graj", zaznacz checkbox „Developer: edycja
+**Jak używać:** `npm run dev`, kliknij bramkę startową, zaznacz checkbox „Developer: edycja
 grafiki na osi czasu" pod HUD-em — tempo wideo spada automatycznie do najniższego
 dostępnego (`player.getAvailablePlaybackRates()`, fallback `1`). Przeciągnij **prawym
 przyciskiem myszy** po scenie — dłoń podąża za kursorem (podgląd, `pointer-events: none`),
@@ -701,7 +705,7 @@ iPhonie to WKWebView bez devtoolsów). Działa niezależnie od checkboxa trybu d
 Interpretacja: `paused=false` i rosnące `t` przy ciszy oznaczają, że dźwięk płynie,
 ale nie dociera do głośnika (kategoria sesji audio / przełącznik Dzwonek-Cisza);
 `paused=true` z wypełnionym `blad=` oznacza odrzucone `play()` (brak odblokowania
-gestem); `odblokowane=0/4` po kliknięciu „Graj" oznacza, że `unlock()` nie zadziałał.
+gestem); `odblokowane=0/4` po kliknięciu bramki startowej oznacza, że `unlock()` nie zadziałał.
 
 Źródłem prawdy jest **beatmapa w pamięci**, nie plik na dysku — zapis jest efektem
 ubocznym. Reload przez Vite HMR jest zablokowany dla `beatmap.json`
@@ -840,7 +844,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i pasek transportu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa pokazuje `#gate-image` ze źródłem `sprites/start-manual.gif`, nie ma `.gate-hint` ani napisu w przycisku, a klik w grafikę chowa bramkę, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i pasek transportu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
 | `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |

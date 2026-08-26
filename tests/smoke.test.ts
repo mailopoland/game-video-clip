@@ -24,6 +24,20 @@ describe('smoke: render i wejscie dotykowe', () => {
     root = document.querySelector<HTMLElement>('#app')!;
   });
 
+  it('bramka pokazuje grafike instrukcji, a klik w nia startuje gre', () => {
+    const clock = new FakeClock();
+    mountGame(root, makeBeatmap([obj('o1', 10)], 20), clock, { now: clock.now });
+
+    const image = root.querySelector<HTMLImageElement>('#gate-image')!;
+    expect(image.getAttribute('src')).toContain('sprites/start-manual.gif');
+    // Grafika zawiera juz „tap to start", wiec osobnego napisu/podpowiedzi nie ma.
+    expect(root.querySelector('.gate-hint')).toBeNull();
+    expect(root.querySelector('#start')!.textContent!.trim()).toBe('');
+
+    tap(image);
+    expect(root.querySelector<HTMLElement>('#gate')!.hidden).toBe(true);
+  });
+
   it('startuje z bramka, renderuje obiekt i zalicza tap na nim', () => {
     const clock = new FakeClock();
     const beatmap = makeBeatmap([obj('o1', 10)], 20); // spawn 10, despawn 11

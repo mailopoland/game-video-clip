@@ -253,30 +253,44 @@ body {
   padding: 1rem;
 }
 
+.gate {
+  /* Grafika bramki pokrywa cala scene — zaden padding nie moze jej odsunac. */
+  padding: 0;
+}
+
 .gate[hidden],
 .results[hidden] {
   display: none;
 }
 
 .gate-button {
-  font: inherit;
-  font-size: clamp(1.1rem, 4vw, 1.6rem);
-  font-weight: 700;
-  padding: 0.75rem 2.5rem;
-  min-height: 3rem;
+  /* Bramka to jedna grafika (instrukcja + „tap to start"), a nie napis —
+     przycisk jest tylko przezroczystym obszarem klikalnym pokrywajacym scene. */
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: #6ef58f;
-  color: #101014;
+  background: none;
   cursor: pointer;
   touch-action: manipulation;
 }
 
-.gate-hint {
-  margin: 0;
-  max-width: 22rem;
-  font-size: 0.85rem;
-  opacity: 0.75;
+.gate-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.gate-image {
+  /* Grafika przesłania doklada kadr wideo: wypelnia scene 1:1, bez marginesu
+     i bez wystawania poza nia. */
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: rgb(0 0 0 / 0.5);
 }
 
 .results h1 {

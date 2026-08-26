@@ -42,11 +42,13 @@ ADR-0010); na dotyku w orientacji pionowej jest dodatkowo obrócona o 90° przez
 (`@media (orientation: portrait) and (pointer: coarse)`), żeby wideo zawsze zajmowało
 maksimum ekranu bez oczekiwania na fizyczny obrót telefonu.
 Dopóki bramka startowa jest widoczna, przycisk play w pasku transportu (i `.yt-button-proxy`)
-nie steruje odtwarzaniem, tylko startuje grę tak samo jak „Graj". Ikony transportu to
+nie steruje odtwarzaniem, tylko startuje grę tak samo jak klik w bramkę. Bramka nie ma
+napisu ani podpowiedzi — jest nią jedna grafika `public/sprites/start-manual.gif`
+w klikalnym, przezroczystym przycisku. Ikony transportu to
 inline SVG (`ICONS` + `setIcon` w `render.ts`, stan w `data-icon`), nie glify Unicode —
 iOS nie ma `❚❚`/`🕪` w foncie i rysował puste kwadraty; ikona dźwięku pokazuje stan
 (głośnik / przekreślony), nie akcję przycisku.
-`npm test` — 212 testów, zielone.
+`npm test` — 213 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
