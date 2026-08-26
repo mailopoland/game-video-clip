@@ -82,7 +82,17 @@ function defaultStorage(): KeyValueStorage | undefined {
 }
 
 export function createTelemetry(deps: TelemetryDeps = {}): Telemetry {
-  const send = deps.send ?? ((payload: EventPayload) => postEvent(payload));
+  const emit = deps.send ?? ((payload: EventPayload) => postEvent(payload));
+  // `postEvent` sam nigdy nie rzuca, ale gwarancja „telemetria nie wywraca
+  // rozgrywki" ma byc strukturalna, a nie zalezec od tego, kto wstrzyknie
+  // `send`. Koszt: jeden try/catch na PRZEJSCIE STANU, nie na klatke.
+  const send = (payload: EventPayload): void => {
+    try {
+      emit(payload);
+    } catch {
+      // celowo cicho
+    }
+  };
   const storage = 'storage' in deps ? deps.storage : defaultStorage();
   const visitorId = getVisitorId(storage);
 

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest';
+import { mountGame } from '../src/game.js';
 import { createTelemetry, type FrameView } from '../src/telemetry/telemetry.js';
+import { FakeClock, makeBeatmap, obj } from './fake-clock.js';
 import { getVisitorId, nextPlayNo, PLAY_NO_KEY, VISITOR_KEY, type KeyValueStorage } from '../src/telemetry/ids.js';
 import { postEvent, type EventPayload } from '../src/telemetry/transport.js';
 
@@ -424,5 +426,96 @@ describe('postEvent — transport', () => {
     } finally {
       globalThis.fetch = original;
     }
+  });
+});
+
+/**
+ * Odwzorowanie wpiecia z `src/main.ts` — ten sam `mountGame`, co produkcja,
+ * tylko na wstrzyknietym zrodle czasu (jak `describe('dzwiek trafienia
+ * w rozgrywce')` w `sound.test.ts`). `main.ts` samo w sobie nie da sie
+ * zaimportowac w tescie: uruchamia bootstrap i YouTube przy imporcie.
+ */
+describe('telemetria w rozgrywce', () => {
+  let root: HTMLElement;
+
+  beforeEach(() => {
+    document.body.innerHTML = '<div id="app"></div>';
+    root = document.querySelector<HTMLElement>('#app')!;
+  });
+
+  /** jsdom nie implementuje PointerEvent — gra i tak slucha tylko `pointerdown`. */
+  function tap(element: Element): void {
+    element.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+  }
+
+  function playTo(clock: FakeClock, frame: () => void, targetSec: number): void {
+    while (clock.timeSec < targetSec - 1e-9) {
+      clock.advance(Math.min(0.016, targetSec - clock.timeSec));
+      frame();
+    }
+  }
+
+  function mount(send: (payload: EventPayload) => void) {
+    const clock = new FakeClock();
+    const telemetry = createTelemetry({ send, storage: new FakeStorage() });
+    telemetry.visit();
+    const beatmap = makeBeatmap([obj('o1', 10)], 12);
+    const game = mountGame(root, beatmap, clock, {
+      now: clock.now,
+      onStart: () => telemetry.gateClick(),
+      onFrame: (gameView) => telemetry.frame(gameView),
+    });
+    return { clock, game, telemetry };
+  }
+
+  it('pelny przebieg daje visit, gate_click, play_start i finish z wynikiem', () => {
+    const sent: EventPayload[] = [];
+    const { clock, game } = mount((payload) => sent.push(payload));
+
+    tap(root.querySelector('#start')!);
+    playTo(clock, game.frame, 10.0);
+    tap(root.querySelector('.obj[data-id="o1"]')!);
+    playTo(clock, game.frame, 12.5); // przekroczenie endScreenAtSec
+
+    expect(sent.map((payload) => payload.event)).toEqual([
+      'visit',
+      'gate_click',
+      'play_start',
+      'finish',
+    ]);
+
+    const finish = sent[3]!;
+    expect(finish.score).toBe(1);
+    expect(finish.hits).toBe(1);
+    expect(finish.seeked).toBe(false);
+    expect(finish.play_no).toBe(1);
+    expect(finish.play_id).toBe(sent[2]!.play_id);
+  });
+
+  it('gate_click nie leci, dopoki gracz nie tapnie bramki', () => {
+    const sent: EventPayload[] = [];
+    const { clock, game } = mount((payload) => sent.push(payload));
+
+    playTo(clock, game.frame, 10.5);
+
+    expect(sent.map((payload) => payload.event)).toEqual(['visit']);
+  });
+
+  // Twarde wymaganie ADR-0026: brak sieci, bloker reklam ani blad zapisu nie
+  // moga wywrocic rozgrywki. Tu `send` rzuca synchronicznie na kazdym zdarzeniu.
+  it('rzucajaca wysylka nie przerywa petli gry ani nie psuje punktacji', () => {
+    const { clock, game } = mount(() => {
+      throw new Error('ERR_BLOCKED_BY_CLIENT');
+    });
+
+    expect(() => {
+      tap(root.querySelector('#start')!);
+      playTo(clock, game.frame, 10.0);
+      tap(root.querySelector('.obj[data-id="o1"]')!);
+      playTo(clock, game.frame, 12.5);
+    }).not.toThrow();
+
+    expect(game.engine.getStats().score).toBe(1);
+    expect(root.querySelector<HTMLElement>('#results')!.hidden).toBe(false);
   });
 });

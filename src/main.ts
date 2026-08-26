@@ -5,11 +5,38 @@ import { SPRITE_KEYS } from './sprites.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
 import type { DevHandEditorHandle } from './dev/hand-editor.js';
+import type { Telemetry } from './telemetry/telemetry.js';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 
+/**
+ * Telemetria (ADR-0026) zyje WYLACZNIE w buildzie produkcyjnym — dokladnie
+ * odwrotnie niz `src/dev/*`, ktore jest za `import.meta.env.DEV` (ADR-0016).
+ * Dzieki temu `npm run dev` nie wysyla nic i nagrywanie beatmapy nie zasmieca
+ * statystyk.
+ *
+ * Nigdy nie rzuca: gdyby dynamiczny import albo `visit()` zawiodly, gra ma
+ * ruszyc tak samo jak przy zablokowanym zapytaniu.
+ */
+async function startTelemetry(): Promise<Telemetry | undefined> {
+  if (!import.meta.env.PROD) return undefined;
+  try {
+    const { createTelemetry } = await import('./telemetry/telemetry.js');
+    const telemetry = createTelemetry();
+    telemetry.visit();
+    // `pagehide`, nie `unload`: `unload` bywa pomijany przez bfcache (iOS),
+    // a `pagehide` leci takze przy przejsciu karty w tlo.
+    window.addEventListener('pagehide', () => telemetry.pageHide());
+    return telemetry;
+  } catch {
+    return undefined;
+  }
+}
+
 async function bootstrap(): Promise<void> {
   const beatmap = validateBeatmap(beatmapJson as Beatmap, SPRITE_KEYS);
+
+  const telemetry = await startTelemetry();
 
   // Player powstaje dopiero wewnatrz gotowej sceny, wiec do czasu jego
   // zaladowania gra widzi czas 0 w stanie zamrozonym.
@@ -22,8 +49,13 @@ async function bootstrap(): Promise<void> {
   // ADR-0021) — nie ma tu juz nic do zrobienia, w odroznieniu od dawnego
   // requestFullscreen wymagajacego gestu uzytkownika.
   const game = mountGame(root, beatmap, timeSource, {
-    onStart: () => player?.play(),
+    onStart: () => {
+      telemetry?.gateClick();
+      player?.play();
+    },
     getReferenceVolume: () => player?.getVolume() ?? 1,
+    // Poza produkcja `onFrame` w ogole nie istnieje — zero pracy na klatke.
+    onFrame: telemetry && ((view) => telemetry.frame(view)),
   });
   game.ui.setStartEnabled(false);
 
@@ -91,7 +123,13 @@ async function bootstrap(): Promise<void> {
   game.ui.enableTransport({
     play: () => player?.play(),
     pause: () => player?.pause(),
-    seekTo: (sec) => player?.seekTo(sec),
+    seekTo: (sec) => {
+      // Jedyne zrodlo przewiniec w produkcji: suwak transportu i PLAY AGAIN
+      // (tryb dev jest wyciety z buildu). Stad flaga `seeked` bez zadnych
+      // heurystyk na skokach `timeSec` — patrz ADR-0026.
+      telemetry?.seek(sec);
+      player?.seekTo(sec);
+    },
     getDuration: () => player?.getDuration() ?? 0,
     isMuted: () => player?.isMuted() ?? false,
     setMuted: (muted) => player?.setMuted(muted),
