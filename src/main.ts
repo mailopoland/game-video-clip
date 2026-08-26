@@ -5,23 +5,29 @@ import { SPRITE_KEYS } from './sprites.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
 import type { DevHandEditorHandle } from './dev/hand-editor.js';
-import type { Telemetry } from './telemetry/telemetry.js';
+import { createTelemetry, type Telemetry } from './telemetry/telemetry.js';
 
 const root = document.querySelector<HTMLElement>('#app')!;
 
 /**
- * Telemetria (ADR-0026) zyje WYLACZNIE w buildzie produkcyjnym — dokladnie
- * odwrotnie niz `src/dev/*`, ktore jest za `import.meta.env.DEV` (ADR-0016).
- * Dzieki temu `npm run dev` nie wysyla nic i nagrywanie beatmapy nie zasmieca
+ * Telemetria (ADR-0026) jest AKTYWNA wylacznie w buildzie produkcyjnym —
+ * `npm run dev` nie wysyla nic, wiec nagrywanie beatmapy nie zasmieca
  * statystyk.
  *
- * Nigdy nie rzuca: gdyby dynamiczny import albo `visit()` zawiodly, gra ma
- * ruszyc tak samo jak przy zablokowanym zapytaniu.
+ * Bramka jest RUNTIME'owa (`import.meta.env.PROD`), a import statyczny —
+ * celowo, w odroznieniu od `src/dev/*`, ktore jest wycinane dynamicznym
+ * importem (ADR-0016). Osobny chunk oznaczalby, ze start gry czeka na
+ * zadanie sieciowe o sciezce zawierajacej „telemetry" — czyli na cos, co
+ * filtry blokerow tresci lapia wprost. Przegrany wyscig gubilby `gate_click`,
+ * a razem z nim `play_start` i caly lejek. Doklejone do glownego chunka
+ * ~2 kB nie da sie zablokowac bez zablokowania calej gry.
+ *
+ * Nigdy nie rzuca: gdyby cokolwiek tu zawiodlo, gra ma ruszyc tak samo jak
+ * przy zablokowanym zapytaniu.
  */
-async function startTelemetry(): Promise<Telemetry | undefined> {
+function startTelemetry(): Telemetry | undefined {
   if (!import.meta.env.PROD) return undefined;
   try {
-    const { createTelemetry } = await import('./telemetry/telemetry.js');
     const telemetry = createTelemetry();
     telemetry.visit();
     // `pagehide`, nie `unload`: `unload` bywa pomijany przez bfcache (iOS),
@@ -36,7 +42,7 @@ async function startTelemetry(): Promise<Telemetry | undefined> {
 async function bootstrap(): Promise<void> {
   const beatmap = validateBeatmap(beatmapJson as Beatmap, SPRITE_KEYS);
 
-  const telemetry = await startTelemetry();
+  const telemetry = startTelemetry();
 
   // Player powstaje dopiero wewnatrz gotowej sceny, wiec do czasu jego
   // zaladowania gra widzi czas 0 w stanie zamrozonym.
