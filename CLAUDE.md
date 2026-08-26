@@ -41,7 +41,10 @@ klatki strony, bez Fullscreen API i bez gestu użytkownika (ADR-0021, unieważni
 ADR-0010); na dotyku w orientacji pionowej jest dodatkowo obrócona o 90° przez CSS
 (`@media (orientation: portrait) and (pointer: coarse)`), żeby wideo zawsze zajmowało
 maksimum ekranu bez oczekiwania na fizyczny obrót telefonu.
-`npm test` — 205 testów, zielone.
+Dopóki bramka startowa jest widoczna, przycisk play w pasku transportu (i `.yt-button-proxy`)
+nie steruje odtwarzaniem, tylko startuje grę tak samo jak „Graj"; ikona `#transport-mute`
+pokazuje stan dźwięku (`🕪` gra / `🕪×` wyciszone), nie akcję przycisku.
+`npm test` — 209 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 

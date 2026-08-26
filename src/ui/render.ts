@@ -33,8 +33,9 @@ export interface Ui {
 
 const PLAY_ICON = '▶︎';
 const PAUSE_ICON = '❚❚';
-const MUTE_ICON = '🕪×';
-const UNMUTE_ICON = '🕪';
+/** Ikona odzwierciedla STAN dzwieku, nie akcje przycisku: `🕪` = gra, `🕪×` = wyciszone. */
+const SOUND_ON_ICON = '🕪';
+const SOUND_OFF_ICON = '🕪×';
 
 /** `M:ss`, lokalny helper — nie reuzywac `formatClock` z `src/dev/record.ts` (kod dev, ADR-0016). */
 function formatTime(sec: number): string {
@@ -88,7 +89,7 @@ export function createUi(
                min="0" max="0" step="0.1" value="0" disabled aria-label="Przewijanie" />
         <span class="transport-time" id="transport-time">0:00 / 0:00</span>
         <button class="transport-button transport-icon" id="transport-mute" type="button"
-                aria-pressed="false" disabled aria-label="Wycisz">${MUTE_ICON}</button>
+                aria-pressed="false" disabled aria-label="Wycisz">${SOUND_ON_ICON}</button>
         <span class="hud-score" id="hud-score">0</span>
         <span class="hud-hand" id="hud-hand" aria-hidden="true"></span>
       </div>
@@ -122,9 +123,20 @@ export function createUi(
   let lastFrozen = true;
 
   const startButton = byId<HTMLButtonElement>('start');
+
+  // Bramka startowa ma dwa wejscia: wlasny przycisk "Graj" i przycisk play
+  // paska transportu (oraz proxy duzego przycisku YouTube'a) — pierwsze
+  // klikniecie ktoregokolwiek z nich jest startem gry, nie zwyklym play.
+  // `onStart` musi pojsc dokladnie raz: odblokowuje `AudioContext` (ADR-0017),
+  // dlatego bramka jest warunkiem — `hideGate()` zamyka ja na dobre.
+  function triggerStart(): void {
+    if (gate.hidden || startButton.disabled) return;
+    handlers.onStart();
+  }
+
   startButton.addEventListener('pointerdown', (event) => {
     event.preventDefault();
-    if (!startButton.disabled) handlers.onStart();
+    triggerStart();
   });
 
   const elements = new Map<string, HTMLElement>();
@@ -306,6 +318,12 @@ export function createUi(
       transportMute.disabled = false;
 
       const togglePlayback = (): void => {
+        // Dopoki bramka stoi, play jest startem gry — inaczej wideo ruszyloby
+        // pod nia, a `AudioContext` zostalby zablokowany.
+        if (!gate.hidden) {
+          triggerStart();
+          return;
+        }
         if (lastFrozen) controls.play();
         else controls.pause();
       };
@@ -331,7 +349,7 @@ export function createUi(
         const muted = controls.isMuted();
         transportMute.setAttribute('aria-pressed', String(muted));
         transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
-        transportMute.textContent = muted ? UNMUTE_ICON : MUTE_ICON;
+        transportMute.textContent = muted ? SOUND_OFF_ICON : SOUND_ON_ICON;
       };
       transportMute.addEventListener('click', () => {
         controls.setMuted(!controls.isMuted());

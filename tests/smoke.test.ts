@@ -214,6 +214,7 @@ describe('smoke: render i wejscie dotykowe', () => {
       setMuted: vi.fn(),
     };
     game.ui.enableTransport(controls);
+    game.ui.hideGate(); // za bramka startowa; pierwszy klik przed nia jest startem
     const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
 
     clock.playing = false;
@@ -395,6 +396,7 @@ describe('pasek transportu (ADR-0019)', () => {
     const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
     const controls = makeControls();
     game.ui.enableTransport(controls);
+    game.ui.hideGate(); // za bramka startowa; pierwszy klik przed nia jest startem
 
     clock.playing = false;
     game.frame(); // renderuje frozen === true
@@ -489,5 +491,84 @@ describe('pasek transportu (ADR-0019)', () => {
     expect(controls.setMuted).toHaveBeenCalledWith(false);
     expect(muteButton.getAttribute('aria-pressed')).toBe('false');
     expect(muteButton.getAttribute('aria-label')).toBe('Wycisz');
+  });
+
+  it('ikona glosnosci odzwierciedla stan dzwieku, takze od pierwszej klatki', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const muteButton = root.querySelector<HTMLButtonElement>('#transport-mute')!;
+
+    // Przed enableTransport: wideo gra z dzwiekiem, wiec nie wolno pokazywac wyciszenia.
+    expect(muteButton.textContent).toBe('🕪');
+
+    let muted = false;
+    game.ui.enableTransport(
+      makeControls({
+        isMuted: vi.fn(() => muted),
+        setMuted: vi.fn((next: boolean) => {
+          muted = next;
+        }),
+      }),
+    );
+    expect(muteButton.textContent).toBe('🕪');
+
+    muteButton.click();
+    expect(muteButton.textContent).toBe('🕪×');
+
+    muteButton.click();
+    expect(muteButton.textContent).toBe('🕪');
+  });
+
+  it('play w transporcie przy widocznej bramce startuje gre zamiast wolac play()', () => {
+    const clock = new FakeClock();
+    const onStart = vi.fn();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now, onStart });
+    const controls = makeControls();
+    game.ui.enableTransport(controls);
+
+    const gate = root.querySelector<HTMLElement>('#gate')!;
+    expect(gate.hidden).toBe(false);
+
+    root.querySelector<HTMLButtonElement>('#transport-play')!.click();
+
+    expect(gate.hidden).toBe(true);
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(controls.play).not.toHaveBeenCalled();
+
+    // Drugi klik to juz zwykle sterowanie odtwarzaniem.
+    clock.playing = false;
+    game.frame();
+    root.querySelector<HTMLButtonElement>('#transport-play')!.click();
+    expect(controls.play).toHaveBeenCalledTimes(1);
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
+  it('przezroczysty przycisk YouTube przy widocznej bramce tez startuje gre', () => {
+    const clock = new FakeClock();
+    const onStart = vi.fn();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now, onStart });
+    const controls = makeControls();
+    game.ui.enableTransport(controls);
+
+    root.querySelector<HTMLButtonElement>('#yt-button-proxy')!.click();
+
+    expect(root.querySelector<HTMLElement>('#gate')!.hidden).toBe(true);
+    expect(onStart).toHaveBeenCalledTimes(1);
+    expect(controls.play).not.toHaveBeenCalled();
+  });
+
+  it('play w transporcie nie startuje gry, dopoki odtwarzacz nie jest gotowy', () => {
+    const clock = new FakeClock();
+    const onStart = vi.fn();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now, onStart });
+    game.ui.setStartEnabled(false);
+    const controls = makeControls();
+    game.ui.enableTransport(controls);
+
+    root.querySelector<HTMLButtonElement>('#transport-play')!.click();
+
+    expect(root.querySelector<HTMLElement>('#gate')!.hidden).toBe(false);
+    expect(onStart).not.toHaveBeenCalled();
+    expect(controls.play).not.toHaveBeenCalled();
   });
 });
