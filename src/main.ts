@@ -20,7 +20,7 @@ const root = document.querySelector<HTMLElement>('#app')!;
  * zadanie sieciowe o sciezce zawierajacej „telemetry" — czyli na cos, co
  * filtry blokerow tresci lapia wprost. Przegrany wyscig gubilby `gate_click`,
  * a razem z nim `play_start` i caly lejek. Doklejone do glownego chunka
- * ~2 kB nie da sie zablokowac bez zablokowania calej gry.
+ * ~2 kB (0,7 kB po gzipie) nie da sie zablokowac bez zablokowania calej gry.
  *
  * Nigdy nie rzuca: gdyby cokolwiek tu zawiodlo, gra ma ruszyc tak samo jak
  * przy zablokowanym zapytaniu.
