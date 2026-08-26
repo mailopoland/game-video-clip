@@ -40,6 +40,13 @@ export interface Ui {
  *
  * Ikona dzwieku odzwierciedla STAN, nie akcje: glosnik = gra, przekreslony = wyciszone.
  */
+/**
+ * Jak dlugo po ruszeniu odtwarzania duzy przycisk YouTube'a jest widoczny na
+ * srodku kadru (zmierzone na odtwarzaczu). Tylko w tym oknie `.yt-button-proxy`
+ * cokolwiek robi — i tylko pauzuje.
+ */
+export const YT_BUTTON_VISIBLE_SEC = 5;
+
 const ICONS = {
   play: '<path d="M8 5v14l11-7z" />',
   pause: '<path d="M6.5 5h3.5v14H6.5zM14 5h3.5v14H14z" />',
@@ -168,6 +175,11 @@ export function createUi(
   // co klatke z `controls.isMuted()`.
   let lastMuted: boolean | null = null;
   let lastFrozen = true;
+  // Duzy przycisk YouTube'a jest widoczny tylko przez chwile po ruszeniu
+  // odtwarzania — potem znika i srodek kadru jest zwyklym tlem. Proxy dziala
+  // wylacznie w tym oknie i wylacznie w jedna strone (pauza).
+  let playStartedAtSec: number | null = null;
+  let ytProxyArmed = false;
 
   const startButton = byId<HTMLButtonElement>('start');
   // Instrukcja + "tap to start" sa jedna grafika (public/sprites/), wiec sciezka
@@ -274,6 +286,11 @@ export function createUi(
 
     if (transportControls) {
       syncMuteIcon(transportControls);
+      if (lastFrozen && !view.frozen) playStartedAtSec = view.timeSec;
+      ytProxyArmed =
+        !view.frozen &&
+        playStartedAtSec !== null &&
+        view.timeSec - playStartedAtSec < YT_BUTTON_VISIBLE_SEC;
       lastFrozen = view.frozen;
       if (!durationKnown) {
         const duration = transportControls.getDuration();
@@ -401,7 +418,15 @@ export function createUi(
       // pauzowaloby wideo. Zamiast tego wlasny przezroczysty przycisk dokladnie
       // w tym miejscu: wyglad YouTube'a, dzialanie nasze (ADR-0019).
       ytButtonProxy.disabled = false;
-      ytButtonProxy.addEventListener('click', togglePlayback);
+      ytButtonProxy.addEventListener('click', () => {
+        if (!gate.hidden) {
+          triggerStart();
+          return;
+        }
+        // Poza oknem widocznosci przycisku YouTube'a klik w srodek kadru nie
+        // robi nic — dokladnie tak jak klik w kazde inne miejsce bez dloni.
+        if (ytProxyArmed) controls.pause();
+      });
 
       // PLAY AGAIN nie potrzebuje zadnego nowego API silnika: przewiniecie do 0
       // to zwykly seek, ktory `Engine.tick()` rozpozna jako rozjazd wiekszy niz

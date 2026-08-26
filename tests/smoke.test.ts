@@ -216,9 +216,9 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(proxy.disabled).toBe(false);
   });
 
-  it('klik w przezroczysty przycisk przelacza odtwarzanie tak jak pasek transportu', () => {
+  it('klik w przezroczysty przycisk pauzuje przez 5 s od startu, potem nic nie robi', () => {
     const clock = new FakeClock();
-    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)], 999), clock, { now: clock.now });
     const controls = {
       play: vi.fn(),
       pause: vi.fn(),
@@ -231,12 +231,50 @@ describe('smoke: render i wejscie dotykowe', () => {
     game.ui.hideGate(); // za bramka startowa; pierwszy klik przed nia jest startem
     const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
 
+    // Wideo stoi — duzego przycisku YouTube'a nie proxujemy do `play()`.
     clock.playing = false;
     game.frame();
     proxy.click();
-    expect(controls.play).toHaveBeenCalledTimes(1);
+    expect(controls.play).not.toHaveBeenCalled();
     expect(controls.pause).not.toHaveBeenCalled();
 
+    // Ruszylo: przez pierwsze 5 s przycisk YouTube'a jest widoczny i pauzuje.
+    clock.playing = true;
+    game.frame();
+    proxy.click();
+    expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.play).not.toHaveBeenCalled();
+
+    // Po 5 s przycisk znika z kadru, wiec klik w srodek nic nie robi.
+    playTo(clock, game.frame, 5.5);
+    proxy.click();
+    expect(controls.pause).toHaveBeenCalledTimes(1);
+    expect(controls.play).not.toHaveBeenCalled();
+  });
+
+  it('okno pauzy odnawia sie po wznowieniu odtwarzania', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)], 999), clock, { now: clock.now });
+    const controls = {
+      play: vi.fn(),
+      pause: vi.fn(),
+      seekTo: vi.fn(),
+      getDuration: vi.fn(() => 0),
+      isMuted: vi.fn(() => false),
+      setMuted: vi.fn(),
+    };
+    game.ui.enableTransport(controls);
+    game.ui.hideGate();
+    const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
+
+    clock.playing = true;
+    game.frame();
+    playTo(clock, game.frame, 8);
+    proxy.click();
+    expect(controls.pause).not.toHaveBeenCalled();
+
+    clock.playing = false;
+    game.frame();
     clock.playing = true;
     game.frame();
     proxy.click();

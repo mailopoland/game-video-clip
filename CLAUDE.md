@@ -26,7 +26,9 @@ z obrazem, a iframe jest cross-origin, więc każdy sposób jego ukrycia (czarna
 `backdrop-filter`) ukrywa tam też wideo; oba wdrożono i odrzucono. W zamian jest
 klikalny przez `.yt-button-proxy` — przezroczysty przycisk w tym samym miejscu, spięty
 z `TransportControls` (zdarzeń nie wpuszczamy do iframe'a, bo pudło obok dłoni znów
-pauzowałoby wideo). `.shield` jest przezroczystą, **bezstanową** blokadą wskaźnika —
+pauzowałoby wideo). Proxy działa **tylko przez 5 s od ruszenia odtwarzania**
+(`YT_BUTTON_VISIBLE_SEC`) i **tylko pauzuje** — tyle, ile ikona jest widoczna;
+potem klik w środek kadru nie robi nic, jak każde inne miejsce bez dłoni. `.shield` jest przezroczystą, **bezstanową** blokadą wskaźnika —
 kadr nie jest już czerniony na pauzie. Letterbox potwierdzony na urządzeniu — obraz nie
 jest przybliżony, cele pokrywają się z wideo; w razie czego `--player-overscan: 0%` cofa.
 Tryb deweloperski (`npm run dev`, wyłącznie) nagrywa ścieżkę ręki prawym przyciskiem
@@ -74,7 +76,7 @@ snapshot z chwili zdarzenia. SQL (schemat, RLS wyłącznie na INSERT dla `anon`,
 pięć zapisanych zapytań) jest w `docs/SUPABASE.md`; keepalive to codzienny cron
 w `.github/workflows/supabase-keepalive.yml`, bo darmowy projekt Supabase
 pauzuje po 7 dniach bez zapytań.
-`npm test` — 279 testów, zielone.
+`npm test` — 280 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
