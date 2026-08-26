@@ -121,8 +121,8 @@ export function createUi(
         <button class="transport-button transport-icon" id="transport-mute" type="button"
                 aria-pressed="false" disabled data-icon="sound-on"
                 aria-label="Wycisz">${iconMarkup('sound-on')}</button>
-        <span class="hud-score" id="hud-score">0</span>
         <span class="hud-hand" id="hud-hand" aria-hidden="true"></span>
+        <span class="hud-score" id="hud-score">0</span>
       </div>
     </div>
   `;

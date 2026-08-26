@@ -386,17 +386,18 @@ body {
 
 .hud-score {
   flex: none;
-  margin-left: auto;
   font-size: 1.25rem;
   font-weight: 700;
 }
 
 .hud-hand {
   flex: none;
+  margin-left: auto;
   display: flex;
   align-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
+  margin-right: -0.25rem;
+  width: 2.75rem;
+  height: 2.75rem;
 }
 
 .hud-hand img {
