@@ -609,7 +609,20 @@ której kadr i tak nie wykorzystywał:
   na iOS Safari < 17.4 suwak wraca do poziomu.
 - **Czas leci z góry w dół** — góra to `0:00`, dół to koniec filmu (`direction: ltr`,
   zapisane wprost przy suwaku).
-- **Tor jest żółty (`#f5c518`), kuleczka zielona (`#6ef58f`).** Dwa kolory wykluczają
+- **Transport ma dwa kolory: żółty `#f5c518` i zielony `#048322`.** Przyciski play
+  i wyciszenia to **żółte koła z zieloną ikoną** (tło i obwódka na `.transport-icon`,
+  a kolor samej ikony przez `color`, bo SVG mają `fill="currentColor"`; ikony mają
+  dodatkowo delikatny czarny kontur — `stroke` + `paint-order: stroke` na `.icon`,
+  czyli kreska pod wypełnieniem, w jednostkach `viewBox`, więc skaluje się z ikoną.
+  Łuki fal dźwięku zostają bez konturu: mają własne `stroke="currentColor"` w atrybucie,
+  a atrybut elementu wygrywa z wartością dziedziczoną). Tor suwaka
+  jest żółty, kuleczka zielona. Liczba punktów — żółta.
+- **Liczba punktów naśladuje napis „TAP TO START"** z grafiki bramki: najcięższy
+  dostępny krój bezszeryfowy ze stosu systemowego (`'Arial Black', Impact, …`),
+  `font-weight: 900` i ciemna obwódka przez `text-shadow`. Font z grafiki jest
+  rastrem — nie mamy jego pliku, a projekt nie pobiera assetów z internetu, więc to
+  przybliżenie, nie ten sam krój.
+- **Tor jest żółty (`#f5c518`), kuleczka zielona (`#048322`).** Dwa kolory wykluczają
   `accent-color` (koloruje tor i kciuk jednym), więc suwak jest stylowany ręcznie:
   tłem toru jest **sam element** `input`, a tory w `::-webkit-slider-runnable-track` /
   `::-moz-range-track` są przezroczyste, żeby kolor się nie dublował. Kciuk ma własne
@@ -617,6 +630,11 @@ której kadr i tak nie wykorzystywał:
 - **Licznik czasu jest ukryty** (`.transport-time { display: none }`) — w kolumnie
   `3.5rem` nie mieści się „0:12 / 2:30", a postęp pokazuje suwak. Element zostaje
   w DOM i `render()` nadal go aktualizuje.
+
+Dłoń w HUD ma `5rem` i to ona wyznacza `--hud-width`; stoi tuż nad liczbą punktów
+i jak najdalej od ikony dźwięku (`margin-top: auto` + ujemny `margin-bottom`).
+Szerszej kolumny **nie widać na telefonie** — tam `--stage-width` i tak wybiera człon
+wysokościowy `100dvh * 16 / 9`, nie szerokościowy.
 
 **Pokrętła** (w `src/styles.css`): `--hud-width` (szerokość kolumny transportu),
 `--player-overscan` (ile playera wystaje poza scenę) i `--yt-button-size`

@@ -24,7 +24,10 @@ body {
      zabiera szerokosc, nie wysokosc. Kadr 16:9 na telefonie jest ograniczony
      wysokoscia — pasek poziomy kosztowal realny fragment obrazu, pionowy nie.
      --hud-width = szerokosc kolumny transportu. */
-  --hud-width: 3.5rem;
+  /* 5rem, a nie 3.5rem: dlon w HUD ma 5rem i to ona wyznacza teraz szerokosc
+     kolumny. Na telefonie nic to nie kosztuje — tam `--stage-width` i tak wybiera
+     czlon wysokosciowy `100dvh * 16 / 9`, nie szerokosciowy. */
+  --hud-width: 5rem;
   --stage-width: min(calc(100vw - var(--hud-width)), calc(100dvh * 16 / 9), 1280px);
   position: fixed;
   inset: 0;
@@ -352,7 +355,7 @@ body {
   flex: none;
   padding: 0.4rem 0.9rem;
   min-height: 2.25rem;
-  border: 1px solid rgb(255 255 255 / 0.25);
+  border: 1px solid rgb(245 197 24 / 0.45);
   border-radius: 999px;
   background: none;
   color: inherit;
@@ -405,7 +408,7 @@ body {
   height: 1.25rem;
   border: 2px solid #101014;
   border-radius: 50%;
-  background: #6ef58f;
+  background: #048322;
   cursor: pointer;
 }
 
@@ -414,7 +417,7 @@ body {
   height: 1.25rem;
   border: 2px solid #101014;
   border-radius: 50%;
-  background: #6ef58f;
+  background: #048322;
   cursor: pointer;
 }
 
@@ -423,39 +426,74 @@ body {
 }
 
 .transport-icon {
+  color: #048322;
+  background: #f5c518;
+  border-color: #f5c518;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
-  padding: 0.5rem 0.4rem;
+  /* Rowne boki => kolo (border-radius 999px z .transport-button). */
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
 }
 
 /* Ikony sa inline SVG, nie glify — iOS nie ma `❚❚`/`🕪` w foncie i rysowal
-   puste kwadraty. Rozmiar sterujemy tu, nie przez `font-size`. */
+   puste kwadraty. Rozmiar sterujemy tu, nie przez `font-size`.
+   Kolko przycisku jest zolte (#f5c518) jak tor suwaka, a sama ikona zielona
+   (#048322) jak kuleczka suwaka — SVG maja `fill="currentColor"`, wiec kolor
+   ikony to `color` na przycisku, a kolko to jego tlo i obwodka. */
 .transport-icon .icon {
   display: block;
   width: 1.25rem;
   height: 1.25rem;
+  /* Delikatny czarny kontur ikony. `stroke` dziedziczy sie na <path>, a
+     `paint-order: stroke` maluje go POD wypelnieniem, wiec kreska nie zjada
+     ksztaltu, tylko go obrysowuje. Szerokosc jest w jednostkach viewBox
+     (0 0 24 24), nie w px — skaluje sie razem z ikona. */
+  stroke: #101014;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
 
 /* --- HUD (punkty + dlon) — teraz w jednej linii z transportem --- */
 
+/* Punkty: ten sam zolty co reszta transportu i najciezszy dostepny krój bezszeryfowy
+   — jak najblizej napisu "TAP TO START" z grafiki bramki (public/sprites/
+   start-manual.gif). Font z grafiki jest rastrem, nie mamy jego pliku i nie
+   pobieramy niczego z internetu (zasada projektu), wiec idziemy stosem systemowym:
+   Arial Black jest na Windows, macOS i iOS, Impact to zapasowa droga.
+   Ciemna obwodka przez `text-shadow` odtwarza kontur z grafiki i trzyma czytelnosc
+   punktow na zolto, gdyby kolumna kiedys stanela na jasnym tle. */
 .hud-score {
   flex: none;
+  font-family: 'Arial Black', 'Arial Bold', Impact, system-ui, sans-serif;
   /* 150% wiekszy niz 1rem — punkty maja byc czytelne w waskiej kolumnie. */
   font-size: 2.5rem;
-  font-weight: 700;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: #f5c518;
+  text-shadow:
+    0 0 2px #101014,
+    0 2px 4px rgb(16 16 20 / 0.9);
   text-align: center;
 }
 
+/* Dlon siedzi tuz nad punktami, na dole kolumny: `margin-top: auto` odpycha ja
+   od ikony glosnika najdalej jak sie da, a ujemny `margin-bottom` przyciaga do
+   liczby punktow (GIF ma sporo przezroczystego marginesu, wiec nachodzenie
+   marginesow nie zasłania grafiki). */
 .hud-hand {
   flex: none;
   margin-top: auto; /* auto-margines na osi pionowej — kolumna, nie wiersz */
   display: flex;
   align-items: center;
-  margin-bottom: -0.25rem;
-  width: 2.25rem;
-  height: 2.25rem;
+  margin-bottom: -1.5rem; /* -1rem realnie, po dodaniu `gap: 0.5rem` kolumny */
+  width: 5rem;
+  height: 5rem;
 }
 
 .hud-hand img {

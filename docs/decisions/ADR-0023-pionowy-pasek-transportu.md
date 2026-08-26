@@ -28,7 +28,8 @@ jako szerokości. Na 390×844 dawało to scenę 390 px zamiast możliwych ~690 p
 2. **Suwak przewijania jest pionowy przez `writing-mode: vertical-lr`**
    (Safari 17.4+, Chrome 124+) — wprost wymaganie właściciela („długość filmu musi
    być pionowa"). Czas leci **z góry w dół** (`direction: ltr`), góra to `0:00`.
-   Tor jest **żółty** (`#f5c518`), kuleczka **zielona** (`#6ef58f`). Dwa różne kolory
+   Tor jest **żółty** (`#f5c518`), kuleczka **zielona** (`#048322`) — ta sama para
+   kolorów co przyciski transportu (żółte koło, zielona ikona). Dwa różne kolory
    wykluczają `accent-color` (jeden kolor na tor i kciuk), więc suwak ma
    `appearance: none` i własne style — a to z kolei wyklucza zdeprecjonowany
    `-webkit-appearance: slider-vertical`, który wcześniej dawał pion na starym iOS.
