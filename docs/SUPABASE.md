@@ -247,28 +247,69 @@ limit 500;
 ## 6. Ręczna weryfikacja po wdrożeniu
 
 Testy Vitest podstawiają `fetch` i `localStorage`, więc **realna droga do
-Supabase nie jest pokryta automatycznie**. Do sprawdzenia raz, po pierwszym
-deployu:
+Supabase nie jest pokryta automatycznie**. Ta lista jest jej odpowiednikiem
+robionym ręką — dzieli się na to, co już zmierzone, i to, co wymaga prawdziwej
+przeglądarki.
 
-1. **Wiersz wpada do tabeli.** `npm run build` + serwowanie `dist/` (procedura
-   w README, port 4174), przejście przez bramkę, potem
+### 6.1 Zweryfikowane — `curl` przeciw żywemu projektowi, 2026-08-26
+
+Wszystko poniżej to realne kody HTTP z działającego projektu, nie przewidywania.
+Zapisy szły na `visitor_id = 'deadbeef-dead-beef-dead-beefdeadbeef'` (wiersze
+usuwalne jednym `delete`, patrz niżej).
+
+| # | Co | Wynik |
+|---|---|---|
+| 1 | `POST rpc/keepalive` | **200** + `"2026-08-26T15:09:21.745707+00:00"` — funkcja z sekcji 4 istnieje i robi roundtrip do Postgresa |
+| 2 | poprawny INSERT z `Prefer: return=minimal` | **201**, ciało **0 bajtów** |
+| 3 | ten sam INSERT **bez** `Prefer` | **201**, ciało puste — `return=minimal` to domyślka PostgREST (patrz punkt niżej) |
+| 4 | INSERT z `Prefer: return=representation` | **401** `42501 permission denied for table events` — potwierdza, po co nagłówek |
+| 5 | `GET /rest/v1/events?select=*` | **401** `42501` — **zero danych**, RLS trzyma |
+| 6 | `event: "lol"` | **400** `23514 … events_event_ck` |
+| 7 | podrobione `"ts": "2020-01-01T00:00:00Z"` | **401** `42501 … GRANT INSERT` — grant kolumnowy odrzuca zapis, `ts` jest nienaruszalny |
+| 8 | `visitor_id: "nie-hex-!!"` | **400** `23514 … events_visitor_ck` |
+| 9 | **CORS preflight** `OPTIONS` z `Origin: https://mailopoland.github.io` | **200**, `access-control-allow-headers: apikey,authorization,content-type,prefer`, `max-age 3600` |
+| 10 | POST z tym samym `Origin` | **201** + `Access-Control-Allow-Origin: https://mailopoland.github.io` |
+
+Punkty 9 i 10 są tu dlatego, że przeglądarka bije w Supabase **cross-origin**:
+cztery nagłówki PostgREST wymuszają preflight, więc źle skonfigurowany CORS
+wywaliłby telemetrię wyłącznie w przeglądarce, przy w pełni działającym `curl`-u.
+Supabase odpowiada `Access-Control-Allow-Origin: *` na preflight, czyli działa
+z każdego hosta — także z `localhost` przy testach.
+
+Sprzątanie po takiej sesji:
+
+```sql
+delete from public.events
+where visitor_id = 'deadbeef-dead-beef-dead-beefdeadbeef';
+```
+
+Zweryfikowany jest też **build**: `dist/assets/` ma **jeden** chunk `index-*.js`,
+klucz publishable występuje w nim **raz**, a plików ze słowem `telemetry`
+w ścieżce nie ma wcale (ADR-0026 pkt 3).
+
+### 6.2 Do sprawdzenia w prawdziwej przeglądarce
+
+Tego `curl` nie zastąpi. Procedura serwowania builda — w README, port 4174
+(`npm run dev` **nie wysyła nic**).
+
+1. **Wiersz wpada do tabeli.** Przejście przez bramkę, potem
    `select * from public.events order by ts desc limit 20` w panelu.
-2. **`Prefer: return=minimal` wystarcza.** Zakładka Network: POST kończy się
-   **`201`** z pustym ciałem, w konsoli zero czerwonego. Nagłówek powtarza
-   domyślkę PostgREST — bez niego POST też daje `201` — i broni dopiero przed
-   `return=representation`, które wymaga `SELECT`-a i odbija się `401`.
-3. **RLS naprawdę blokuje odczyt:**
-   `curl -H "apikey: <klucz>" "<URL>/rest/v1/events?select=*"` musi zwrócić
-   pustą tablicę albo błąd uprawnień — **nigdy** danych.
-4. **Grant kolumnowy działa:** POST z `"ts": "2020-01-01T00:00:00Z"` w ciele
-   musi zostać odrzucony (albo `ts` musi wyjść serwerowe).
-5. **`abandon` na `pagehide`:** zamknięcie karty w trakcie gry zostawia wiersz.
-   Osobno na iOS Safari i osobno przy uruchomieniu PWA z ekranu początkowego.
-6. **Pre-roll:** realna reklama ma dać `gate_click` **bez** `play_start`
+2. **Zakładka Network:** POST kończy się **`201`** z pustym ciałem, w konsoli
+   zero czerwonego.
+3. **`abandon` na `pagehide`:** zamknięcie karty w trakcie gry zostawia wiersz
+   (Network na „Preserve log"). Osobno na iOS Safari i osobno przy uruchomieniu
+   PWA z ekranu początkowego.
+4. **Pre-roll:** realna reklama ma dać `gate_click` **bez** `play_start`
    (przewidywane z ADR-0024, zmierzone dotąd tylko dla zegara).
+5. **Dedup `finish`:** przewinięcie w tył tak, żeby ekran wyniku zgasł i zapalił
+   się ponownie, **nie** może dać drugiego `finish` dla tej samej rozgrywki.
+6. **Flaga `seeked`:** dojazd suwakiem daje `finish` z `seeked: true`, a
+   `PLAY AGAIN` — nowy `play_id`, `play_no + 1` i `seeked: false`.
 7. **Bloker reklam / tryb prywatny:** zablokowany POST zostawia grę w pełni
    sprawną — klikanie, dźwięk, ekran wyniku.
-8. **Workflow keepalive:** jedno `workflow_dispatch` i HTTP 200 w logu.
+8. **Workflow keepalive:** jedno `workflow_dispatch` i HTTP 200 w logu. Sama
+   funkcja `rpc/keepalive` jest już potwierdzona (6.1 punkt 1) — zostaje
+   sprawdzenie, czy **workflow** ją woła i czy fail jest widoczny jako mail.
 9. **Pięć zapytań na realnych danych:** po pierwszym dniu sprawdzić, czy liczby
    zgadzają się z tym, co faktycznie zrobiono (dwie własne rozgrywki muszą dać
    `osoby_wiecej_niz_raz = 1`).
