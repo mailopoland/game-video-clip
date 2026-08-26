@@ -23,9 +23,6 @@ export interface Ui {
   hideGate(): void;
   /** Przycisk "Graj" jest aktywny dopiero, gdy odtwarzacz jest gotowy. */
   setStartEnabled(enabled: boolean): void;
-  /** Pokazuje przycisk pelnego ekranu i podpina jego obsluge. */
-  enableFullscreen(toggle: () => void): void;
-  setFullscreenActive(active: boolean): void;
   /** Podglad reki podczas nagrywania w trybie dev (ADR-0016); `null` usuwa go. */
   setRecordingPreview(pos: { x: number; y: number } | null): void;
   /** Pierscien zaznaczenia + uchwyt rozmiaru dla trybu dev-edit-hand; `null` usuwa go. */
@@ -33,6 +30,11 @@ export interface Ui {
   /** Odblokowuje pasek transportu i podpina go pod kontrolki playera (ADR-0019). */
   enableTransport(controls: TransportControls): void;
 }
+
+const PLAY_ICON = '▶︎';
+const PAUSE_ICON = '❚❚';
+const MUTE_ICON = '🕪×';
+const UNMUTE_ICON = '🕪';
 
 /** `M:ss`, lokalny helper — nie reuzywac `formatClock` z `src/dev/record.ts` (kod dev, ADR-0016). */
 function formatTime(sec: number): string {
@@ -80,19 +82,15 @@ export function createUi(
         </section>
       </main>
       <div class="transport" id="transport">
-        <button class="transport-button" id="transport-play" type="button" disabled>Odtwarzaj</button>
+        <button class="transport-button transport-icon" id="transport-play" type="button" disabled
+                aria-label="Odtwarzaj lub wstrzymaj">${PLAY_ICON}</button>
         <input class="transport-seek" id="transport-seek" type="range"
                min="0" max="0" step="0.1" value="0" disabled aria-label="Przewijanie" />
         <span class="transport-time" id="transport-time">0:00 / 0:00</span>
-        <button class="transport-button" id="transport-mute" type="button"
-                aria-pressed="false" disabled>Wycisz</button>
-      </div>
-      <div class="hud">
+        <button class="transport-button transport-icon" id="transport-mute" type="button"
+                aria-pressed="false" disabled aria-label="Wycisz">${MUTE_ICON}</button>
         <span class="hud-score" id="hud-score">0</span>
-        <span class="hud-frozen" id="hud-frozen" hidden>pauza</span>
-        <button class="hud-fullscreen" id="fullscreen" type="button" aria-pressed="false" hidden>
-          Pelny ekran
-        </button>
+        <span class="hud-hand" id="hud-hand" aria-hidden="true"></span>
       </div>
     </div>
   `;
@@ -103,8 +101,15 @@ export function createUi(
   const gate = byId('gate');
   const results = byId('results');
   const hudScore = byId('hud-score');
-  const hudFrozen = byId('hud-frozen');
+  const hudHand = byId('hud-hand');
   const ytButtonProxy = byId<HTMLButtonElement>('yt-button-proxy');
+
+  {
+    const sprite = SPRITES['hand']!;
+    if (sprite.kind === 'image' && sprite.hitSrc) {
+      hudHand.append(Object.assign(document.createElement('img'), { src: sprite.hitSrc, alt: '' }));
+    }
+  }
 
   const transportPlay = byId<HTMLButtonElement>('transport-play');
   const transportSeek = byId<HTMLInputElement>('transport-seek');
@@ -194,7 +199,6 @@ export function createUi(
     }
 
     hudScore.textContent = String(view.stats.score);
-    hudFrozen.hidden = !view.frozen;
 
     if (transportControls) {
       lastFrozen = view.frozen;
@@ -208,7 +212,7 @@ export function createUi(
       }
       if (!scrubbing) transportSeek.value = String(view.timeSec);
       transportTime.textContent = `${formatTime(view.timeSec)} / ${formatTime(durationSec)}`;
-      transportPlay.textContent = view.frozen ? 'Odtwarzaj' : 'Pauza';
+      transportPlay.textContent = view.frozen ? PLAY_ICON : PAUSE_ICON;
     }
 
     results.hidden = !view.showResults;
@@ -219,8 +223,6 @@ export function createUi(
       byId('r-accuracy').textContent = `${Math.round(view.stats.accuracy)}%`;
     }
   }
-
-  const fullscreenButton = byId<HTMLButtonElement>('fullscreen');
 
   // Podglad reki w trybie dev — zyje poza mapa `elements`, wiec render() go
   // nie kasuje co klatke (ADR-0016). Reuzywa budowy sprite'a z createObjectElement.
@@ -297,17 +299,6 @@ export function createUi(
       startButton.disabled = !enabled;
       startButton.textContent = enabled ? 'Graj' : 'Ladowanie…';
     },
-    enableFullscreen: (toggle) => {
-      fullscreenButton.hidden = false;
-      // Tu celowo `click`, nie `pointerdown`: to najpewniejsze zrodlo gestu
-      // uzytkownika dla requestFullscreen we wszystkich przegladarkach, a
-      // przycisk nie jest elementem rozgrywki, wiec opoznienie nie szkodzi.
-      fullscreenButton.addEventListener('click', () => toggle());
-    },
-    setFullscreenActive: (active) => {
-      fullscreenButton.setAttribute('aria-pressed', String(active));
-      fullscreenButton.textContent = active ? 'Zamknij pelny ekran' : 'Pelny ekran';
-    },
     enableTransport: (controls) => {
       transportControls = controls;
       transportPlay.disabled = false;
@@ -339,7 +330,8 @@ export function createUi(
       const updateMuteLabel = (): void => {
         const muted = controls.isMuted();
         transportMute.setAttribute('aria-pressed', String(muted));
-        transportMute.textContent = muted ? 'Wlacz dzwiek' : 'Wycisz';
+        transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
+        transportMute.textContent = muted ? UNMUTE_ICON : MUTE_ICON;
       };
       transportMute.addEventListener('click', () => {
         controls.setMuted(!controls.isMuted());

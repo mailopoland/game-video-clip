@@ -12,8 +12,8 @@ pozycja celu jest niezmiennicza względem rozmiaru sceny (ADR-0014); zostaje mim
 uzasadnienia po ADR-0019 (koszt migracji beatmapy).
 Kontrolki YouTube są wyłączone (`controls: 0`, `disablekb: 1`) i player nie reaguje na
 wskaźnik — całe sterowanie (play/pauza, przewijanie, czas, wyciszenie) idzie przez własny
-pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w pełnym ekranie (ADR-0019,
-unieważnia mitygację z ADR-0008). Sama blokada wskaźnika **nie ukrywa** brandingu
+pasek transportu pod sceną, wewnątrz `.frame`, więc działa też w zmaksymalizowanej ramce
+(ADR-0019, unieważnia mitygację z ADR-0008). Sama blokada wskaźnika **nie ukrywa** brandingu
 YouTube'a — poza stanem `PLAYING` player rysuje własny overlay (tytuł, avatar, logo,
 miniatury, duży przycisk), którego nie wyłącza żaden `playerVar` (`modestbranding`
 i `showinfo` są martwe, `rel: 0` tylko zawęża propozycje). Branding jest widoczny też
@@ -36,7 +36,12 @@ Dźwięk trafienia idzie przez Web Audio na zdekodowanym buforze, nie przez `<au
 Drugi tryb deweloperski pozwala edytować punkty już nagranej ścieżki (przesunięcie,
 zmiana `size`) i zapisuje przez ten sam mechanizm co nagrywanie; oba tryby dev dzielą
 jedną beatmapę w pamięci (`BeatmapStore`) i wzajemnie się wykluczają (ADR-0018).
-`npm test` — 214 testów, zielone.
+`.frame` jest na stałe `position: fixed; inset: 0` — zajmuje cały viewport od pierwszej
+klatki strony, bez Fullscreen API i bez gestu użytkownika (ADR-0021, unieważnia
+ADR-0010); na dotyku w orientacji pionowej jest dodatkowo obrócona o 90° przez CSS
+(`@media (orientation: portrait) and (pointer: coarse)`), żeby wideo zawsze zajmowało
+maksimum ekranu bez oczekiwania na fizyczny obrót telefonu.
+`npm test` — 205 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -95,7 +100,6 @@ src/
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
     youtube.ts           # IFrame API + adapter TimeSource
-    fullscreen.ts        # pelny ekran ramki gry + straznik przejecia przez iframe
     sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
   dev/                   # tryb deweloperski — wycinany z buildu produkcyjnego (ADR-0016)
     rdp.ts                # simplifyPath — uproszczenie sciezki, metryka czasowa
@@ -105,7 +109,7 @@ src/
     node-shims.d.ts        # minimalny declare module 'node:fs' (brak @types/node)
 tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
-  engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  fullscreen.test.ts  sound.test.ts
+  engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
@@ -144,7 +148,7 @@ Wymaga Node ≥ 20.17.
 - Assety: **nie pobieramy niczego z internetu.**
 - **Nowa funkcjonalność albo zmiana zachowania = pokrycie testami.** Jeśli logika
   daje się przetestować bez przeglądarki, testuj jak `engine.test.ts`/`beatmap.test.ts`;
-  jeśli dotyczy DOM, testuj jak `smoke.test.ts`/`fullscreen.test.ts`.
+  jeśli dotyczy DOM, testuj jak `smoke.test.ts`.
 - **Po każdej implementacji uruchom `npm test` i potwierdź 100% zielone** przed
   zgłoszeniem zadania jako ukończone — również gdy zmiana wydaje się niezwiązana
   z istniejącymi testami.
@@ -173,3 +177,5 @@ Wymaga Node ≥ 20.17.
 - [ADR-0017 — Dźwięk trafienia przez Web Audio na zdekodowanym buforze](docs/decisions/ADR-0017-dzwiek-przez-web-audio-na-buforze.md)
 - [ADR-0018 — Tryb deweloperski edycji punktów ścieżki](docs/decisions/ADR-0018-tryb-deweloperski-edycji-punktow-sciezki.md)
 - [ADR-0019 — Własne kontrolki zamiast kontrolek YouTube](docs/decisions/ADR-0019-wlasne-kontrolki-zamiast-kontrolek-youtube.md)
+- [ADR-0020 — Ikonowy pasek transportu i automatyczny pełny ekran](docs/decisions/ADR-0020-ikonowy-transport-i-automatyczny-pelny-ekran.md) — punkt 3 unieważniony przez ADR-0021
+- [ADR-0021 — Ramka zawsze zmaksymalizowana na viewport bez Fullscreen API](docs/decisions/ADR-0021-zawsze-zmaksymalizowana-ramka-bez-fullscreen-api.md) — unieważnia ADR-0010

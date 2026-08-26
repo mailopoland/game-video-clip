@@ -117,7 +117,6 @@ describe('smoke: render i wejscie dotykowe', () => {
     }
 
     expect(root.querySelectorAll('.obj')).toHaveLength(0);
-    expect(root.querySelector<HTMLElement>('#hud-frozen')!.hidden).toBe(false);
   });
 
   it('ramka pelnego ekranu obejmuje scene razem z HUD-em', () => {
@@ -131,7 +130,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(frame.contains(root.querySelector('#overlay'))).toBe(true);
     expect(frame.contains(root.querySelector('#gate'))).toBe(true);
     expect(frame.contains(root.querySelector('#results'))).toBe(true);
-    expect(frame.contains(root.querySelector('.hud'))).toBe(true);
+    expect(frame.contains(root.querySelector('#transport'))).toBe(true);
     expect(frame.contains(game.ui.playerHost)).toBe(true);
   });
 
@@ -227,24 +226,6 @@ describe('smoke: render i wejscie dotykowe', () => {
     game.frame();
     proxy.click();
     expect(controls.pause).toHaveBeenCalledTimes(1);
-  });
-
-  it('przycisk pelnego ekranu jest ukryty do czasu wlaczenia i zmienia etykiete', () => {
-    const clock = new FakeClock();
-    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
-    const button = root.querySelector<HTMLButtonElement>('#fullscreen')!;
-    expect(button.hidden).toBe(true);
-
-    const toggle = vi.fn();
-    game.ui.enableFullscreen(toggle);
-    expect(button.hidden).toBe(false);
-
-    button.click();
-    expect(toggle).toHaveBeenCalledTimes(1);
-
-    game.ui.setFullscreenActive(true);
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(button.textContent).toContain('Zamknij');
   });
 
   it('size z punktu sciezki skaluje szerokosc obiektu wzgledem bazowych 16%', () => {
@@ -502,11 +483,11 @@ describe('pasek transportu (ADR-0019)', () => {
     muteButton.click();
     expect(controls.setMuted).toHaveBeenCalledWith(true);
     expect(muteButton.getAttribute('aria-pressed')).toBe('true');
-    expect(muteButton.textContent).toBe('Wlacz dzwiek');
+    expect(muteButton.getAttribute('aria-label')).toBe('Wlacz dzwiek');
 
     muteButton.click();
     expect(controls.setMuted).toHaveBeenCalledWith(false);
     expect(muteButton.getAttribute('aria-pressed')).toBe('false');
-    expect(muteButton.textContent).toBe('Wycisz');
+    expect(muteButton.getAttribute('aria-label')).toBe('Wycisz');
   });
 });

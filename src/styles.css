@@ -4,56 +4,52 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow: hidden;
+}
+
 body {
   margin: 0;
   background: #101014;
   color: #f2f2f5;
-  font-family: system-ui, sans-serif;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-    env(safe-area-inset-left);
 }
 
-/* Ramka = scena + HUD. To ona idzie na pelny ekran, zeby warstwa gry i HUD
-   trafily tam razem z odtwarzaczem (ADR-0010). */
+/* Ramka = scena + pasek transportu, zawsze zmaksymalizowana na viewport
+   (ADR-0021) — bez Fullscreen API i bez gestu uzytkownika, gotowa zanim
+   ktokolwiek kliknie "Graj". `position: fixed` zamiast przycisku pelnego
+   ekranu YouTube/przegladarki, ktorego uzytkownik nie chcial. */
 .frame {
-  /* Jedno zrodlo szerokosci dla sceny, paska transportu i HUD-u — maja
-     konczyc sie rowno z krawedzia wideo, takze po wejsciu w pelny ekran.
-     --hud-height = HUD (3.5rem) + transport (3rem): bez tego w pelnym
-     ekranie scena + oba paski nie zmiescilyby sie w viewport (ADR-0019). */
-  --hud-height: 6.5rem;
+  /* Jedno zrodlo szerokosci dla sceny i paska transportu — maja konczyc sie
+     rowno z krawedzia wideo. --hud-height = wysokosc paska transportu: bez
+     tego scena i pasek nie zmiescilyby sie razem w viewport (ADR-0019). */
+  --hud-height: 3rem;
   --stage-width: min(100vw, calc((100dvh - var(--hud-height)) * 16 / 9), 1280px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-}
-
-.frame:fullscreen {
-  justify-content: center;
-  height: 100%;
-  background: #101014;
-}
-
-/* Tryb zastepczy dla iPhone'a — brak Fullscreen API, wiec ramka rozpycha sie
-   na caly viewport. Paski przegladarki zostaja; prawdziwy pelny ekran na iOS
-   daje dopiero uruchomienie z ekranu poczatkowego (ADR-0010). */
-.frame.is-pseudo-fullscreen {
   position: fixed;
   inset: 0;
   z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
+  width: 100vw;
   height: 100dvh;
   background: #101014;
 }
 
-html.has-pseudo-fullscreen,
-html.has-pseudo-fullscreen body {
-  overflow: hidden;
+/* Wymuszona orientacja pozioma na dotykowych ekranach w pionie: obraca ramke
+   o 90 stopni, zamieniajac vw/vh, zeby wideo zawsze zajmowalo maksimum
+   ekranu — bez oczekiwania na fizyczny obrot telefonu (ADR-0021). */
+@media (orientation: portrait) and (pointer: coarse) {
+  .frame {
+    inset: auto;
+    top: 0;
+    left: 100%;
+    width: 100vh;
+    height: 100vw;
+    transform-origin: 0 0;
+    transform: rotate(90deg);
+  }
 }
 
 /* Scena trzyma 16:9 razem z playerem; w orientacji poziomej ogranicza ja wysokosc. */
@@ -370,47 +366,33 @@ html.has-pseudo-fullscreen body {
   opacity: 0.85;
 }
 
-/* --- HUD --- */
+.transport-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.4rem 0.7rem;
+}
 
-.hud {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: var(--stage-width);
-  height: 3.5rem;
-  padding: 0 0.75rem;
-  font-size: 1.5rem;
+/* --- HUD (punkty + dlon) — teraz w jednej linii z transportem --- */
+
+.hud-score {
+  flex: none;
+  margin-left: auto;
+  font-size: 1.25rem;
   font-weight: 700;
 }
 
-.hud-frozen {
-  font-size: 0.8rem;
-  font-weight: 400;
-  opacity: 0.6;
+.hud-hand {
+  flex: none;
+  display: flex;
+  align-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
-.hud-frozen[hidden] {
-  display: none;
-}
-
-.hud-fullscreen {
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-left: auto;
-  padding: 0.4rem 0.9rem;
-  min-height: 2.25rem;
-  border: 1px solid rgb(255 255 255 / 0.25);
-  border-radius: 999px;
-  background: none;
-  color: inherit;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.hud-fullscreen[hidden] {
-  display: none;
+.hud-hand img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* --- Tryb deweloperski (ADR-0016) — nigdy w buildzie produkcyjnym --- */

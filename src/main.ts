@@ -2,7 +2,6 @@ import beatmapJson from './data/beatmap.json';
 import { validateBeatmap } from './engine/beatmap.js';
 import { mountGame } from './game.js';
 import { SPRITE_KEYS } from './sprites.js';
-import { createFullscreenController } from './ui/fullscreen.js';
 import { createPlayer, type PlayerHandle } from './ui/youtube.js';
 import type { Beatmap, TimeSource } from './engine/types.js';
 import type { DevHandEditorHandle } from './dev/hand-editor.js';
@@ -19,23 +18,14 @@ async function bootstrap(): Promise<void> {
     sample: () => player?.sample() ?? { timeSec: 0, playing: false, ended: false },
   };
 
+  // Ramka gry jest zawsze zmaksymalizowana na viewport przez CSS (`.frame`,
+  // ADR-0021) — nie ma tu juz nic do zrobienia, w odroznieniu od dawnego
+  // requestFullscreen wymagajacego gestu uzytkownika.
   const game = mountGame(root, beatmap, timeSource, {
     onStart: () => player?.play(),
     getReferenceVolume: () => player?.getVolume() ?? 1,
   });
   game.ui.setStartEnabled(false);
-
-  // Pelny ekran bierze cala ramke gry, nie iframe (ADR-0010). Gdyby YouTube
-  // mimo wszystko przejal go dla siebie i nie dalo sie odzyskac — pauzujemy,
-  // bo silnik zamarza tylko poza stanem PLAYING i inaczej naliczalby pudla.
-  const fullscreen = createFullscreenController({
-    target: game.ui.frame,
-    playerHost: game.ui.playerHost,
-    onChange: (active) => game.ui.setFullscreenActive(active),
-    onLost: () => player?.pause(),
-  });
-  game.ui.enableFullscreen(() => void fullscreen.toggle());
-  game.ui.setFullscreenActive(fullscreen.isActive());
 
   // Tryby deweloperskie (nagrywanie + edycja punktow) — wylacznie dev,
   // wycinane z buildu produkcyjnego przez import.meta.env.DEV (ADR-0016).
