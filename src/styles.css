@@ -367,9 +367,19 @@ body {
 }
 
 .transport-icon {
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
   padding: 0.4rem 0.7rem;
+}
+
+/* Ikony sa inline SVG, nie glify — iOS nie ma `❚❚`/`🕪` w foncie i rysowal
+   puste kwadraty. Rozmiar sterujemy tu, nie przez `font-size`. */
+.transport-icon .icon {
+  display: block;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 /* --- HUD (punkty + dlon) — teraz w jednej linii z transportem --- */

@@ -31,11 +31,41 @@ export interface Ui {
   enableTransport(controls: TransportControls): void;
 }
 
-const PLAY_ICON = '▶︎';
-const PAUSE_ICON = '❚❚';
-/** Ikona odzwierciedla STAN dzwieku, nie akcje przycisku: `🕪` = gra, `🕪×` = wyciszone. */
-const SOUND_ON_ICON = '🕪';
-const SOUND_OFF_ICON = '🕪×';
+/**
+ * Ikony transportu jako inline SVG, nie znaki Unicode. iOS nie ma w foncie ani
+ * `❚❚`, ani `🕪` — na iPhonie w miejsce guzikow byly puste kwadraty. SVG nie
+ * zalezy od fontu ani od sieci (assetow nie pobieramy), skaluje sie bez
+ * rozmycia i bierze kolor z `currentColor`.
+ *
+ * Ikona dzwieku odzwierciedla STAN, nie akcje: glosnik = gra, przekreslony = wyciszone.
+ */
+const ICONS = {
+  play: '<path d="M8 5v14l11-7z" />',
+  pause: '<path d="M6.5 5h3.5v14H6.5zM14 5h3.5v14H14z" />',
+  'sound-on':
+    '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" />' +
+    '<path d="M15.4 8.6a4.8 4.8 0 0 1 0 6.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />' +
+    '<path d="M18 6a8.4 8.4 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />',
+  'sound-off':
+    '<path d="M4 9.5h3.5L12 5.5v13L7.5 14.5H4z" />' +
+    '<path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />',
+} as const;
+
+type IconName = keyof typeof ICONS;
+
+function iconMarkup(name: IconName): string {
+  return `<svg class="icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">${ICONS[name]}</svg>`;
+}
+
+/**
+ * `data-icon` jest kontraktem dla testow (i debugowania) — po podmianie na SVG
+ * `textContent` przycisku jest pusty, wiec nie da sie po nim rozpoznac ikony.
+ */
+function setIcon(button: HTMLButtonElement, name: IconName): void {
+  if (button.dataset.icon === name) return;
+  button.dataset.icon = name;
+  button.innerHTML = iconMarkup(name);
+}
 
 /** `M:ss`, lokalny helper — nie reuzywac `formatClock` z `src/dev/record.ts` (kod dev, ADR-0016). */
 function formatTime(sec: number): string {
@@ -84,12 +114,13 @@ export function createUi(
       </main>
       <div class="transport" id="transport">
         <button class="transport-button transport-icon" id="transport-play" type="button" disabled
-                aria-label="Odtwarzaj lub wstrzymaj">${PLAY_ICON}</button>
+                data-icon="play" aria-label="Odtwarzaj lub wstrzymaj">${iconMarkup('play')}</button>
         <input class="transport-seek" id="transport-seek" type="range"
                min="0" max="0" step="0.1" value="0" disabled aria-label="Przewijanie" />
         <span class="transport-time" id="transport-time">0:00 / 0:00</span>
         <button class="transport-button transport-icon" id="transport-mute" type="button"
-                aria-pressed="false" disabled aria-label="Wycisz">${SOUND_ON_ICON}</button>
+                aria-pressed="false" disabled data-icon="sound-on"
+                aria-label="Wycisz">${iconMarkup('sound-on')}</button>
         <span class="hud-score" id="hud-score">0</span>
         <span class="hud-hand" id="hud-hand" aria-hidden="true"></span>
       </div>
@@ -224,7 +255,7 @@ export function createUi(
       }
       if (!scrubbing) transportSeek.value = String(view.timeSec);
       transportTime.textContent = `${formatTime(view.timeSec)} / ${formatTime(durationSec)}`;
-      transportPlay.textContent = view.frozen ? PLAY_ICON : PAUSE_ICON;
+      setIcon(transportPlay, view.frozen ? 'play' : 'pause');
     }
 
     results.hidden = !view.showResults;
@@ -349,7 +380,7 @@ export function createUi(
         const muted = controls.isMuted();
         transportMute.setAttribute('aria-pressed', String(muted));
         transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
-        transportMute.textContent = muted ? SOUND_OFF_ICON : SOUND_ON_ICON;
+        setIcon(transportMute, muted ? 'sound-off' : 'sound-on');
       };
       transportMute.addEventListener('click', () => {
         controls.setMuted(!controls.isMuted());

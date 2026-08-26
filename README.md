@@ -394,10 +394,10 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
     <section class="results">… <!-- ekran wyniku -->
   </main>
   <div class="transport">     <!-- jedna linia pod scena: play/pauza, suwak, czas, wyciszenie, punkty, dlon (ADR-0019/ADR-0020) -->
-    <button id="transport-play">▶︎/❚❚</button>
+    <button id="transport-play" data-icon="play|pause"><svg class="icon">…</svg></button>
     <input id="transport-seek" type="range">
     <span id="transport-time">…</span>
-    <button id="transport-mute">🕪/🕪×</button> <!-- ikona = STAN dzwieku: gra / wyciszony -->
+    <button id="transport-mute" data-icon="sound-on|sound-off"><svg class="icon">…</svg></button> <!-- ikona = STAN dzwieku -->
     <span id="hud-score">…</span>
     <span id="hud-hand"><img></span> <!-- statyczna grafika dloni w wariancie "hit" -->
   </div>
@@ -536,13 +536,25 @@ raz na zawsze i od drugiego kliknięcia play działa jak zwykły przełącznik
 play/pauza. Jeśli player nie jest jeszcze gotowy (`setStartEnabled(false)`,
 przycisk „Ladowanie…”), klik w play **nie robi nic** — tak samo jak klik w „Graj".
 
-### Ikona wyciszenia
+### Ikony transportu — inline SVG, nie glify Unicode
 
-`#transport-mute` pokazuje **stan dźwięku**, nie akcję przycisku: `🕪` gdy dźwięk
-gra, `🕪×` gdy jest wyciszony. Tę samą wartość ma statyczny HTML przed
-`enableTransport()` (`🕪`), bo wideo startuje z dźwiękiem — inaczej pierwsza
-klatka strony kłamałaby o stanie. `aria-pressed` i `aria-label` opisują natomiast
-akcję („Wycisz" / „Wlacz dzwiek").
+Ikony `#transport-play` i `#transport-mute` są **inline SVG** (`ICONS`
+w `src/ui/render.ts`, `viewBox="0 0 24 24"`, `fill="currentColor"`). Wcześniej
+były znakami Unicode (`▶︎`, `❚❚`, `🕪`, `🕪×`) i **na iPhonie rysowały się jako
+puste kwadraty** — iOS nie ma tych znaków w foncie systemowym. Rastrowe grafiki
+byłyby gorsze: kolejne pliki do wczytania i rozmycie przy skalowaniu, podczas gdy
+SVG nie zależy od fontu ani od sieci i dziedziczy kolor tekstu.
+
+Nazwa ikony żyje w **`data-icon`** na przycisku (`play` / `pause` / `sound-on` /
+`sound-off`) — po `textContent` nie da się już rozpoznać stanu, bo jest pusty.
+`setIcon()` podmienia zawartość tylko przy faktycznej zmianie nazwy, więc
+`render()` nie przepisuje DOM co klatkę. Rozmiar ustawia `.transport-icon .icon`
+w CSS (`1.25rem`), nie `font-size`.
+
+**Ikona dźwięku pokazuje stan, nie akcję:** głośnik z falami = dźwięk gra,
+przekreślony = wyciszony. Statyczny HTML startuje z `sound-on`, bo wideo startuje
+z dźwiękiem — inaczej pierwsza klatka strony kłamałaby o stanie. `aria-pressed`
+i `aria-label` opisują natomiast akcję („Wycisz" / „Wlacz dzwiek").
 
 **Pokrętła** (w `src/styles.css`): `--player-overscan` (ile playera wystaje
 poza scenę) i `--yt-button-size` (jak duży jest klikalny środek).
@@ -785,7 +797,7 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 24 testy logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i pasek transportu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, ikona mute odzwierciedla stan dźwięku (`🕪` / `🕪×`) już od pierwszej klatki, przed `enableTransport`, klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), ekran wyniku z liczbami, `.frame` obejmuje scenę i pasek transportu. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`. Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
 | `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
@@ -876,6 +888,10 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
   przycisk na środku zostaje — to świadoma decyzja); (2b) klik w ten przycisk
   wstrzymuje i wznawia wideo; (3) scena + pasek transportu mieszczą się w viewport
   na maksymalizowanym `.frame`.
+- **Widoczność ikon transportu na iOS wymaga weryfikacji na urządzeniu.** Glify
+  Unicode (`❚❚`, `🕪`) rysowały się tam jako puste kwadraty; zastąpiono je inline
+  SVG, co problem z fontem eliminuje z definicji, ale jsdom nie renderuje, więc
+  testy pokrywają wyłącznie obecność `svg.icon` w DOM, nie realny wygląd.
 - **Obrót o 90° w portrecie na dotyku (ADR-0021) niezweryfikowany na realnym
   urządzeniu** — `@media (orientation: portrait) and (pointer: coarse)` w
   `src/styles.css` nie jest pokryty testami (`jsdom` nie liczy layoutu ani

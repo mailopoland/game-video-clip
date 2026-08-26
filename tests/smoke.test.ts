@@ -499,7 +499,7 @@ describe('pasek transportu (ADR-0019)', () => {
     const muteButton = root.querySelector<HTMLButtonElement>('#transport-mute')!;
 
     // Przed enableTransport: wideo gra z dzwiekiem, wiec nie wolno pokazywac wyciszenia.
-    expect(muteButton.textContent).toBe('🕪');
+    expect(muteButton.dataset.icon).toBe('sound-on');
 
     let muted = false;
     game.ui.enableTransport(
@@ -510,13 +510,45 @@ describe('pasek transportu (ADR-0019)', () => {
         }),
       }),
     );
-    expect(muteButton.textContent).toBe('🕪');
+    expect(muteButton.dataset.icon).toBe('sound-on');
 
     muteButton.click();
-    expect(muteButton.textContent).toBe('🕪×');
+    expect(muteButton.dataset.icon).toBe('sound-off');
 
     muteButton.click();
-    expect(muteButton.textContent).toBe('🕪');
+    expect(muteButton.dataset.icon).toBe('sound-on');
+  });
+
+  it('ikony transportu sa inline SVG, nie glifami zaleznymi od fontu systemowego', () => {
+    // iOS nie ma w foncie ani `❚❚`, ani `🕪` — glify rysowaly sie jako puste kwadraty.
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    game.ui.enableTransport(makeControls());
+
+    for (const id of ['#transport-play', '#transport-mute']) {
+      const button = root.querySelector<HTMLButtonElement>(id)!;
+      const svg = button.querySelector('svg.icon');
+      expect(svg).not.toBeNull();
+      expect(svg!.getAttribute('viewBox')).toBe('0 0 24 24');
+      expect(svg!.querySelector('path')).not.toBeNull();
+      // Zaden tekst do wyrenderowania — caly znak niesie SVG.
+      expect(button.textContent).toBe('');
+    }
+  });
+
+  it('ikona play zmienia sie na pause wraz z wyrenderowanym stanem odtwarzania', () => {
+    const clock = new FakeClock();
+    const game = mountGame(root, makeBeatmap([obj('o1', 10)]), clock, { now: clock.now });
+    game.ui.enableTransport(makeControls());
+    const playButton = root.querySelector<HTMLButtonElement>('#transport-play')!;
+
+    clock.playing = false;
+    game.frame();
+    expect(playButton.dataset.icon).toBe('play');
+
+    clock.playing = true;
+    game.frame();
+    expect(playButton.dataset.icon).toBe('pause');
   });
 
   it('play w transporcie przy widocznej bramce startuje gre zamiast wolac play()', () => {
