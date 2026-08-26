@@ -63,7 +63,12 @@ body {
   touch-action: manipulation; /* brak 300 ms opoznienia i double-tap-zoom */
   container-type: inline-size;
   /* Ile playera wystaje poza scene u gory i u dolu — patrz `.player` (ADR-0019). */
-  --player-overscan: 15%;
+  /* Procent skaluje sie ze scena, ale branding YouTube'a ma tez minimalna
+     wysokosc w px — na iOS Safari 15% (~78 px) zostawialo widoczny skrawek
+     paska tytulu u gory i rzedu "Wiecej filmow" / logo u dolu. Stad max():
+     procent rzadzi na duzym ekranie, prog px na telefonie. Wieksza wartosc
+     NIE przybliza obrazu — wideo jest ograniczone szerokoscia. */
+  --player-overscan: max(24%, 120px);
   /* Rozmiar przezroczystego przycisku nad duzym przyciskiem YouTube'a. Ten
      skaluje sie z playerem, ale nie liniowo, stad clamp: dol chroni telefon,
      gora — duzy ekran. Za duzy zabieralby kliki obok dloni w srodku kadru. */
@@ -76,7 +81,8 @@ body {
    u gory i u dolu branding wyjezdza poza `.stage` (`overflow: hidden`), a samo
    wideo — ograniczone szerokoscia — laduje dokladnie tam, gdzie bylo. Dzieki
    temu wspolrzedne beatmapy zostaja nietkniete (ADR-0019).
-   ⚠️ Gdyby obraz wygladal na przyblizony, ustaw `--player-overscan: 0%`. */
+   ⚠️ Gdyby obraz wygladal na przyblizony, ustaw `--player-overscan: 0%`.
+   ⚠️ Gdyby skrawek brandingu wracal — zwieksz oba czlony `max()`. */
 .player {
   position: absolute;
   left: 0;

@@ -475,7 +475,7 @@ Dlatego potrzebne są dwa niezależne środki:
 
 | Środek | Co robi |
 |---|---|
-| `--player-overscan: 15%` na `.stage` | wypycha poza kadr pasek tytułu, avatar, udostępnianie, „More videos" i logo |
+| `--player-overscan: max(24%, 120px)` na `.stage` | wypycha poza kadr pasek tytułu, avatar, udostępnianie, „More videos" i logo |
 | `.yt-button-proxy` | duży przycisk play/pauza **zostaje widoczny**, ale klik w niego obsługuje nasz transport |
 
 ### `--player-overscan` — player wyższy niż scena
@@ -485,12 +485,17 @@ YouTube kotwiczy pasek tytułu (góra) oraz ikony i logo (dół) do krawędzi
 o `--player-overscan` wyższy u góry i u dołu — branding wyjeżdża poza `.stage`
 (`overflow: hidden`), a samo wideo, ograniczone szerokością, ląduje **dokładnie
 tam, gdzie było**. Dzięki temu **współrzędne beatmapy zostają nietknięte** i 73
-nagrane pozycje ręki nie wymagają migracji. Zmierzone: scena 426 px → player
-554 px, przesunięcie −64 px; cały branding znika ze sceny.
+nagrane pozycje ręki nie wymagają migracji.
+
+Wartość to `max(24%, 120px)`, nie samo `15%`: branding YouTube'a ma również
+**minimalną wysokość w pikselach**, więc na iOS Safari (scena ~520 px, 15% ≈
+78 px) u góry zostawał skrawek paska tytułu z avatarem, a u dołu skrawek rzędu
+„Więcej filmów" i logo — widoczne na zrzucie z urządzenia. Procent rządzi na
+dużym ekranie, próg px na telefonie.
 
 Potwierdzone na urządzeniu: obraz nie jest przybliżony, a cele nadal pokrywają
 się z wideo. Gdyby kiedyś przestało — `--player-overscan: 0%` cofa to jedną
-linią.
+linią; gdyby skrawek brandingu wrócił — zwiększ oba człony `max()`.
 
 ### `.yt-button-proxy` — duży przycisk na środku zostaje, ale działa
 
