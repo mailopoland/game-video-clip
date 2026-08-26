@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 224 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 228 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -180,6 +180,24 @@ wie o reklamach nic i nie wymagał żadnej zmiany. W trakcie reklamy `sample()` 
 transportu nie skakał na długość reklamy. `getDuration() === 0` (brak metadanych) nie
 jest traktowane jako reklama. **Brak `videoDurationSec` wyłącza detekcję** i wypisuje
 `console.warn` z długością odczytaną z playera — gotową do wpisania w beatmapę.
+
+### ⚠️ Tymczasowa sonda diagnostyczna (do usunięcia)
+
+Wykrywanie reklam **nie działa jeszcze poprawnie** — ręce pojawiają się nad reklamą
+mimo detekcji. Reklamy widać wyłącznie na deployu (GitHub Pages, iOS Safari), gdzie
+nie ma ani trybu deweloperskiego, ani dostępu do konsoli, więc `src/debug-probe.ts`
+wypisuje surowe odczyty IFrame API **na ekran**: zielony pasek w lewym górnym rogu
+z historią 8 ostatnich zmian (`st=` stan playera, `dur=` `getDuration()`,
+`t=` `getCurrentTime()`, `vid=` `getVideoData().video_id`, werdykt `REKLAMA`/`TRESC`).
+Wystarczy jeden zrzut ekranu zrobiony w trakcie reklamy.
+
+**To jedyny kod dev-owy, który celowo jedzie na produkcję** (wyjątek od ADR-0016).
+Pasek ma `pointer-events: none`, więc nie zabiera kliknięć rozgrywce.
+
+Usunięcie: skasuj `src/debug-probe.ts` i `tests/debug-probe.test.ts`, usuń z
+`src/ui/youtube.ts` import `createAdProbe`, stałą `probe` i wywołanie `probe?.(...)`
+w `sample()`, a stąd tę sekcję. Żeby tylko schować sondę przed graczami bez
+kasowania kodu — `ENABLED_IN_PRODUCTION = false` w `src/debug-probe.ts`.
 
 ---
 
