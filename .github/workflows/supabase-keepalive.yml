@@ -1,0 +1,48 @@
+name: Supabase keepalive
+
+# Darmowy projekt Supabase pauzuje po 7 dniach bez ZADNEGO zapytania do API,
+# a pauza cicho gubi dane: gra dziala dalej, POST-y wracaja bledem, ktorego
+# nikt nie widzi. Raz dziennie strzelamy lekkim RPC (ADR-0026).
+#
+# UWAGA: GitHub wylacza zaplanowane workflow po 60 dniach bez aktywnosci
+# w repozytorium i wysyla o tym maila. Wtedy keepalive milknie, a 7 dni pozniej
+# pauzuje Supabase. `workflow_dispatch` nizej pozwala wlaczyc go z powrotem
+# jednym klikiem w zakladce Actions.
+on:
+  schedule:
+    # 06:17 UTC — celowo nie o pelnej godzinie: o :00 GitHub ma szczyt
+    # i zaplanowane joby potrafia sie opoznic albo zostac pominiete.
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: POST /rest/v1/rpc/keepalive
+        env:
+          # Oba publiczne z zalozenia — ten sam klucz siedzi w bundlu gry
+          # (src/telemetry/config.ts), wiec nie ma czego trzymac w sekretach.
+          SUPABASE_URL: https://dtbtvmsxhhsjieodqjos.supabase.co
+          SUPABASE_KEY: sb_publishable_IU4Jd6eKYKZGYGHw5Xb3MA_5fG-8rWI
+        run: |
+          set -euo pipefail
+          code=$(curl -sS --retry 3 --retry-delay 10 --max-time 30 \
+            -o /tmp/keepalive.out -w '%{http_code}' \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/keepalive" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -H 'Content-Type: application/json' \
+            -d '{}')
+          echo "HTTP $code"
+          cat /tmp/keepalive.out
+          echo
+          # Twardy fail: awaria po stronie Supabase ma dac maila, a nie cisze.
+          test "$code" = "200"
