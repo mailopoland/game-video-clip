@@ -45,9 +45,12 @@ export function postEvent(payload: EventPayload, deps: TransportDeps = {}): void
         apikey: key,
         Authorization: `Bearer ${key}`,
         'Content-Type': 'application/json',
-        // WYMAGANE, nie kosmetyczne: bez tego PostgREST probuje zwrocic
-        // wstawiony wiersz, a rola `anon` nie ma SELECT — 401 i mylacy
-        // czerwony blad w konsoli mimo poprawnego zapisu.
+        // Jawny zapis DOMYSLKI PostgREST, nie obejscie bledu: goly POST bez
+        // `Prefer` i tak zwraca 201 z pustym cialem (zmierzone). Naglowek ma
+        // znaczenie dopiero wtedy, gdy o odpowiedz poprosi sie inaczej —
+        // `return=representation` wymaga SELECT-a, ktorego rola `anon` nie ma,
+        // wiec daje 401 mimo poprawnego zapisu. Tak wlasnie domyslnie wysyla
+        // `@supabase/supabase-js`, gdyby ktos kiedys przeszedl z golego fetcha.
         Prefer: 'return=minimal',
       },
       body: JSON.stringify([payload]),

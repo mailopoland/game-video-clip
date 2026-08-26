@@ -254,8 +254,9 @@ deployu:
    w README, port 4174), przejście przez bramkę, potem
    `select * from public.events order by ts desc limit 20` w panelu.
 2. **`Prefer: return=minimal` wystarcza.** Zakładka Network: POST kończy się
-   **`201`** z pustym ciałem, w konsoli zero czerwonego. Bez tego nagłówka
-   PostgREST próbuje zwrócić wstawiony wiersz i odbija się o brak `SELECT`.
+   **`201`** z pustym ciałem, w konsoli zero czerwonego. Nagłówek powtarza
+   domyślkę PostgREST — bez niego POST też daje `201` — i broni dopiero przed
+   `return=representation`, które wymaga `SELECT`-a i odbija się `401`.
 3. **RLS naprawdę blokuje odczyt:**
    `curl -H "apikey: <klucz>" "<URL>/rest/v1/events?select=*"` musi zwrócić
    pustą tablicę albo błąd uprawnień — **nigdy** danych.

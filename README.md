@@ -795,9 +795,13 @@ z widoku**, a nie zgłaszany osobnym API.
   (obejście `?apikey=` w URL wkłada klucz do logów pośredników bez zysku).
   `keepalive` daje nagłówki **i** przetrwanie odładowania dokumentu — czyli to,
   po co w ogóle sięga się po beacon.
-- **`Prefer: return=minimal`.** Bez tego PostgREST próbuje zwrócić wstawiony
-  wiersz, a `anon` nie ma SELECT: zapis się udaje, ale odpowiedź to błąd
-  uprawnień i czerwona linia w konsoli.
+- **`Prefer: return=minimal`.** To **jawny zapis domyślki** PostgREST, nie
+  obejście błędu: goły POST bez tego nagłówka też kończy się `201` z pustym
+  ciałem (zmierzone). Nagłówek zaczyna być potrzebny dopiero, gdy o odpowiedź
+  poprosi się inaczej — `return=representation` wymaga SELECT-a, którego `anon`
+  nie ma, więc zapis się udaje, ale odpowiedź to `401` i czerwona linia
+  w konsoli. Dokładnie tak domyślnie wysyła `@supabase/supabase-js`, więc
+  nagłówek zostaje jako asekuracja na wypadek odejścia od gołego `fetch`.
 
 ### Awaria telemetrii nie może dotknąć rozgrywki
 

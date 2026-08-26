@@ -377,7 +377,8 @@ describe('postEvent — transport', () => {
     expect(headers.apikey).toBe('K');
     expect(headers.Authorization).toBe('Bearer K');
     expect(headers['Content-Type']).toBe('application/json');
-    // Bez tego PostgREST probuje zwrocic wiersz, a `anon` nie ma SELECT.
+    // Domyslka PostgREST zapisana wprost; broni przed `return=representation`,
+    // ktore wymaga SELECT-a, a rola `anon` go nie ma.
     expect(headers.Prefer).toBe('return=minimal');
   });
 

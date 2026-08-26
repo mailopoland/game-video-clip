@@ -49,9 +49,13 @@ Dwie rzeczy w transporcie nie są kosmetyką:
   wymaga `apikey` i `Authorization`. Jedyne obejście — `?apikey=` w URL — wkłada
   klucz do logów pośredników bez żadnego zysku. `keepalive` daje nagłówki **i**
   przetrwanie odładowania dokumentu, czyli to, po co sięga się po beacon.
-- **`Prefer: return=minimal`.** Bez tego PostgREST próbuje zwrócić wstawiony
-  wiersz, a `anon` nie ma SELECT — zapis się udaje, ale odpowiedź to błąd
-  uprawnień i czerwona linia w konsoli.
+- **`Prefer: return=minimal`.** Jawny zapis **domyślki** PostgREST, nie
+  obejście błędu: goły POST bez tego nagłówka też kończy się `201` z pustym
+  ciałem. Nagłówek broni przed odpowiedzią poproszoną inaczej —
+  `return=representation` wymaga SELECT-a, którego `anon` nie ma, więc zapis
+  się udaje, ale odpowiedź to `401` i czerwona linia w konsoli. Tak domyślnie
+  wysyła `@supabase/supabase-js`, więc nagłówek jest asekuracją na wypadek
+  odejścia od gołego `fetch`.
 
 ### 2. Model zdarzeń: `visit / gate_click / play_start / finish / abandon`
 
