@@ -33,6 +33,19 @@ export interface AdProbeInputs {
 
 export type AdProbe = (state: number, duration: number, timeSec: number, ad: boolean) => void;
 
+/** Ostatnia linia paska — stan gry, nie playera. Nadpisywana, nie dopisywana. */
+let statusBox: HTMLElement | undefined;
+
+/**
+ * Pokazuje stan silnika i DOM obok odczytow playera: bez tego nie da sie
+ * odroznic „reka spawnowana przez silnik" od „grafika bramki startowej".
+ * Nadpisuje jedna linie, wiec mozna wolac co klatke.
+ */
+export function setProbeStatus(text: string): void {
+  if (!statusBox) return;
+  if (statusBox.textContent !== text) statusBox.textContent = text;
+}
+
 /**
  * Zwraca funkcje logujaca albo `undefined`, gdy sonda jest wylaczona
  * (testy zawsze, produkcja przy `ENABLED_IN_PRODUCTION === false`).
@@ -64,12 +77,20 @@ export function createAdProbe({ expected, getDuration, getVideoId }: AdProbeInpu
   ].join(';');
   document.body.append(box);
 
+  // Historia i status to osobne wezly — inaczej `push()` kasowalby status.
+  const history = document.createElement('div');
+  box.append(history);
+
   const push = (line: string): void => {
     lines.push(line);
     if (lines.length > MAX_LINES) lines.shift();
-    box.textContent = lines.join('\n');
+    history.textContent = lines.join('\n');
     console.info(`[reklamy] ${line}`);
   };
+
+  statusBox = document.createElement('div');
+  statusBox.style.cssText = 'color: #ff0';
+  box.append(statusBox);
 
   push(`start dur=${getDuration()} oczek=${expected || 'BRAK'} vid=${getVideoId()}`);
 

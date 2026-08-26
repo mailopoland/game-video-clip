@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 228 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 229 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -188,7 +188,9 @@ mimo detekcji. Reklamy widać wyłącznie na deployu (GitHub Pages, iOS Safari),
 nie ma ani trybu deweloperskiego, ani dostępu do konsoli, więc `src/debug-probe.ts`
 wypisuje surowe odczyty IFrame API **na ekran**: zielony pasek w lewym górnym rogu
 z historią 8 ostatnich zmian (`st=` stan playera, `dur=` `getDuration()`,
-`t=` `getCurrentTime()`, `vid=` `getVideoData().video_id`, werdykt `REKLAMA`/`TRESC`).
+`t=` `getCurrentTime()`, `vid=` `getVideoData().video_id`, werdykt `REKLAMA`/`TRESC`)
+oraz żółtą linię ze stanem **gry** (`t=` czas silnika, `ZAMROZONA`/`idzie`,
+`obiekty=` ile celów renderuje, `bramka=` czy bramka startowa jest widoczna).
 Wystarczy jeden zrzut ekranu zrobiony w trakcie reklamy.
 
 **To jedyny kod dev-owy, który celowo jedzie na produkcję** (wyjątek od ADR-0016).
@@ -196,7 +198,8 @@ Pasek ma `pointer-events: none`, więc nie zabiera kliknięć rozgrywce.
 
 Usunięcie: skasuj `src/debug-probe.ts` i `tests/debug-probe.test.ts`, usuń z
 `src/ui/youtube.ts` import `createAdProbe`, stałą `probe` i wywołanie `probe?.(...)`
-w `sample()`, a stąd tę sekcję. Żeby tylko schować sondę przed graczami bez
+w `sample()`, z `src/main.ts` import `setProbeStatus` i blok w pętli `loop`,
+a stąd tę sekcję. Żeby tylko schować sondę przed graczami bez
 kasowania kodu — `ENABLED_IN_PRODUCTION = false` w `src/debug-probe.ts`.
 
 ---

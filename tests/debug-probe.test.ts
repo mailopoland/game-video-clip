@@ -6,7 +6,7 @@
  * zanim ktos pojedzie z tym na GitHub Pages i wroci z niczym.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createAdProbe } from '../src/debug-probe.js';
+import { createAdProbe, setProbeStatus } from '../src/debug-probe.js';
 
 const inputs = {
   expected: 150,
@@ -48,6 +48,21 @@ describe('createAdProbe — tymczasowa sonda na ekranie (ADR-0022)', () => {
     expect(text).toContain('=> REKLAMA');
     expect(text).toContain('=> TRESC');
     expect(text.split('\n')).toHaveLength(3); // start + reklama + tresc
+  });
+
+  it('setProbeStatus nadpisuje linie stanu gry, nie kasujac historii', () => {
+    vi.stubEnv('MODE', 'production');
+    const probe = createAdProbe(inputs)!;
+    probe(1, 30, 5, true);
+
+    setProbeStatus('gra t=0.0 ZAMROZONA obiekty=0 bramka=WIDOCZNA');
+    setProbeStatus('gra t=4.2 idzie obiekty=1 bramka=ukryta');
+
+    const text = box()!.textContent!;
+    expect(text).toContain('start dur=30'); // historia przetrwala
+    expect(text).toContain('=> REKLAMA');
+    expect(text).toContain('gra t=4.2 idzie obiekty=1 bramka=ukryta');
+    expect(text).not.toContain('ZAMROZONA'); // stan nadpisany, nie dopisany
   });
 
   it('nie przechwytuje klikniec rozgrywki', () => {
