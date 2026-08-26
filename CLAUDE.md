@@ -116,6 +116,11 @@ tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
+public/
+  manifest.webmanifest   # PWA — jedyna droga do pelnego ekranu bez paskow Safari (iOS)
+  icons/                 # ikony PWA, generowane przez scripts/make-icons.mjs
+scripts/
+  make-icons.mjs         # proceduralny generator ikon PNG (node:zlib, zero zaleznosci)
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages

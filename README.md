@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 214 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 211 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -586,6 +586,41 @@ viewport od pierwszej klatki strony — zanim ktokolwiek kliknie „Graj", nie t
   aż ktoś fizycznie obróci urządzenie. `pointer: coarse` ogranicza to do ekranów
   dotykowych — okno przeglądarki na desktopie zwężone do portretu nie jest obracane.
 
+### PWA — jedyny sposób na ukrycie pasków Safari na iPhonie
+
+`.frame` zajmuje cały viewport, ale na iPhonie **poza viewportem** zostają jeszcze
+paski Safari: adresu u góry i nawigacji u dołu. Nie da się ich schować ani CSS-em,
+ani JS-em — Safari usunął tę możliwość, a przy każdym geście wracają.
+
+**Prawdziwego pełnego ekranu nie da się tu zrobić.** iPhone nie ma Fullscreen API
+dla dowolnego elementu (`element.requestFullscreen()` nie istnieje na iOS; na
+iPadzie od 12+ tak). Jedyne natywne wejście w pełny ekran to
+`video.webkitEnterFullscreen()` na elemencie `<video>` — a nasz `<video>` siedzi
+w **cross-origin iframie** YouTube'a, więc jest nieosiągalny (IFrame API też nie
+wystawia takiej metody). Nawet gdyby był: natywna warstwa wideo iOS rysuje się
+**nad całą stroną**, więc `.overlay` z celami, `.transport` i HUD zniknęłyby pod
+spodem — dostalibyśmy czyste wideo bez gry.
+
+Zostaje **uruchomienie z ekranu początkowego** („Udostępnij” → „Do ekranu
+początkowego”). Wtedy paski Safari nie istnieją, a strona dostaje cały ekran:
+
+| Plik | Rola |
+|---|---|
+| `public/manifest.webmanifest` | `display: fullscreen`, `orientation: landscape`, `start_url`/`scope` **względne** (build siedzi w podścieżce `/game-video-clip/`), ikony 192/512 z `purpose: "any maskable"` |
+| `<meta name="apple-mobile-web-app-capable">` w `index.html` | iOS nie honoruje `display` z manifestu przy dodawaniu do ekranu początkowego — ten meta jest tam warunkiem trybu bez pasków |
+| `<link rel="apple-touch-icon" href="icons/icon-180.png">` | iOS ignoruje `icons` z manifestu; bez tej linii robi ikonę ze **zrzutu strony** |
+| `scripts/make-icons.mjs` | generuje `public/icons/icon-{180,192,512}.png` |
+
+Ikony są **generowane proceduralnie** (ADR-0005), nie pobierane — `node
+scripts/make-icons.mjs` maluje cel (koncentryczne pierścienie `#6ef58f` na tle
+`#101014`) własnym enkoderem PNG na `node:zlib`, bez żadnej zależności graficznej.
+Grafika mieści się w 40% promienia od środka, więc przetrwa przycięcie maski
+Androida i zaokrąglenie rogów iOS. Skrypt jest jednorazowy — PNG-i są w repo,
+uruchamiaj go tylko po zmianie wyglądu ikony.
+
+⚠️ **Niezweryfikowane na urządzeniu:** faktyczne zniknięcie pasków Safari po
+dodaniu do ekranu początkowego i wygląd ikony na iOS.
+
 ---
 
 ## Wejście i mobile
@@ -922,6 +957,7 @@ Workflow `.github/workflows/deploy.yml` (push na `master` lub ręcznie) uruchami
 | zmienić pasek transportu / kontrolki wideo | `src/ui/render.ts` + `src/ui/youtube.ts` |
 | zmienić integrację z playerem | `src/ui/youtube.ts` |
 | zmienić zachowanie zmaksymalizowanej ramki / obrót w portrecie | `src/styles.css` (`.frame`, ADR-0021) |
+| zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
 | zmienić tryb deweloperski nagrywania ścieżki (RDP, zapis, DOM) | `src/dev/*` (patrz [ADR-0016](docs/decisions/ADR-0016-tryb-deweloperski-nagrywania-sciezki.md)) |
 | zmienić endpoint zapisu beatmapy dla trybu dev | `vite.config.ts` + `src/dev/beatmap-write-plugin.ts` |

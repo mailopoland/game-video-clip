@@ -54,8 +54,13 @@ urzadzenie.
   mobilnej. Wymaga ręcznej weryfikacji na urządzeniu.
 - PWA/manifest (`display: fullscreen`, „Dodaj do ekranu początkowego” na
   iPhonie) nie jest już potrzebne do uzyskania efektu pełnego ekranu — CSS
-  daje go od razu, bez instalacji. Manifest zostaje bez zmian (nieszkodliwy),
-  ale przestaje być jedyną drogą do pełnoekranowego wrażenia na iOS.
+  daje go od razu, bez instalacji. Manifest **zostaje i jest uzupełniony
+  o ikony**: to jedyna droga do ukrycia pasków Safari (adresu u góry,
+  nawigacji u dołu), których żadnym CSS-em ani JS-em na iOS schować się nie
+  da. Prawdziwy pełny ekran przez `webkitEnterFullscreen()` — jedyne
+  natywne API iPhone'a — jest niedostępny, bo wideo siedzi w cross-origin
+  iframie, a nawet gdyby był, natywna warstwa wideo zasłoniłaby `.overlay`
+  z celami i pasek transportu, czyli całą grę.
 
 ## Odrzucone warianty
 

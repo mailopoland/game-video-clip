@@ -8,12 +8,16 @@
     />
     <title>Click the target</title>
     <!-- iPhone nie ma Fullscreen API. Jedyny prawdziwy pelny ekran na iOS to
-         uruchomienie z ekranu poczatkowego — daja go te dwie linie (ADR-0010).
+         uruchomienie z ekranu poczatkowego (ADR-0021) — daja go te linie.
          Sciezki wzgledne, bo build na GitHub Pages siedzi w podsciezce. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Click" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#101014" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <!-- iOS ignoruje `icons` z manifestu przy dodawaniu do ekranu poczatkowego —
+         bez tej linii robi ikone ze zrzutu strony. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
