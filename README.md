@@ -18,7 +18,7 @@ Wyłącznie client-side: bez backendu, kont, zapisu wyników i analityki.
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 229 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 230 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -190,7 +190,11 @@ wypisuje surowe odczyty IFrame API **na ekran**: zielony pasek w lewym górnym r
 z historią 8 ostatnich zmian (`st=` stan playera, `dur=` `getDuration()`,
 `t=` `getCurrentTime()`, `vid=` `getVideoData().video_id`, werdykt `REKLAMA`/`TRESC`)
 oraz żółtą linię ze stanem **gry** (`t=` czas silnika, `ZAMROZONA`/`idzie`,
-`obiekty=` ile celów renderuje, `bramka=` czy bramka startowa jest widoczna).
+`obiekty=` ile celów renderuje, `bramka=` czy bramka startowa jest widoczna,
+`klatki=`/`zyje=` licznik klatek i czas życia — żywa pętla `rAF` ma ~60 klatek na
+sekundę działania, dużo mniej znaczy, że pętla stanęła) i czerwoną linię
+z pierwszym błędem JS (wyjątek w klatce zabija `requestAnimationFrame` na zawsze:
+ostatnia klatka zostaje zamrożona na ekranie, a gra stoi).
 Wystarczy jeden zrzut ekranu zrobiony w trakcie reklamy.
 
 **To jedyny kod dev-owy, który celowo jedzie na produkcję** (wyjątek od ADR-0016).

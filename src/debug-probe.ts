@@ -35,6 +35,9 @@ export type AdProbe = (state: number, duration: number, timeSec: number, ad: boo
 
 /** Ostatnia linia paska — stan gry, nie playera. Nadpisywana, nie dopisywana. */
 let statusBox: HTMLElement | undefined;
+/** Przedostatnia linia — pierwszy blad JS. Wyjatek w petli klatek zabija rAF
+    na zawsze: ostatnia klatka (z rekami) zostaje na ekranie, a gra stoi. */
+let errorBox: HTMLElement | undefined;
 
 /**
  * Pokazuje stan silnika i DOM obok odczytow playera: bez tego nie da sie
@@ -88,9 +91,24 @@ export function createAdProbe({ expected, getDuration, getVideoId }: AdProbeInpu
     console.info(`[reklamy] ${line}`);
   };
 
+  errorBox = document.createElement('div');
+  errorBox.style.cssText = 'color: #f66';
+  box.append(errorBox);
+
   statusBox = document.createElement('div');
   statusBox.style.cssText = 'color: #ff0';
   box.append(statusBox);
+
+  const reportError = (what: string): void => {
+    // Tylko pierwszy blad — kolejne sa zwykle jego konsekwencja.
+    if (errorBox && !errorBox.textContent) errorBox.textContent = `BLAD: ${what}`;
+  };
+  window.addEventListener('error', (event) =>
+    reportError(`${event.message} @ ${event.filename ?? '?'}:${event.lineno ?? 0}`),
+  );
+  window.addEventListener('unhandledrejection', (event) =>
+    reportError(`odrzucona obietnica: ${String(event.reason)}`),
+  );
 
   push(`start dur=${getDuration()} oczek=${expected || 'BRAK'} vid=${getVideoId()}`);
 

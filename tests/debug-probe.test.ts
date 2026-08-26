@@ -65,6 +65,20 @@ describe('createAdProbe — tymczasowa sonda na ekranie (ADR-0022)', () => {
     expect(text).not.toContain('ZAMROZONA'); // stan nadpisany, nie dopisany
   });
 
+  it('pokazuje pierwszy blad JS i nie nadpisuje go kolejnymi', () => {
+    vi.stubEnv('MODE', 'production');
+    createAdProbe(inputs);
+
+    window.dispatchEvent(
+      new ErrorEvent('error', { message: 'boom', filename: 'main.ts', lineno: 42 }),
+    );
+    window.dispatchEvent(new ErrorEvent('error', { message: 'drugi', lineno: 7 }));
+
+    const text = box()!.textContent!;
+    expect(text).toContain('BLAD: boom @ main.ts:42');
+    expect(text).not.toContain('drugi');
+  });
+
   it('nie przechwytuje klikniec rozgrywki', () => {
     vi.stubEnv('MODE', 'production');
     createAdProbe(inputs);

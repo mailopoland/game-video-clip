@@ -57,7 +57,7 @@ detekcję i loguje podpowiedź z realną długością.
 ⚠️ Wykrywanie reklam jeszcze NIE dziala poprawnie — w kodzie siedzi tymczasowa
 sonda diagnostyczna (`src/debug-probe.ts`), jedyny kod dev-owy jadacy celowo na
 produkcje; instrukcja usuniecia w naglowku tego pliku i w README.
-`npm test` — 229 testów, zielone.
+`npm test` — 230 testów, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
