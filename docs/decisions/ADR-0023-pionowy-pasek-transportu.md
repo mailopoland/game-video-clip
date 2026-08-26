@@ -25,15 +25,15 @@ jako szerokości. Na 390×844 dawało to scenę 390 px zamiast możliwych ~690 p
    `min(100vw - var(--hud-width), 100dvh * 16 / 9, 1280px)`.
    Kolumna zabiera teraz szerokość, której kadr 16:9 na telefonie i tak nie
    wykorzystywał — obraz rośnie do pełnej dostępnej wysokości.
-2. **Suwak przewijania jest pionowy, dwiema drogami naraz:** `writing-mode: vertical-lr`
-   (droga standardowa, Safari 17.4+, Chrome 124+) **oraz** `-webkit-appearance:
-   slider-vertical` (zdeprecjonowany fallback dla starszego iOS Safari). Starsze
-   WebKity ignorują pierwszą, nowe — drugą; podane razem dają pion na obu. To jest
-   wprost wymaganie właściciela: „długość filmu musi być pionowa".
-   Czas leci **z góry w dół** (`direction: ltr`) — góra to `0:00`. Na starej drodze
-   `slider-vertical` kierunek jest odwrotny; CSS nie odwróci go bez zepsucia drogi
-   nowoczesnej, więc to znane ograniczenie starego iOS Safari, nie usterka.
-   Suwak jest żółty (`#f5c518`, `accent-color` + tło kciuka).
+2. **Suwak przewijania jest pionowy przez `writing-mode: vertical-lr`**
+   (Safari 17.4+, Chrome 124+) — wprost wymaganie właściciela („długość filmu musi
+   być pionowa"). Czas leci **z góry w dół** (`direction: ltr`), góra to `0:00`.
+   Tor jest **żółty** (`#f5c518`), kuleczka **zielona** (`#6ef58f`). Dwa różne kolory
+   wykluczają `accent-color` (jeden kolor na tor i kciuk), więc suwak ma
+   `appearance: none` i własne style — a to z kolei wyklucza zdeprecjonowany
+   `-webkit-appearance: slider-vertical`, który wcześniej dawał pion na starym iOS.
+   **Cena:** na iOS Safari < 17.4 suwak wraca do poziomu. Świadomy kompromis —
+   kolory ważniejsze niż wsparcie przeglądarki sprzed marca 2024.
 3. **Licznik czasu jest ukryty** (`display: none`). W kolumnie `3.5rem` nie ma miejsca
    na „0:12 / 2:30", a postęp pokazuje suwak. Element zostaje w DOM i `render()` nadal
    go aktualizuje — zero zmian w `src/ui/render.ts`, więc zero ryzyka dla testów.

@@ -365,45 +365,59 @@ body {
   cursor: default;
 }
 
-/* Suwak pionowy dwiema drogami naraz: `writing-mode` to droga nowoczesna
-   (Safari 17.4+, Chrome 124+), `slider-vertical` — zdeprecjonowany fallback dla
-   starszego iOS Safari. Starsze WebKity ignoruja pierwsza, nowe druga.
-   `direction: ltr` (domyslne, zapisane wprost) sprawia, ze czas leci Z GORY
-   W DOL: gora = 0:00, dol = koniec filmu. ⚠️ Na starym iOS Safari, gdzie dziala
-   wylacznie `slider-vertical`, kierunek jest odwrotny (dol = 0:00) — CSS nie ma
-   jak tego odwrocic bez zepsucia drogi nowoczesnej.
-   Zolty kolor idzie przez `accent-color` (natywny suwak, oba kierunki) i przez
-   tlo kciuka w pseudo-elementach. */
+/* Suwak: pionowy przez `writing-mode: vertical-lr` (Safari 17.4+, Chrome 124+).
+   `direction: ltr` sprawia, ze czas leci Z GORY W DOL: gora = 0:00, dol = koniec.
+   ⚠️ Wypadl zdeprecjonowany `-webkit-appearance: slider-vertical` — nie da sie go
+   pogodzic z `appearance: none`, ktore jest jedyna droga do WLASNYCH kolorow
+   (natywny suwak przez `accent-color` daje jeden kolor na tor i kciuk, a maja byc
+   dwa: tor zolty, kuleczka zielona). Cena: na iOS Safari < 17.4 suwak wraca do
+   poziomu. Sam element JEST torem — stad zolte tlo tutaj, a tory w pseudo-
+   elementach sa przezroczyste, zeby kolor nie dublowal sie i nie ciemnial. */
 .transport-seek {
   flex: 1;
   min-width: 0;
   min-height: 0;
   width: 1.25rem;
+  margin: 0;
   writing-mode: vertical-lr;
   direction: ltr;
-  -webkit-appearance: slider-vertical;
-  accent-color: #f5c518;
+  appearance: none;
+  -webkit-appearance: none;
+  background: #f5c518;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.transport-seek::-webkit-slider-runnable-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.transport-seek::-moz-range-track {
+  background: transparent;
+  border-radius: 999px;
 }
 
 .transport-seek::-webkit-slider-thumb {
-  width: 1rem;
-  height: 1rem;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #101014;
   border-radius: 50%;
-  background: #f5c518;
+  background: #6ef58f;
   cursor: pointer;
 }
 
 .transport-seek::-moz-range-thumb {
-  width: 1rem;
-  height: 1rem;
-  border: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid #101014;
   border-radius: 50%;
-  background: #f5c518;
+  background: #6ef58f;
   cursor: pointer;
 }
 
-/* W waskiej kolumnie nie ma miejsca na "0:12 / 2:30" — postep pokazuje suwak
-   (ADR-0023). Element zostaje w DOM (render() nadal go aktualizuje). */
 .transport-time {
   display: none;
 }
