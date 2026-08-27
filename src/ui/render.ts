@@ -1,5 +1,5 @@
 import { SPRITES, preloadSprites } from '../sprites.js';
-import { resultImageSrc, resultPercent } from './result-image.js';
+import { resultImageAlt, resultImageSrc, resultPercent } from './result-image.js';
 import type { GameView, VisibleObject } from '../engine/types.js';
 
 export interface TransportControls {
@@ -108,11 +108,12 @@ export function createUi(
         <div class="player" id="player"></div>
         <div class="shield" id="shield"></div>
         <button class="yt-button-proxy" id="yt-button-proxy" type="button" disabled
-                aria-label="Odtwarzaj lub wstrzymaj"></button>
+                aria-label="Play or pause the video"></button>
         <div class="overlay" id="overlay"></div>
         <div class="gate" id="gate">
-          <button class="gate-button" id="start" type="button" aria-label="Graj">
-            <img class="gate-image" id="gate-image" alt="Klikaj dlonie, gdy sie pojawia" />
+          <button class="gate-button" id="start" type="button"
+                  aria-label="Play the Mood Brazil slap game">
+            <img class="gate-image" id="gate-image" alt="Start screen: tap a hand the moment it appears on the Mood Brazil video to score a point" />
           </button>
         </div>
         <section class="results" id="results" hidden>
@@ -128,13 +129,13 @@ export function createUi(
       </main>
       <div class="transport" id="transport">
         <button class="transport-button transport-icon" id="transport-play" type="button" disabled
-                data-icon="play" aria-label="Odtwarzaj lub wstrzymaj">${iconMarkup('play')}</button>
+                data-icon="play" aria-label="Play or pause the video">${iconMarkup('play')}</button>
         <input class="transport-seek" id="transport-seek" type="range"
-               min="0" max="0" step="0.1" value="0" disabled aria-label="Przewijanie" />
+               min="0" max="0" step="0.1" value="0" disabled aria-label="Seek through the video" />
         <span class="transport-time" id="transport-time">0:00 / 0:00</span>
         <button class="transport-button transport-icon" id="transport-mute" type="button"
                 aria-pressed="false" disabled data-icon="sound-on"
-                aria-label="Wycisz">${iconMarkup('sound-on')}</button>
+                aria-label="Mute">${iconMarkup('sound-on')}</button>
         <span class="hud-hand" id="hud-hand" aria-hidden="true"></span>
         <span class="hud-score" id="hud-score">0</span>
       </div>
@@ -210,7 +211,7 @@ export function createUi(
     element.type = 'button';
     element.className = 'obj';
     element.dataset.id = object.id;
-    element.setAttribute('aria-label', 'Cel');
+    element.setAttribute('aria-label', 'Slap the hand');
 
     const sprite = SPRITES[object.sprite]!;
     const spriteElement =
@@ -244,7 +245,7 @@ export function createUi(
     if (muted === lastMuted) return;
     lastMuted = muted;
     transportMute.setAttribute('aria-pressed', String(muted));
-    transportMute.setAttribute('aria-label', muted ? 'Wlacz dzwiek' : 'Wycisz');
+    transportMute.setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
     setIcon(transportMute, muted ? 'sound-off' : 'sound-on');
   }
 
@@ -316,6 +317,8 @@ export function createUi(
       // sprite'a na `hitSrc` wyzej.
       const src = resultImageSrc(percent);
       if (!resultsImage.src.endsWith(src)) resultsImage.src = src;
+      const alt = resultImageAlt(percent);
+      if (resultsImage.alt !== alt) resultsImage.alt = alt;
     }
   }
 
@@ -392,7 +395,10 @@ export function createUi(
     },
     setStartEnabled: (enabled) => {
       startButton.disabled = !enabled;
-      startButton.setAttribute('aria-label', enabled ? 'Graj' : 'Ladowanie…');
+      startButton.setAttribute(
+        'aria-label',
+        enabled ? 'Play the Mood Brazil slap game' : 'Loading',
+      );
     },
     enableTransport: (controls) => {
       transportControls = controls;

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Jedna strona, jeden URL. Celowo bez znacznika daty ostatniej modyfikacji:
+     niewiarygodna data kaze Google zignorowac cala mape, a data w repo szybko
+     sie rozjezdza z rzeczywistoscia (docs/SEO.md). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://mailopoland.github.io/game-video-clip/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>

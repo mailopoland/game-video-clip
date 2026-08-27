@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resultImageSrc, resultPercent } from '../src/ui/result-image.js';
+import { resultImageAlt, resultImageSrc, resultPercent } from '../src/ui/result-image.js';
 import { RESULT_IMAGES } from '../src/sprites.js';
 
 /** Nazwa pliku bez sciezki — testy nie zaleza od BASE_URL. */
@@ -72,5 +72,30 @@ describe('resultImageSrc', () => {
   it('procent poza zakresem nie wychodzi poza rejestr', () => {
     expect(file(resultImageSrc(-5))).toBe('score0.gif');
     expect(file(resultImageSrc(140))).toBe('score5.gif');
+  });
+});
+
+describe('resultImageAlt', () => {
+  it('kazdy kubelek ma wlasny, niepusty opis', () => {
+    const alts = [0, 10, 40, 60, 90, 100].map(resultImageAlt);
+    for (const alt of alts) expect(alt.length).toBeGreaterThan(10);
+    expect(new Set(alts).size).toBe(6);
+  });
+
+  it('granice kubelkow sa te same co w resultImageSrc (alt nie moze rozjechac sie z grafika)', () => {
+    // Kazda para (percent, percent+1) na granicy: gdy zmienia sie grafika, musi
+    // zmienic sie tez opis — i odwrotnie.
+    for (let percent = 0; percent < 100; percent += 1) {
+      const srcChanged = resultImageSrc(percent) !== resultImageSrc(percent + 1);
+      const altChanged = resultImageAlt(percent) !== resultImageAlt(percent + 1);
+      expect(altChanged).toBe(srcChanged);
+    }
+  });
+
+  it('nazwa utworu pada wylacznie przy komplecie trafien (bez keyword stuffingu)', () => {
+    expect(resultImageAlt(100)).toContain('Mood Brazil');
+    for (const percent of [0, 1, 25, 26, 50, 51, 75, 76, 99]) {
+      expect(resultImageAlt(percent)).not.toContain('Mood Brazil');
+    }
   });
 });

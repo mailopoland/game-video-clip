@@ -21,7 +21,7 @@ nigdzie zapisywane per gracz. Build produkcyjny wysyła **anonimową telemetrię
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 280 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 293 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
 ```
 
@@ -900,7 +900,8 @@ dodaniu do ekranu początkowego i wygląd ikony na iOS.
 
 ### Favikona karty przeglądarki
 
-Tytuł karty to `Music Video Slap Game` (`<title>` w `index.html`). Favikona
+Tytuł karty to `Mood Brazil Slap Game — LIL NAAY Rhythm Tap Game`
+(`<title>` w `index.html`, dobrany pod SEO — patrz [SEO i metadane](#seo-i-metadane)). Favikona
 (`public/favicon.png`, 64×64, RGBA) to sprite ręki w stanie **po trafieniu**
 (`public/sprites/hand-hit.gif`, ADR-0011) — zamiast celu, żeby ikona karty
 kojarzyła się z akcją gry, a nie z abstrakcyjnym symbolem. Wygenerowana przez
@@ -909,6 +910,47 @@ ten sam enkoder PNG na `node:zlib` co `make-icons.mjs`, więc bez nowej
 zależności i bez pobierania niczego z internetu. Skrypt jest jednorazowy —
 `public/favicon.png` jest w repo; uruchamiaj go ponownie tylko po zmianie
 `hand-hit.gif`.
+
+---
+
+## SEO i metadane
+
+Strona jest w całości renderowana z JS, a widoczny tekst to trzy liczby i `PLAY AGAIN`
+(ADR-0025). Google renderuje JS, więc zobaczy DOM gry — a w nim brak nagłówków
+i akapitów. **Metadane są więc jedyną powierzchnią dla wyszukiwarek**, i to jest
+świadomy sufit: właściciel produktu nie chce żadnej widocznej treści
+([ADR-0027](docs/decisions/ADR-0027-seo-tylko-w-metadanych.md), treści i checklisty
+w [`docs/SEO.md`](docs/SEO.md)).
+
+- **`index.html`** — `lang="en"` (interfejs jest bezsłowny, wszystkie metadane
+  angielskie), `<title>`, `description`, `keywords`, `robots`, `canonical`, 9 tagów
+  Open Graph, 5 Twittera, JSON-LD typu `VideoGame` (z `isBasedOn` → `MusicRecording`
+  „Mood Brazil" / LIL NAAY) i `<noscript>` — jedyny tekst w `<body>`, widoczny wyłącznie
+  przy wyłączonym JS.
+- **`alt` i `aria-label`** niosą opisy zgodne z tym, co widać: `alt` bramki startowej
+  opisuje jej instrukcję, a `resultImageAlt(percent)` w `src/ui/result-image.ts` dobiera
+  opis grafiki wyniku **tymi samymi granicami kubełków** co `resultImageSrc` — test
+  przechodzi po wszystkich 100 wartościach i pilnuje, żeby opis zmieniał się dokładnie
+  tam, gdzie zmienia się plik. Sprite'y celów i dłoń w HUD zostają z `alt=""`
+  (dekoracyjne, powtarzane do 73 razy).
+- **`public/robots.txt` i `public/sitemap.xml`** — mapa działa od razu (zgłasza się ją
+  w Search Console wprost adresem), `robots.txt` **dopiero po podpięciu własnej domeny**:
+  roboty czytają go wyłącznie z korzenia domeny, a build stoi w podścieżce
+  `/game-video-clip/` (ADR-0007). Powstał z wyprzedzeniem, żeby po zmianie hostingu nie
+  było już nic do zrobienia poza podmianą adresu w linii `Sitemap:`.
+- **`public/og-image.png`** (1200×630) — podgląd linku w social mediach, generowany
+  proceduralnie przez `scripts/make-og-image.mjs` z `hand-hit.gif`: przycięcie do
+  zawartości, skalowanie z zachowaniem proporcji, alpha-blend na tle `#101014`.
+  Dekoder GIF-a i enkoder PNG dzieli z `make-favicon.mjs` przez `scripts/lib/gif-png.mjs`
+  (po refaktorze favikona wychodzi bajt w bajt taka sama).
+- **Zero ukrytej treści.** Żadnego `<h1>` pod `display:none`, `sr-only` ani `alt`
+  napchanych frazami — to cloaking, wymieniony wprost w wytycznych Google jako spam.
+  JSON-LD nie ma `aggregateRating` (brak realnych ocen), co pilnuje test.
+
+**Podpięcie własnej domeny** to osobna, późniejsza zmiana: `base: '/'` w `vite.config.ts`,
+`public/CNAME` i podmiana adresu w **siedmiu** miejscach — pełna checklista w
+[`docs/SEO.md`](docs/SEO.md) §4. `tests/seo.test.ts` sprawdza, że wszystkie własne adresy
+absolutne mają wspólny prefiks, więc połowiczna podmiana wywala się na `npm test`.
 
 ---
 
@@ -1115,7 +1157,7 @@ zamiast być zablokowane (patrz wyżej).
 
 ## Testy
 
-`npm test` — **280 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **293 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -1132,7 +1174,8 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania punktacji — rośnie wyłącznie `total`, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 | `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, `+` między punktami wypełnia wiersz roboczy bieżącym czasem wideo i zinterpolowaną pozycją zaznaczonego obiektu i od razu dopisuje nowy punkt (posortowany po `t`), nowy punkt z `t` kolidującym z istniejącym (bieżący czas równy punktowi) jest odrzucany bez zmiany beatmapy, a pola wiersza roboczego zostają wypełnione bieżącymi wartościami do poprawki, `−` usuwa punkt natychmiast przy więcej niż 2 punktach, a na ścieżce z dokładnie 2 punktami usuwa cały obiekt zamiast być zablokowany, guzik `.dev-edit-panel-delete-point` ("Usuń punkt") pod nagłówkiem panelu jest ukryty bez wybranego punktu, widoczny i klikalny po wybraniu (usuwa punkt, a na ścieżce z 2 punktami cały obiekt — nigdy nie jest `disabled`), brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
-| `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr). |
+| `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr). Do tego `resultImageAlt` (ADR-0027): sześć różnych, niepustych opisów, granice kubełków **identyczne** z `resultImageSrc` (pętla po wszystkich 100 wartościach), nazwa utworu wyłącznie w wariancie 100%. |
+| `tests/seo.test.ts` | `node`, ADR-0027: czyta z dysku `index.html`, `public/robots.txt`, `public/sitemap.xml` i manifest — `lang="en"`, długości `<title>` (≤ 60) i `description` (≤ 160), komplet 8 tagów Open Graph i 5 Twittera, JSON-LD parsuje się jako `VideoGame` z `url` równym `canonical` i **bez** `aggregateRating`/`review`, niepusty `<noscript>`, `robots.txt` z `Sitemap:`, `<loc>` sitemapy równy `canonical`, manifest z `description`/`lang`/`categories` przy nietkniętych polach pełnego ekranu z ADR-0021, oraz **spójność adresów**: każdy własny URL absolutny zaczyna się od `canonical` (bezpiecznik podmiany domeny). |
 | `tests/telemetry.test.ts` | jsdom, ADR-0026: **cykl zdarzeń** (`visit`/`gate_click` po jednym razie, klatki przed bramką bez skutku, zamrożone klatki po `gate_click` **nie** dają `play_start` — regresja pre-rolla, pierwsza żywa klatka daje `play_start` z `play_no = 1`, `showResults` daje `finish` **raz** mimo gaśnięcia i ponownego zapalenia ekranu wyniku, `finish` niesie snapshot statystyk odporny na późniejszą zmianę, `accuracy` zaokrąglone do dwóch miejsc, `showResults` bez `play_start` nie daje `finish`); **wiele rozgrywek** (`PLAY AGAIN` → nowy `play_id` i `play_no = 2`, druga rozgrywka ma własny `finish`, `play_no` rośnie między instancjami na wspólnym storage, `visitor_id` stabilny, storage rzucający przy każdym dostępie i brak storage w ogóle nie wywracają telemetrii); **flaga `seeked`** (przewinięcie w trakcie gry zapala ją, gra bez przewijania nie, `seek(0)` przy zamkniętej rozgrywce to restart i nie brudzi następnej gry, `seek(90)` przy zamkniętej przechodzi na następną, seek przed pierwszą rozgrywką przechodzi na nią); **`pagehide`** (porzucenie daje `abandon` ze snapshotem, po `finish` zero `abandon`, bez rozgrywki zero, dwa `pagehide` dają jeden); **tożsamości** (`getVisitorId` zapisuje i odczytuje, odrzuca wartość o złym kształcie, `nextPlayNo` liczy od 1 i ignoruje śmieci); **transport** (URL, `apikey`, `Authorization`, `Content-Type`, `Prefer: return=minimal`, `keepalive: true`, ciało jako tablica jednego wiersza, odrzucone `fetch` / rzucające synchronicznie / HTTP 500 / brak `fetch` w środowisku — żadne nie rzuca); **integracja** na `mountGame` + `FakeClock` (pełny przebieg daje `visit, gate_click, play_start, finish` z wynikiem, `gate_click` nie leci przed tapnięciem bramki, a `send` rzucający na każdym zdarzeniu **nie przerywa pętli gry ani nie psuje punktacji**). |
 | `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
 | `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
@@ -1303,6 +1346,10 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
 | zmienić szerokość pionowego paska transportu | `src/styles.css` (`--hud-width` na `.frame`, ADR-0023) |
 | zmienić nazwę/ikonę/orientację aplikacji na ekranie początkowym | `public/manifest.webmanifest` + `index.html` (metatagi `apple-*`) + `scripts/make-icons.mjs` |
 | zmienić tytuł karty przeglądarki / favikonę | `<title>` w `index.html` / `public/favicon.png` (`scripts/make-favicon.mjs`) |
+| zmienić treści SEO / canonical / Open Graph / JSON-LD | `index.html` (+ [`docs/SEO.md`](docs/SEO.md)) |
+| zmienić `alt` grafik ekranu wyniku | `src/ui/result-image.ts` (`resultImageAlt`) |
+| zmienić obrazek podglądu linku | `scripts/make-og-image.mjs` → `public/og-image.png` |
+| podpiąć własną domenę | [`docs/SEO.md`](docs/SEO.md) §4 + `vite.config.ts` + `public/CNAME` |
 | zmienić hosting / ścieżkę bazową | `vite.config.ts` + `docs/DEPLOY.md` |
 | zmienić projekt / klucz Supabase | `src/telemetry/config.ts` (+ `.github/workflows/supabase-keepalive.yml`) |
 | dodać albo zmienić zdarzenie telemetrii | `src/telemetry/telemetry.ts` (+ `CHECK` w [`docs/SUPABASE.md`](docs/SUPABASE.md)) |
@@ -1344,3 +1391,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0024](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) | Zegar treści kontra zegar reklamy — adapter nie wpuszcza czasu reklamy do silnika (zastępuje ADR-0022) |
 | [0025](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md) | Bezsłowny ekran wyniku: procent z całej beatmapy, grafika zamiast napisów, restart przez `seekTo(0)` |
 | [0026](docs/decisions/ADR-0026-telemetria-w-supabase.md) | Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu, keepalive cronem |
+| [0027](docs/decisions/ADR-0027-seo-tylko-w-metadanych.md) | SEO wyłącznie w metadanych: zero treści w widocznym DOM, `alt` spięty z kubełkiem wyniku, `robots.txt` z wyprzedzeniem pod domenę |

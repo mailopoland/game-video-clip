@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountGame } from '../src/game.js';
 import { SPRITES } from '../src/sprites.js';
+import { resultImageAlt } from '../src/ui/result-image.js';
 import { FakeClock, makeBeatmap, obj } from './fake-clock.js';
 
 /** jsdom nie implementuje PointerEvent — gra i tak slucha tylko `pointerdown`. */
@@ -414,6 +415,32 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(text).toContain('PLAY AGAIN');
   });
 
+  it('grafiki niosace tresc maja alt, a alt wyniku idzie za kubelkiem (ADR-0027)', () => {
+    const clock = new FakeClock();
+    const beatmap = makeBeatmap([obj('o1', 10), obj('o2', 12)], 15);
+    const game = mountGame(root, beatmap, clock, { now: clock.now });
+
+    // Bramka startowa niesie instrukcje, wiec ma opis; dekoracyjne sprite'y nie.
+    const gateImage = root.querySelector<HTMLImageElement>('#gate-image')!;
+    expect(gateImage.alt.length).toBeGreaterThan(10);
+
+    // Zero trafien: alt kubelka 0%.
+    playTo(clock, game.frame, 15.0);
+    const resultsImage = root.querySelector<HTMLImageElement>('#r-image')!;
+    const altAtZero = resultsImage.alt;
+    expect(altAtZero.length).toBeGreaterThan(10);
+    expect(altAtZero).toBe(resultImageAlt(0));
+
+    // Seek w tyl, jedno trafienie, powrot na koniec — 50%, wiec inny kubelek.
+    clock.seekTo(9.5);
+    game.frame();
+    playTo(clock, game.frame, 10.0);
+    tap(root.querySelector('.obj[data-id="o1"]')!);
+    playTo(clock, game.frame, 15.0);
+    expect(resultsImage.alt).toBe(resultImageAlt(50));
+    expect(resultsImage.alt).not.toBe(altAtZero);
+  });
+
   it('PLAY AGAIN ma ikone SVG, nie glif Unicode (regresja iOS)', () => {
     playToResults();
 
@@ -616,12 +643,12 @@ describe('pasek transportu (ADR-0019)', () => {
     muteButton.click();
     expect(controls.setMuted).toHaveBeenCalledWith(true);
     expect(muteButton.getAttribute('aria-pressed')).toBe('true');
-    expect(muteButton.getAttribute('aria-label')).toBe('Wlacz dzwiek');
+    expect(muteButton.getAttribute('aria-label')).toBe('Unmute');
 
     muteButton.click();
     expect(controls.setMuted).toHaveBeenCalledWith(false);
     expect(muteButton.getAttribute('aria-pressed')).toBe('false');
-    expect(muteButton.getAttribute('aria-label')).toBe('Wycisz');
+    expect(muteButton.getAttribute('aria-label')).toBe('Mute');
   });
 
   it('ikona glosnosci odzwierciedla stan dzwieku, takze od pierwszej klatki', () => {

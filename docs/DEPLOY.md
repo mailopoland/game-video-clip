@@ -56,6 +56,25 @@ Strona: `https://<user>.github.io/game-video-clip/`
 
 Pełna checklista ręczna: [`PLAN.md`](PLAN.md), krok 15.
 
+## 6. Własna domena
+
+Podpięcie domeny do repozytorium projektowego sprawia, że treść serwuje się z **korzenia**
+tej domeny, a nie z podścieżki `/game-video-clip/`. To zmienia trzy rzeczy naraz, więc
+robi się je **jednym commitem, w momencie ustawiania DNS** — wcześniej zepsułyby działający
+adres `github.io` (przeglądarka nie znalazłaby `assets/*`).
+
+1. `vite.config.ts` — `base: '/'`.
+2. `public/CNAME` — jedna linia z domeną; w repo: **Settings → Pages → Custom domain**
+   plus rekordy DNS (`A`/`ALIAS` na adresy GitHub Pages albo `CNAME` na
+   `<user>.github.io`). Zaznacz **Enforce HTTPS**, gdy certyfikat się wystawi.
+3. Adresy absolutne w metadanych SEO — **siedem miejsc**, pełna checklista w
+   [`SEO.md`](SEO.md) §4. `npm test` (`tests/seo.test.ts`) sprawdza, że wszystkie mają
+   wspólny prefiks, więc połowiczna podmiana wywala się lokalnie.
+
+Po deployu stary adres przekierowuje na domenę (robi to GitHub). W Search Console dodaj
+nową usługę i zgłoś `https://<domena>/sitemap.xml` — od tego momentu działa też
+`robots.txt`, który w podścieżce był ignorowany.
+
 ## Alternatywy
 
 Jeśli zamiast Pages wybierzesz Netlify lub Cloudflare Pages: build command
