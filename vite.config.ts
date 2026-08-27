@@ -18,6 +18,16 @@ export default defineConfig(({ command }) => {
     // Endpoint zapisu beatmapy dla trybu dev (ADR-0016) — nigdy w buildzie.
     // `apply: 'serve'` w pluginie to pierwsze zabezpieczenie, to drugie.
     plugins: command === 'serve' ? [beatmapWritePlugin()] : [],
+    build: {
+      // Build produkcyjny nie ma dynamicznych importow (src/dev/* jest wycinane
+      // przez import.meta.env.DEV), wiec Vite nie emituje zadnego <link
+      // rel=modulepreload> — polyfill bylby martwym kodem w kazdym bundlu.
+      modulePreload: { polyfill: false },
+    },
+    // Beatmapa (~28 kB) trafia do bundla jako `JSON.parse('...')`, nie jako
+    // literal obiektowy JS — parser JSON jest wyraznie szybszy od parsera JS
+    // przy takiej ilosci danych, co widac na starcie na telefonie.
+    json: { stringify: true },
     server: {
       // YouTube odmawia osadzenia, gdy Referer jest golym adresem IP ("Film
       // niedostepny") — nazwa hosta jest akceptowana. Testujac na telefonie

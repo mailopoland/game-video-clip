@@ -30,3 +30,19 @@ export function resultImageSrc(percent: number): string {
   if (percent <= 75) return RESULT_IMAGES[3]!;
   return RESULT_IMAGES[4]!;
 }
+
+/**
+ * Czy warto sciagnac juz grafike ekranu wyniku (ADR-0027). Do wersji z ADR-0025
+ * pobieranych bylo wszystkie szesc plikow naraz w `onStart` (~0,5 MB), mimo ze
+ * pokazywany jest dokladnie jeden. Pod koniec klipu wynik jest praktycznie
+ * ustalony, wiec kubelek policzony `leadSec` przed ekranem wyniku prawie zawsze
+ * jest tym ostatecznym — a jesli gracz jeszcze trafi i przeskoczy prog, drugie
+ * pobranie kosztuje jeden plik, nie szesc.
+ */
+export function shouldPrefetchResult(
+  timeSec: number,
+  endScreenAtSec: number,
+  leadSec: number,
+): boolean {
+  return timeSec >= endScreenAtSec - leadSec;
+}

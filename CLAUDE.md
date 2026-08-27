@@ -46,7 +46,7 @@ ADR-0010); na dotyku w orientacji pionowej jest dodatkowo obrócona o 90° przez
 maksimum ekranu bez oczekiwania na fizyczny obrót telefonu.
 Dopóki bramka startowa jest widoczna, przycisk play w pasku transportu (i `.yt-button-proxy`)
 nie steruje odtwarzaniem, tylko startuje grę tak samo jak klik w bramkę. Bramka nie ma
-napisu ani podpowiedzi — jest nią jedna grafika `public/sprites/start-manual.gif`
+napisu ani podpowiedzi — jest nią jedna grafika `public/sprites/start-manual.png`
 w klikalnym, przezroczystym przycisku. Ikony transportu to
 inline SVG (`ICONS` + `setIcon` w `render.ts`, stan w `data-icon`), nie glify Unicode —
 iOS nie ma `❚❚`/`🕪` w foncie i rysował puste kwadraty; ikona dźwięku pokazuje stan
@@ -58,7 +58,7 @@ do silnika tylko gdy film raz ruszył i player nie jest w UNSTARTED — inaczej 
 freeze z ostatnim czasem treści (ADR-0024, zastępuje ADR-0022; detekcja po długości
 usunięta). `videoDurationSec` służy już tylko suwakowi transportu.
 Ekran wyniku jest bez polskich napisów (ADR-0025): `X / Y`, procent i grafika
-`public/results/scoreN.gif` dobrana do progu, plus przycisk `PLAY AGAIN`. Procent
+`public/results/scoreN.png` dobrana do progu, plus przycisk `PLAY AGAIN`. Procent
 liczy się z **całej** beatmapy (`hits / Stats.total`), nie z `accuracy` — ta pomija
 obiekty `skipped`, więc po przewinięciu w przód pokazywałaby 100% przy jednym
 trafieniu; `accuracy` zostaje w modelu, ale UI jej nie używa. Progi i wybór grafiki
@@ -76,7 +76,19 @@ snapshot z chwili zdarzenia. SQL (schemat, RLS wyłącznie na INSERT dla `anon`,
 pięć zapisanych zapytań) jest w `docs/SUPABASE.md`; keepalive to codzienny cron
 w `.github/workflows/supabase-keepalive.yml`, bo darmowy projekt Supabase
 pauzuje po 7 dniach bez zapytań.
-`npm test` — 280 testów, zielone.
+Assety to **PNG-8 (paleta + `tRNS`) w rozdzielczości wyświetlania**, nie GIF-y
+w rozdzielczości źródła (ADR-0027): pomiar pokazał, że żaden asset nie jest
+animowany, a sprite dłoni był pobierany ~6× większy, niż jest rysowany. Generuje je
+`node scripts/optimize-assets.mjs` ze źródeł w `images/` — własny dekoder GIF/PNG
+i enkoder PNG na `node:zlib`, **dalej zero zależności i nic z internetu**. Grafika
+ekranu wyniku pobierana jest **jedna** (kubełek liczony w `src/game.ts` najwyżej
+`RESULT_PREFETCH_LEAD_SEC = 15` s przed końcem), a nie wszystkie sześć w `onStart`.
+Razem: transfer na rozgrywkę **~1,23 MB → ~265 kB**, `dist/` 1327 → 694 kB, bundle JS
+20,3 → 12,8 kB po gzipie (na to ostatnie składa się też zaokrąglenie liczb
+w `beatmap.json`). Szczegóły i to, czego świadomie **nie** ruszono, są w README,
+sekcja „Waga strony i ładowanie”.
+
+`npm test` — 294 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -152,12 +164,17 @@ tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
-  result-image.test.ts  telemetry.test.ts
+  result-image.test.ts  telemetry.test.ts  optimize-assets.test.ts
+  node-shims.d.ts        # shim `node:zlib` — projekt nie ma @types/node
 public/
-  results/               # scoreN.gif — grafiki ekranu wyniku (ADR-0025)
+  sprites/               # hand-idle/hand-hit/start-manual .png — PNG-8, generowane (ADR-0027)
+  results/               # scoreN.png — grafiki ekranu wyniku (ADR-0025), generowane (ADR-0027)
   manifest.webmanifest   # PWA — jedyna droga do pelnego ekranu bez paskow Safari (iOS)
   icons/                 # ikony PWA, generowane przez scripts/make-icons.mjs
 scripts/
+  optimize-assets.mjs    # images/ -> PNG-8 w public/ (dekoder GIF+PNG, median cut, enkoder PNG)
+  optimize-assets.d.mts  # typy dla testu — sam skrypt jest JS-em, nie przechodzi przez tsc
+  make-favicon.mjs       # favikona z tego samego zrodla co sprite dloni (nakladka na powyzsze)
   make-icons.mjs         # proceduralny generator ikon PNG (node:zlib, zero zaleznosci)
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
@@ -175,6 +192,7 @@ docs/
 | `npm run dev` | dev server Vite (HMR) |
 | `npm run build` | statyczny build do `dist/` |
 | `npm run preview` | podgląd builda lokalnie |
+| `node scripts/optimize-assets.mjs` | regeneracja assetów z `images/` (ADR-0027) — jednorazowo, wynik w repo |
 | **`npm test`** | **Vitest — jedyna komenda potrzebna do weryfikacji regresji. Musi być zielona w 100%.** |
 | deploy | ręcznie, wg [`docs/DEPLOY.md`](docs/DEPLOY.md) — nigdy automatycznie |
 
@@ -234,3 +252,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0024 — Zegar treści kontra zegar reklamy](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) — zastępuje ADR-0022
 - [ADR-0025 — Bezsłowny ekran wyniku, procent z całej beatmapy i restart przez seek](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md)
 - [ADR-0026 — Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu](docs/decisions/ADR-0026-telemetria-w-supabase.md)
+- [ADR-0027 — Assety jako PNG-8 generowane własnym skryptem, w rozdzielczości wyświetlania](docs/decisions/ADR-0027-assety-png8-generowane-skryptem.md) — zastępuje uzasadnienie formatu z ADR-0011 i przepis `ffmpeg` z ADR-0025

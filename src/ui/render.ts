@@ -175,6 +175,13 @@ export function createUi(
   // co klatke z `controls.isMuted()`.
   let lastMuted: boolean | null = null;
   let lastFrozen = true;
+  // `render()` leci 60 razy na sekunde, a te trzy wartosci zmieniaja sie duzo
+  // rzadziej: suwak ma krok 0,1 s, zegar tyka raz na sekunde, punkty tylko przy
+  // trafieniu. Zapis do DOM jest tu porownywany z ostatnim — dokladnie ten sam
+  // wzorzec co `setIcon()` i `syncMuteIcon()` nizej. Zachowanie bez zmian.
+  let lastSeekValue: string | null = null;
+  let lastTimeText: string | null = null;
+  let lastScoreText: string | null = null;
   // Duzy przycisk YouTube'a jest widoczny tylko przez chwile po ruszeniu
   // odtwarzania — potem znika i srodek kadru jest zwyklym tlem. Proxy dziala
   // wylacznie w tym oknie i wylacznie w jedna strone (pauza).
@@ -185,7 +192,7 @@ export function createUi(
   // Instrukcja + "tap to start" sa jedna grafika (public/sprites/), wiec sciezka
   // musi liczyc sie od BASE_URL tak samo jak sprite'y (ADR-0007).
   byId<HTMLImageElement>('gate-image').src =
-    `${import.meta.env.BASE_URL}sprites/start-manual.gif`;
+    `${import.meta.env.BASE_URL}sprites/start-manual.png`;
 
   // Bramka startowa ma dwa wejscia: wlasny przycisk "Graj" i przycisk play
   // paska transportu (oraz proxy duzego przycisku YouTube'a) — pierwsze
@@ -282,7 +289,11 @@ export function createUi(
       elements.delete(id);
     }
 
-    hudScore.textContent = String(view.stats.score);
+    const scoreText = String(view.stats.score);
+    if (scoreText !== lastScoreText) {
+      lastScoreText = scoreText;
+      hudScore.textContent = scoreText;
+    }
 
     if (transportControls) {
       syncMuteIcon(transportControls);
@@ -300,8 +311,20 @@ export function createUi(
           durationKnown = true;
         }
       }
-      if (!scrubbing) transportSeek.value = String(view.timeSec);
-      transportTime.textContent = `${formatTime(view.timeSec)} / ${formatTime(durationSec)}`;
+      if (!scrubbing) {
+        // Suwak ma `step: 0.1` — zapis z wieksza dokladnoscia i tak jest
+        // przyciety, a kazdy z nich przelicza polozenie kuleczki.
+        const seekValue = (Math.round(view.timeSec * 10) / 10).toString();
+        if (seekValue !== lastSeekValue) {
+          lastSeekValue = seekValue;
+          transportSeek.value = seekValue;
+        }
+      }
+      const timeText = `${formatTime(view.timeSec)} / ${formatTime(durationSec)}`;
+      if (timeText !== lastTimeText) {
+        lastTimeText = timeText;
+        transportTime.textContent = timeText;
+      }
       setIcon(transportPlay, view.frozen ? 'play' : 'pause');
     }
 

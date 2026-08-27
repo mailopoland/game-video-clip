@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resultImageSrc, resultPercent } from '../src/ui/result-image.js';
+import { resultImageSrc, resultPercent, shouldPrefetchResult } from '../src/ui/result-image.js';
 import { RESULT_IMAGES } from '../src/sprites.js';
 
 /** Nazwa pliku bez sciezki — testy nie zaleza od BASE_URL. */
@@ -41,20 +41,20 @@ describe('resultPercent', () => {
 
 describe('resultImageSrc', () => {
   it('0% i 100% maja wlasne, zarezerwowane grafiki', () => {
-    expect(file(resultImageSrc(0))).toBe('score0.gif');
-    expect(file(resultImageSrc(100))).toBe('score5.gif');
+    expect(file(resultImageSrc(0))).toBe('score0.png');
+    expect(file(resultImageSrc(100))).toBe('score5.png');
   });
 
   it('granice kubelkow trafiaja we wlasciwe pliki', () => {
     const buckets: Array<[number, string]> = [
-      [1, 'score1.gif'],
-      [25, 'score1.gif'],
-      [26, 'score2.gif'],
-      [50, 'score2.gif'],
-      [51, 'score3.gif'],
-      [75, 'score3.gif'],
-      [76, 'score4.gif'],
-      [99, 'score4.gif'],
+      [1, 'score1.png'],
+      [25, 'score1.png'],
+      [26, 'score2.png'],
+      [50, 'score2.png'],
+      [51, 'score3.png'],
+      [75, 'score3.png'],
+      [76, 'score4.png'],
+      [99, 'score4.png'],
     ];
     for (const [percent, expected] of buckets) {
       expect(file(resultImageSrc(percent))).toBe(expected);
@@ -70,7 +70,27 @@ describe('resultImageSrc', () => {
   });
 
   it('procent poza zakresem nie wychodzi poza rejestr', () => {
-    expect(file(resultImageSrc(-5))).toBe('score0.gif');
-    expect(file(resultImageSrc(140))).toBe('score5.gif');
+    expect(file(resultImageSrc(-5))).toBe('score0.png');
+    expect(file(resultImageSrc(140))).toBe('score5.png');
+  });
+});
+
+describe('shouldPrefetchResult', () => {
+  it('milczy przez wiekszosc klipu', () => {
+    expect(shouldPrefetchResult(0, 150, 15)).toBe(false);
+    expect(shouldPrefetchResult(134.99, 150, 15)).toBe(false);
+  });
+
+  it('wlacza sie dokladnie na progu `endScreenAtSec - leadSec`', () => {
+    expect(shouldPrefetchResult(135, 150, 15)).toBe(true);
+  });
+
+  it('zostaje wlaczone po progu, takze po ekranie wyniku', () => {
+    expect(shouldPrefetchResult(149, 150, 15)).toBe(true);
+    expect(shouldPrefetchResult(200, 150, 15)).toBe(true);
+  });
+
+  it('dla krotkiej beatmapy prog wypada przed zerem, wiec pobiera od razu', () => {
+    expect(shouldPrefetchResult(0, 10, 15)).toBe(true);
   });
 });

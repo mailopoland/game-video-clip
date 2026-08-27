@@ -21,8 +21,16 @@ nigdzie zapisywane per gracz. Build produkcyjny wysyła **anonimową telemetrię
 ```bash
 npm ci
 npm run dev     # http://localhost:5173/
-npm test        # 280 testów, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
+npm test        # 294 testy, ~2 s, bez sieci — jedyna komenda weryfikacji regresji
 npm run build   # tsc --noEmit + vite build -> dist/
+```
+
+Skrypty jednorazowe (wynik jest w repo, uruchamiaj tylko po zmianie źródeł):
+
+```bash
+node scripts/optimize-assets.mjs   # images/ -> public/sprites/*.png, public/results/*.png (ADR-0027)
+node scripts/make-favicon.mjs      # -> public/favicon.png
+node scripts/make-icons.mjs        # -> public/icons/icon-{180,192,512}.png
 ```
 
 Wymaga Node ≥ 20.17.
@@ -272,12 +280,12 @@ z jednego źródła, więc napis i obrazek nie mogą się rozjechać:
 
 | Procent | Grafika |
 |---|---|
-| 0% | `score0.gif` |
-| 1–25% | `score1.gif` |
-| 26–50% | `score2.gif` |
-| 51–75% | `score3.gif` |
-| 76–99% | `score4.gif` |
-| 100% | `score5.gif` |
+| 0% | `score0.png` |
+| 1–25% | `score1.png` |
+| 26–50% | `score2.png` |
+| 51–75% | `score3.png` |
+| 76–99% | `score4.png` |
+| 100% | `score5.png` |
 
 **`PLAY AGAIN` nie ma własnego API w silniku ani nie przeładowuje strony** — woła
 `controls.seekTo(0)` + `controls.play()` na tych samych `TransportControls`, które
@@ -357,14 +365,14 @@ zamiast cichego pominięcia.
 const asset = (file: string) => `${import.meta.env.BASE_URL}sprites/${file}`;
 
 export const SPRITES: Record<string, Sprite> = {
-  hand: { kind: 'image', src: asset('hand-idle.gif'), hitSrc: asset('hand-hit.gif') },
+  hand: { kind: 'image', src: asset('hand-idle.png'), hitSrc: asset('hand-hit.png') },
 };
 
 export const HIT_SOUND_SRC = `${import.meta.env.BASE_URL}sounds/clap.mp3`;
 
 /** Indeks = kubelek procentowy ekranu wyniku (ADR-0025). */
 export const RESULT_IMAGES = [0, 1, 2, 3, 4, 5]
-  .map((i) => `${import.meta.env.BASE_URL}results/score${i}.gif`);
+  .map((i) => `${import.meta.env.BASE_URL}results/score${i}.png`);
 ```
 
 Wariant `kind: 'image'` ma opcjonalne `hitSrc` — grafikę pokazywaną wyłącznie w stanie
@@ -377,37 +385,67 @@ przez cały `FADE_OUT_MS`.
 **Wszystkie warianty graficzne (`src` i `hitSrc`) są preładowane raz, przy montażu UI**
 — `preloadSprites()` z `src/sprites.ts`, wołane na początku `createUi()`, czyli jeszcze
 przed bramką startową i odtwarzaniem. Wcześniej preładowany był wyłącznie `hitSrc`, a
-`src` pobierał się dopiero przy pierwszym montażu obiektu: `hand-idle.gif` waży ~200 kB,
-a pierwszy cel żyje ~2 s, więc na pierwszym przebiegu widać było pusty (ale klikalny)
-obiekt, a dłoń pojawiała się dopiero po przewinięciu w tył — gdy plik był już w cache.
+`src` pobierał się dopiero przy pierwszym montażu obiektu, a pierwszy cel żyje ~2 s:
+na pierwszym przebiegu widać było pusty (ale klikalny) obiekt, a dłoń pojawiała się
+dopiero po przewinięciu w tył — gdy plik był już w cache. Dziś oba warianty to razem
+79 kB, więc preload jest darmowy.
 
-Pliki leżą w `public/sprites/` (`hand-idle.gif`, `hand-hit.gif`) — animowane GIF-y,
-nie WebP: GIF ma 1-bitową przezroczystość (możliwa widoczna obwódka na krawędziach
-dłoni na tle wideo) i większy rozmiar (~200–224 kB zamiast ~20–60 kB), ale animowany
-WebP wymagałby narzędzia konwersji, którego projekt nie ma, i pobierania z internetu —
-poza ograniczeniami projektu. Świadomy kompromis, opisany w ADR-0011.
+### Format i rozdzielczość (ADR-0027)
+
+Pliki leżą w `public/sprites/` (`hand-idle.png`, `hand-hit.png`) — **PNG-8: paleta
+128 kolorów + `tRNS`**, po 512×512 px. Wcześniej były to GIF-y 1254×1254 po ~200 kB
+każdy; pomiar pokazał, że **żaden asset projektu nie jest animowany** (wszystkie mają
+jedną klatkę), a mediana `size` w beatmapie to 94, czyli ~200 px CSS przy scenie
+ograniczonej do 1280 px — sprite był pobierany w rozdzielczości ~6× większej, niż jest
+rysowany. Argument z ADR-0011 („animowany WebP wymagałby narzędzia konwersji”) nie miał
+więc do czego się odnosić.
+
+| | GIF (przedtem) | PNG-8 (teraz) |
+|---|---|---|
+| `hand-idle` | 1254×1254, 197 kB | 512×512, **35 kB** |
+| `hand-hit` | 1254×1254, 219 kB | 512×512, **43 kB** |
+| `start-manual` | 1672×941, 204 kB | 836×471, **52 kB** |
+
+**Alfa jest teraz 8-bitowa**, nie 1-bitowa — obwódka na krawędziach dłoni na tle wideo,
+opisana wcześniej jako znane ograniczenie, przestaje być możliwa. Zmierzony średni błąd
+kwantyzacji to 0,41 (idle) i 0,68 (hit) w skali 0–255, a prostokąt otaczający grafikę
+zgadza się ze źródłem w granicach 0,1% ramki sprite'a — **żadna współrzędna beatmapy
+nie wymagała migracji**.
+
+Pliki generuje `node scripts/optimize-assets.mjs` ze **źródeł w `images/`** (nie z tego,
+co leży w `public/` — inaczej każde uruchomienie kwantyzowałoby wynik poprzedniego).
+Skrypt ma własny dekoder GIF/PNG i enkoder PNG na `node:zlib`, dokładnie tak jak
+`scripts/make-icons.mjs`: **zero zależności npm i nic nie pobierane z internetu**.
+Odmawia konwersji GIF-a wieloklatkowego, zamiast po cichu wziąć pierwszą klatkę.
 
 ### Grafiki ekranu wyniku
 
-`RESULT_IMAGES` (6 plików w `public/results/`, `score0.gif` … `score5.gif`) —
+`RESULT_IMAGES` (6 plików w `public/results/`, `score0.png` … `score5.png`, 512×768) —
 kolejność tablicy jest kontraktem: `resultImageSrc()` indeksuje ją wprost.
-`preloadResultImages()` jest wołane **w `onStart` (`src/game.ts`), nie przy montażu
-UI** — ~0,5 MB nie ma konkurować z buforowaniem wideo przed startem, a przez czas
-trwania klipu pobiera się z dużym zapasem.
+
+**Pobierana jest jedna grafika, nie sześć (ADR-0027).** Do niedawna
+`preloadResultImages()` ściągało w `onStart` wszystkie sześć plików (~0,5 MB), mimo że
+pokazywany jest dokładnie jeden. Teraz `src/game.ts` woła `preloadResultImage(src)`
+w pętli klatek, gdy spełnione są dwa warunki:
+
+- `shouldPrefetchResult(view.timeSec, beatmap.endScreenAtSec, RESULT_PREFETCH_LEAD_SEC)`
+  — czyli jesteśmy najwyżej **15 s** przed ekranem wyniku (stała w `src/game.ts`);
+- kubełek procentowy różni się od ostatnio pobranego.
+
+Kubełek liczy to samo `resultPercent()`, którego używa renderer, więc pobrany plik to
+dokładnie ten, który za chwilę zobaczy gracz. W ostatnich 15 s wynik jest praktycznie
+ustalony, więc w praktyce leci **jeden** plik (~70 kB); jeśli gracz jeszcze przeskoczy
+próg, drugie pobranie kosztuje jeden plik, nie sześć.
+
+⚠️ Konsekwencja: skok suwakiem prosto na koniec klipu może pokazać grafikę z ~100 ms
+opóźnieniem — wcześniej wszystkie sześć było już w cache.
 
 Źródła to `images/score0.png` … `score5.png` (1024×1536, 32-bit ARGB, ~1,7 MB każdy).
-GIF-y powstały jednorazowo, lokalnie, przez `ffmpeg` — **nic nie jest pobierane
-z internetu i nie doszła żadna zależność npm**:
-
-```bash
-for i in 0 1 2 3 4 5; do
-  ffmpeg -i images/score$i.png -filter_complex     "scale=-1:768:flags=lanczos,split[a][b];     [a]palettegen=max_colors=255:reserve_transparent=1[p];     [b][p]paletteuse=alpha_threshold=128:dither=sierra2_4a"     -y public/results/score$i.gif
-done
-```
-
-`reserve_transparent=1` + `alpha_threshold=128` zachowują przezroczyste tło —
-1-bitowo, tak samo jak przy sprite'ach dłoni (ADR-0011). Wynik: ~83–96 kB na plik,
-540 kB łącznie.
+`node scripts/optimize-assets.mjs` czyta je **wprost** i zapisuje PNG-8 512×768
+(paleta 128 kolorów + `tRNS`), ~61–75 kB na plik. Poprzednia wersja szła przez
+pośredni GIF robiony w `ffmpeg`; pominięcie tego kroku usuwa jedną kwantyzację
+i narzędzie spoza projektu — zmierzony średni błąd względem oryginału spadł
+z **6,0–7,5 do 3,1–3,8** przy pliku o ~25% mniejszym.
 
 Rejestr wspiera też `kind: 'css'` (czyste CSS, `clip-path` + gradient, zero plików
 binarnych) — to ścieżka z v1 (ADR-0005), obecnie nieużywana, ale renderer (`render.ts`)
@@ -486,14 +524,14 @@ szans zadziałać. Na drodze zapasowej zostaje `el.volume = min(1, getReferenceV
       <button class="obj">    <!-- pointer-events: auto -->
         <img class="sprite">  <!-- src podmieniany na hitSrc przy outcome === 'hit' -->
         <span class="feedback">
-    <div class="gate">…</div> <!-- bramka startowa: <button.gate-button> z <img.gate-image> (sprites/start-manual.gif) -->
+    <div class="gate">…</div> <!-- bramka startowa: <button.gate-button> z <img.gate-image> (sprites/start-manual.png) -->
     <section class="results">  <!-- ekran wyniku (ADR-0025): kolumna z liczbami + grafika -->
       <div class="results-panel">
         <p class="results-score"><span id="r-score">…</span> / <span id="r-total">…</span></p>
         <p class="results-percent" id="r-percent">…</p>
         <button class="results-again" id="r-again"><span>PLAY AGAIN</span><svg class="icon">…</svg></button>
       </div>
-      <img class="results-image" id="r-image"> <!-- scoreN.gif wybrany z procentu -->
+      <img class="results-image" id="r-image"> <!-- scoreN.png wybrany z procentu -->
   </main>
   <div class="transport">     <!-- PIONOWA kolumna po PRAWEJ stronie sceny: play/pauza, pionowy suwak, (ukryty czas), wyciszenie, punkty, dlon (ADR-0023) -->
     <button id="transport-play" data-icon="play|pause"><svg class="icon">…</svg></button>
@@ -901,14 +939,14 @@ dodaniu do ekranu początkowego i wygląd ikony na iOS.
 ### Favikona karty przeglądarki
 
 Tytuł karty to `Music Video Slap Game` (`<title>` w `index.html`). Favikona
-(`public/favicon.png`, 64×64, RGBA) to sprite ręki w stanie **po trafieniu**
-(`public/sprites/hand-hit.gif`, ADR-0011) — zamiast celu, żeby ikona karty
-kojarzyła się z akcją gry, a nie z abstrakcyjnym symbolem. Wygenerowana przez
-`scripts/make-favicon.mjs`: własny dekoder GIF (LZW) + downscale ważony alfą +
-ten sam enkoder PNG na `node:zlib` co `make-icons.mjs`, więc bez nowej
-zależności i bez pobierania niczego z internetu. Skrypt jest jednorazowy —
-`public/favicon.png` jest w repo; uruchamiaj go ponownie tylko po zmianie
-`hand-hit.gif`.
+(`public/favicon.png`, 64×64, PNG-8) to sprite ręki w stanie **po trafieniu**
+(`images/unicolor-hand-with-sound-no-bg.gif`, ADR-0011) — zamiast celu, żeby ikona
+karty kojarzyła się z akcją gry, a nie z abstrakcyjnym symbolem. Wygenerowana przez
+`scripts/make-favicon.mjs`, który od ADR-0027 jest **dziesięciolinijkową nakładką na
+`scripts/optimize-assets.mjs`** — wcześniej miał własną, równoległą kopię dekodera GIF
+i enkodera PNG (~290 linii). Nadal bez nowej zależności i bez pobierania czegokolwiek
+z internetu. Skrypt jest jednorazowy — `public/favicon.png` jest w repo; uruchamiaj go
+ponownie tylko po zmianie źródłowej grafiki.
 
 ---
 
@@ -920,7 +958,7 @@ zależności i bez pobierania niczego z internetu. Skrypt jest jednorazowy —
 - **Bramka startowa jest wymuszona technicznie:** przeglądarki blokują
   odtwarzanie z dźwiękiem bez gestu użytkownika, a `autoplay=1` tego nie omija.
   Bramka nie ma napisu ani osobnej podpowiedzi — całą treść (instrukcja „klik →
-  +1" i „tap to start") niesie jedna grafika `public/sprites/start-manual.gif`
+  +1" i „tap to start") niesie jedna grafika `public/sprites/start-manual.png`
   w `<img class="gate-image">`, a `<button class="gate-button">` jest tylko
   przezroczystym obszarem klikalnym wokół niej. Przycisk jest wyłączony
   (przygaszony, `aria-label="Ladowanie…"`) do `onReady` playera.
@@ -1115,7 +1153,7 @@ zamiast być zablokowane (patrz wyżej).
 
 ## Testy
 
-`npm test` — **280 testów, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
+`npm test` — **294 testy, jedyna komenda potrzebna do weryfikacji regresji.** Bez sieci,
 bez prawdziwego YouTube, deterministyczne.
 
 | Plik | Zakres |
@@ -1125,14 +1163,15 @@ bez prawdziwego YouTube, deterministyczne.
 | `tests/path.test.ts` | 7 testów `samplePath` (środowisko `node`, bez jsdom): jeden punkt, przytrzymanie przed pierwszym/za ostatnim punktem, trafienie dokładnie w punkt (też środkowy), lerp `x`/`y`/`size` naraz w połowie segmentu, wybór właściwego segmentu przy 3 punktach, segmenty o różnej długości czasowej liczone względem własnej długości. |
 | `tests/engine.test.ts` | 25 testów logiki: spawn dokładnie od `path[0].t`, klik w dowolnym momencie okna aktywności (start/środek/tuż przed despawnem) = trafienie, brak kliku do despawnu = pudło, drugi klik bez efektu, klik przed spawnem ignorowany, pauza (10 s zegara ściennego → zero zmian), wznowienie bez fałszywego seeka, seek w tył i w przód, celność, interpolacja czasu, odporność na szum odczytu, interpolacja ścieżki ruchu (`getView()` w połowie segmentu, zamrożenie pozycji na pauzie, pozycja po seeku w tył bez dryfu), `total` w `getStats()` równe liczbie wszystkich obiektów beatmapy i niezależne od trafień oraz pudeł (ADR-0025). |
 | `tests/beatmap.test.ts` | Walidacja (w tym `path` z mniej niż dwoma punktami, pusta/brak `path`, `t` nierosnące/zduplikowane/`NaN`, `x`/`y`/`size` poza zakresem w punkcie ścieżki, sortowanie po `path[0].t`) + sprawdzenie beatmapy produkcyjnej wobec rejestru sprite'ów, że produkcyjna beatmapa faktycznie używa każdego sprite'a z rejestru, że wskazuje `5OyTxEbT-fM`, że nie odwołuje się już do usuniętych kluczy `guy`/`girl` i że każdy obiekt ma `path` z co najmniej dwoma punktami. |
-| `tests/smoke.test.ts` | jsdom: bramka startowa pokazuje `#gate-image` ze źródłem `sprites/start-manual.gif`, nie ma `.gate-hint` ani napisu w przycisku, a klik w grafikę chowa bramkę, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), `.frame` obejmuje scenę i pasek transportu. **Ekran wyniku (ADR-0025):** `#r-score`/`#r-total`/`#r-percent` zgodne ze statystykami (1 trafienie z 2 celów → `1` / `2` / `50%`), `#r-image` ze źródłem `results/score2.gif` dla 50%, brak polskich napisów w `#results` (`Koniec`, `pkt`, `Trafienia`, `Pudla`, `Celnosc`) przy obecnym `PLAY AGAIN`, przycisk zawiera `svg.icon` a nie glif `⟳` (regresja iOS), `#r-again` jest `disabled` przed `enableTransport` i odblokowany po nim, a klik woła `seekTo(0)` **i** `play()`. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego **tylko pauzuje i tylko w oknie 5 s od ruszenia odtwarzania** — przed startem odtwarzania i po upływie okna nie woła ani `play()`, ani `pause()`, a okno odnawia się po wznowieniu (osobny test). Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
+| `tests/smoke.test.ts` | jsdom: bramka startowa pokazuje `#gate-image` ze źródłem `sprites/start-manual.png`, nie ma `.gate-hint` ani napisu w przycisku, a klik w grafikę chowa bramkę, tap → `+1` i HUD, sprite obrazkowy renderuje się jako `<img>` ze źródłem z rejestru, trafienie podmienia `img.src` na wariant `hitSrc`, pudło (despawn bez kliku) zostawia wariant idle i pokazuje `✕`, `size` z punktu ścieżki skaluje `width` obiektu względem bazowych 16%, `left`/`top`/`width` zmieniają się między klatkami wraz z upływem czasu wideo, ścieżka statyczna (dwa punkty w tym samym miejscu) trzyma pozycję mimo upływu czasu, pauza → zero celów w DOM, preload obu wariantów sprite'a przy montażu UI (przed startem odtwarzania), `.frame` obejmuje scenę i pasek transportu. **Ekran wyniku (ADR-0025):** `#r-score`/`#r-total`/`#r-percent` zgodne ze statystykami (1 trafienie z 2 celów → `1` / `2` / `50%`), `#r-image` ze źródłem `results/score2.png` dla 50%, brak polskich napisów w `#results` (`Koniec`, `pkt`, `Trafienia`, `Pudla`, `Celnosc`) przy obecnym `PLAY AGAIN`, przycisk zawiera `svg.icon` a nie glif `⟳` (regresja iOS), `#r-again` jest `disabled` przed `enableTransport` i odblokowany po nim, a klik woła `seekTo(0)` **i** `play()`. Osobny blok **„pasek transportu" (ADR-0019)**: guziki i suwak `disabled` przed `enableTransport`, odblokowanie po jego wywołaniu, klik play woła `play()`/`pause()` zależnie od ostatnio wyrenderowanego `frozen`, `render()` ustawia wartość suwaka i etykietę czasu z `view.timeSec` + `getDuration()`, `getDuration()` zwracające `0` jest odpytywane co klatkę aż do pierwszej dodatniej wartości i potem już nie, `input` na suwaku wstrzymuje aktualizację z `render()` bez wołania `seekTo`, `change` woła `seekTo` z wartością suwaka, mute przełącza `setMuted` i aktualizuje `aria-pressed`/etykietę, `data-icon` przycisku mute odzwierciedla stan dźwięku (`sound-on` / `sound-off`) już od pierwszej klatki, przed `enableTransport`, ikona play przechodzi w `pause` wraz z wyrenderowanym stanem odtwarzania, obie ikony są inline SVG (`svg.icon` z `viewBox="0 0 24 24"` i `<path>`, pusty `textContent` — regresja glifów Unicode niewidocznych na iOS), klik w play przy widocznej bramce startuje grę (chowa `.gate`, woła `onStart`) zamiast wołać `play()`, a dopiero drugi klik przełącza odtwarzanie, to samo dla `.yt-button-proxy`, oraz klik w play nie robi nic, dopóki `setStartEnabled(false)`. Osobne testy warstw ADR-0019: `.shield` i `.yt-button-proxy` istnieją w DOM w kolejności `.player` → `.shield` → `.yt-button-proxy` → `.overlay`; `.shield` jest bezstanowa (klasa nie zmienia się przy pauzie ani odtwarzaniu, czyli kadr nie jest zasłaniany); `.yt-button-proxy` jest `disabled` do `enableTransport` i odblokowuje się po nim, a klik w niego **tylko pauzuje i tylko w oknie 5 s od ruszenia odtwarzania** — przed startem odtwarzania i po upływie okna nie woła ani `play()`, ani `pause()`, a okno odnawia się po wznowieniu (osobny test). Realne blokowanie dotyku i geometria `--player-overscan` nie są pokryte — jsdom nie liczy layoutu. |
 | `tests/youtube.test.ts` | jsdom + atrapa `window.YT.Player`: `playerVars` zawiera `controls: 0`, `disablekb: 1`, `fs: 0`, `playsinline: 1`, `rel: 0` (ADR-0019); `setMuted(false)` woła `unMute()` **i** `setVolume(100)`, `setMuted(true)` woła `mute()`; `isMuted()` i `getDuration()` proxują na player; `seekTo(sec)` proxuje na `player.seekTo(sec, true)` (absolutny, obok `seekBy` dla trybu dev). |
 | `tests/sound.test.ts` | jsdom + atrapa `HTMLAudioElement` wstrzyknięta przez `make`: trafienie → dokładnie jedno `play()`, klik przed spawnem i despawn bez kliknięcia → zero `play()`, drugi tap w ten sam cel → nadal jedno, seek w tył przez trafiony cel + seek w przód → zero dodatkowych, dwa szybkie trafienia → dwa różne elementy puli (round-robin), `unlock()` dotyka każdego elementu puli, głośność proporcjonalna do `getReferenceVolume()` w ścieżce zapasowej bez Web Audio (jsdom go nie implementuje, więc podwojenie przez `GainNode` nie jest pokryte testem — wymaga weryfikacji w przeglądarce), `describe()` raportuje tryb i stan elementu, przyczynę odrzuconego `play()` oraz licznik odblokowanych elementów puli. Osobny blok na ścieżkę Web Audio z ADR-0017 (podstawiony `AudioContext`, bo jsdom go nie ma): `unlock()` wznawia kontekst i dekoduje bufor, po zdekodowaniu `play()` nie dotyka już puli `<audio>`, `gain` przekracza 1.0, każde trafienie dostaje własny `AudioBufferSourceNode`, nieudane dekodowanie spada na drogę zapasową z przyczyną w `describe()`, powtórny `unlock()` nie tworzy drugiego kontekstu, `prefetch()` pobiera plik **bez** tworzenia `AudioContext`, `unlock()` po `prefetch()` nie pobiera drugi raz, nieudany `prefetch()` nie blokuje ponowienia w `unlock()`. |
 | `tests/rdp.test.ts` | 7 testów `simplifyPath` (`node`, ADR-0016): dwupunktowa ścieżka bez zmian, redukcja punktów kolinearnych, pierwszy/ostatni punkt zawsze zachowane, **przystanek w środku odcinka prostego nie jest usuwany** (metryka czasowa, nie przestrzenna — to kluczowa różnica względem klasycznego RDP), tolerancja respektowana w obie strony, pojedynczy punkt bez zmian. |
+| `tests/optimize-assets.test.ts` | `node`, ADR-0027: czyste funkcje generatora assetów — `resizeBox` (uśrednia blok pikseli; **nie wciąga koloru pikseli w pełni przezroczystych**, czyli premultiplikacja działa i sprite nie dostaje ciemnej obwódki), `quantize` (zwraca wszystkie kolory poniżej limitu, nigdy nie przekracza limitu, zawsze zostawia w palecie kolor w pełni przezroczysty), `indexImage` (mapuje na najbliższy wpis palety i raportuje zerowy błąd przy trafieniu idealnym), `encodeIndexedPng` (sygnatura i nagłówek obrazu indeksowanego 8-bitowego, `PLTE`, `tRNS` przycięty do ostatniego wpisu z alfą < 255, `IDAT` po rozpakowaniu to scanline z filtrem 0 i tymi samymi indeksami, paleta > 256 kolorów odrzucona). |
 | `tests/dev-record.test.ts` | `node`, ADR-0016/ADR-0018: `toOverlayPercent` (konwersja px→%, round-trip z formułą renderera, clamping poza rectem, rect zerowy z jsdom), `pushSample` (odrzucanie `t` nierosnącego), `buildPath` (bardzo krótki klik → 2 punkty odległe o 0,25 s, brak próbek → `null`, dłuższa ścieżka upraszczana przez RDP), `nextObjectId` (kolizje z sufiksem), `insertObject`/`removeObject` (sortowanie po `path[0].t`, wynik przechodzi `validateBeatmap`), `Engine.setObjects` (dodany obiekt z przeszłości trafialny po seeku bez ruszania punktacji — rośnie wyłącznie `total`, usunięcie kasuje wynik ze statystyk), `updatePathPoint` (w tym modyfikacja `t`), `formatClock` (poniżej/powyżej minuty, dwucyfrowe minuty, zaokrąglanie setnych w górę, zero, wartości ujemne clampowane do `0:00.00`). |
 | `tests/dev-mode.test.ts` | jsdom, ADR-0016: zaznaczenie checkboxa ustawia najniższe dostępne tempo i z powrotem 1× po odznaczeniu, prawy-drag przez kilka klatek tworzy obiekt o rosnących `t` którego payload przechodzi `validateBeatmap` i trafia do podstawionego `fetch`, podgląd ręki w DOM w trakcie nagrania i zniknięcie po puszczeniu, prawy klik w istniejący obiekt usuwa go bez startu nagrania i bez punktu, lewy klik nadal trafia (brak regresji na `button !== 0`), `contextmenu` jest `preventDefault` tylko przy aktywnym trybie, guzik „Test dzwieku" woła `playHitSound` i po 400 ms wpisuje `describeHitSound()` do paska statusu — także przy odznaczonym checkboxie. |
 | `tests/dev-hand-editor.test.ts` | jsdom: 3 testy `Ui.setHandSelection` (tworzenie pierścienia z uchwytem, aktualizacja bez duplikatu, usunięcie po `null`) + `mountDevHandEditor` (tryb edycji punktów ścieżki): aktywacja woła `pause()`, klik w obiekt pokazuje panel z wierszem na punkt (pola `t`/`x`/`y`/`size` z wartościami punktu) i pierścień zaznaczenia, `.dev-time-display` widoczny wyłącznie gdy tryb aktywny i pokazuje `formatClock(timeSec)`, klik przycisku `#<indeks>` w wierszu panelu woła `seekBy(point.t - timeSec)` i zaznacza wyłącznie ten wiersz, drag ręki przed wyborem punktu z listy to no-op, drag po wyborze zmienia `x`/`y` wyłącznie wybranego punktu, drag uchwytu skaluje `size` proporcjonalnie do zmiany odległości od środka, edycja pola `x`/`y`/`size` w panelu zapisuje się natychmiast po `change`, edycja `t` przesuwa punkt gdy zachowuje rosnącą kolejność, edycja `t` naruszająca kolejność jest odrzucana i pole wraca do poprzedniej wartości, `+` między punktami wypełnia wiersz roboczy bieżącym czasem wideo i zinterpolowaną pozycją zaznaczonego obiektu i od razu dopisuje nowy punkt (posortowany po `t`), nowy punkt z `t` kolidującym z istniejącym (bieżący czas równy punktowi) jest odrzucany bez zmiany beatmapy, a pola wiersza roboczego zostają wypełnione bieżącymi wartościami do poprawki, `−` usuwa punkt natychmiast przy więcej niż 2 punktach, a na ścieżce z dokładnie 2 punktami usuwa cały obiekt zamiast być zablokowany, guzik `.dev-edit-panel-delete-point` ("Usuń punkt") pod nagłówkiem panelu jest ukryty bez wybranego punktu, widoczny i klikalny po wybraniu (usuwa punkt, a na ścieżce z 2 punktami cały obiekt — nigdy nie jest `disabled`), brak jakiejkolwiek interakcji gdy silnik nie jest zamrożony (odtwarzanie), każdy zapisany payload przechodzi `validateBeatmap`, klik na pustym miejscu chowa panel i usuwa pierścień, koalescencja zapisu — kilka `pointermove` przed jednym `onFrame()` dają co najwyżej jeden `fetch`, a nierozwiązany `fetch` blokuje kolejny do jego zakończenia. |
-| `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr). |
+| `tests/result-image.test.ts` | `node`, ADR-0025: `resultPercent` (pusta beatmapa bez dzielenia przez zero, `0/10 → 0`, `10/10 → 100`, `1/1000 → 1` a nie 0, `999/1000 → 99` a nie 100, `1/8 → 13`, `5/10 → 50`, mianownikiem są wszystkie cele) i `resultImageSrc` (obie skrajne grafiki zarezerwowane, wszystkie granice kubełków `1/25/26/50/51/75/76/99`, każdy z 6 plików rejestru osiągalny, procent poza zakresem nie wychodzi poza rejestr) oraz `shouldPrefetchResult` (ADR-0027: milczy przez większość klipu, włącza się dokładnie na progu `endScreenAtSec - leadSec`, zostaje włączone po ekranie wyniku, a przy beatmapie krótszej niż `leadSec` pobiera od razu). |
 | `tests/telemetry.test.ts` | jsdom, ADR-0026: **cykl zdarzeń** (`visit`/`gate_click` po jednym razie, klatki przed bramką bez skutku, zamrożone klatki po `gate_click` **nie** dają `play_start` — regresja pre-rolla, pierwsza żywa klatka daje `play_start` z `play_no = 1`, `showResults` daje `finish` **raz** mimo gaśnięcia i ponownego zapalenia ekranu wyniku, `finish` niesie snapshot statystyk odporny na późniejszą zmianę, `accuracy` zaokrąglone do dwóch miejsc, `showResults` bez `play_start` nie daje `finish`); **wiele rozgrywek** (`PLAY AGAIN` → nowy `play_id` i `play_no = 2`, druga rozgrywka ma własny `finish`, `play_no` rośnie między instancjami na wspólnym storage, `visitor_id` stabilny, storage rzucający przy każdym dostępie i brak storage w ogóle nie wywracają telemetrii); **flaga `seeked`** (przewinięcie w trakcie gry zapala ją, gra bez przewijania nie, `seek(0)` przy zamkniętej rozgrywce to restart i nie brudzi następnej gry, `seek(90)` przy zamkniętej przechodzi na następną, seek przed pierwszą rozgrywką przechodzi na nią); **`pagehide`** (porzucenie daje `abandon` ze snapshotem, po `finish` zero `abandon`, bez rozgrywki zero, dwa `pagehide` dają jeden); **tożsamości** (`getVisitorId` zapisuje i odczytuje, odrzuca wartość o złym kształcie, `nextPlayNo` liczy od 1 i ignoruje śmieci); **transport** (URL, `apikey`, `Authorization`, `Content-Type`, `Prefer: return=minimal`, `keepalive: true`, ciało jako tablica jednego wiersza, odrzucone `fetch` / rzucające synchronicznie / HTTP 500 / brak `fetch` w środowisku — żadne nie rzuca); **integracja** na `mountGame` + `FakeClock` (pełny przebieg daje `visit, gate_click, play_start, finish` z wynikiem, `gate_click` nie leci przed tapnięciem bramki, a `send` rzucający na każdym zdarzeniu **nie przerywa pętli gry ani nie psuje punktacji**). |
 | `tests/beatmap-store.test.ts` | `node`: `createBeatmapStore` — `get()` zwraca ostatnio ustawioną przez `set()` wartość, `set()` nadpisuje w całości, dwie niezależne instancje nie dzielą stanu. |
 | `tests/dev-mode-exclusivity.test.ts` | jsdom, ADR-0018: wzajemna wyłączność trybów przez `BeatmapStore` współdzielony między `mountDevRecorder` i `mountDevHandEditor` — aktywacja rekordera odznacza i blokuje checkbox edytora (i odwrotnie), aktywacja rekordera w trakcie zaznaczenia w edytorze czyści pierścień i chowa panel edytora, aktywacja edytora w trakcie trwającego nagrania czyści podgląd ręki rekordera, zmiany zrobione w trybie edycji są widoczne przez `store.get()` po przełączeniu na nagrywanie (współdzielona beatmapa w pamięci, nie prywatna kopia per moduł). |
@@ -1146,9 +1185,77 @@ nie dotyka DOM.
 
 ---
 
+## Waga strony i ładowanie (ADR-0027)
+
+Cała rozgrywka to jeden statyczny plik HTML plus assety, więc „szybciej” znaczy tu
+przede wszystkim „mniej bajtów i wcześniej zamówionych”.
+
+| | Przed | Po |
+|---|---|---|
+| transfer przed kliknięciem „graj” | 687 kB | **195 kB** |
+| grafiki ekranu wyniku | 540 kB (6 plików) | **~70 kB (1 plik)** |
+| **transfer na rozgrywkę** | **~1,23 MB** | **~265 kB** |
+| `dist/` | 1327 kB | **694 kB** |
+| bundle JS | 53,6 kB / 20,3 kB gz | **38,2 kB / 12,8 kB gz** |
+
+Składa się na to pięć rzeczy — obrazki opisane są wyżej ([Sprite'y](#sprite-y),
+[Grafiki ekranu wyniku](#grafiki-ekranu-wyniku)), tu reszta:
+
+**1. Precyzja liczb w beatmapie.** Nagrywarka trybu dev zapisywała `x`/`y`/`size`
+z pełną precyzją `double` (`369.78086106996847`). Wartości są zaokrąglone do dwóch
+miejsc (`size` do jednego): **62,2 → 27,8 kB pliku, 12,4 → 5,1 kB po gzipie**, a że
+beatmapa jest importowana statycznie, to wprost tyle mniej w bundlu. 0,01% szerokości
+sceny to ~0,13 px, więc różnicy nie da się zobaczyć. Zaokrąglanie **nie może** złamać
+warunku ściśle rosnącego `t` z `validateBeatmap`: przy kolizji punkt środkowy (odstęp
+< 10 ms, nic nie wnoszący do interpolacji) jest usuwany, a ostatni punkt ścieżki —
+nigdy, bo to despawn i koniec okna klikalności. Przy obecnej beatmapie wypadły 4 punkty
+z 378.
+
+**2. Podpowiedzi zasobów w `index.html`.** `preconnect` do `www.youtube.com`
+i `i.ytimg.com` oraz `dns-prefetch` do `googlevideo.com`: player powstaje dopiero, gdy
+wykona się bundle, więc DNS i TLS startowały kilkaset ms później, niż musiały.
+Do tego `preload` grafiki bramki (`as="image"`, `fetchpriority="high"`) — to pierwsza
+rzecz, którą widać, a przeglądarka odkrywała ją dopiero po wykonaniu `render.ts`.
+Ścieżka jest **względna**, tak samo jak przy manifeście i ikonach, bo build siedzi
+w podścieżce `/game-video-clip/`.
+
+**3. `vite.config.ts`.** `build.modulePreload.polyfill: false` — build produkcyjny nie
+ma dynamicznych importów (`src/dev/*` jest wycinane), więc Vite nie emituje żadnego
+`<link rel="modulepreload">` i polyfill byłby martwym kodem. `json.stringify: true` —
+beatmapa trafia do bundla jako `JSON.parse('…')` zamiast literału obiektowego JS;
+parser JSON jest przy takiej ilości danych wyraźnie szybszy, co widać na starcie
+na telefonie. (`assetsInlineLimit` nic by tu nie dało — wszystkie assety leżą
+w `public/`, które Vite kopiuje bez przetwarzania.)
+
+**4. Idempotentne zapisy w `render()`.** Wartość suwaka, etykieta czasu i licznik
+punktów były zapisywane do DOM **co klatkę**, choć zmieniają się dużo rzadziej (suwak
+ma krok 0,1 s, zegar tyka raz na sekundę, punkty rosną tylko przy trafieniu). Teraz
+każdy z tych trzech zapisów jest porównywany z ostatnim — ten sam wzorzec, co
+`setIcon()` i `syncMuteIcon()`. Zachowanie bez zmian, mniej pracy stylowania na klatkę.
+
+**Czego świadomie nie ruszono** (pomiar mówi, że to nie jest problem):
+
+- **`left`/`top`/`width` w procentach zamiast `transform`** — jednocześnie widoczne są
+  najwyżej **3 obiekty** (policzone z beatmapy), więc koszt layoutu jest poniżej progu
+  mierzalności. Do tego `translate` w procentach odnosi się do własnego boksu elementu,
+  więc wymagałoby przeliczeń w px i groziło rozjazdem z współrzędnymi beatmapy.
+- **`filter: drop-shadow` na sprite** — daje wygląd, a przy trzech elementach kosztuje
+  tyle co nic.
+- **`clap.mp3` (62 kB)** — obcięcie ogona wymagałoby odsłuchu, a profil bitrate'u
+  (~85–90 kbps do samego końca) pokazuje, że to nie jest cisza.
+- **`images/` i `sounds/` (24 MB źródeł w repo)** — nie trafiają do `dist/`, a usunięcie
+  i tak nie zmniejszyłoby historii gita. Są za to **źródłem** dla generatora assetów.
+- **Content-hashing plików z `public/`** — GitHub Pages wysyła `max-age=600` na
+  wszystko, więc nic by to nie dało.
+- **Odłożenie iframe'a YouTube do kliknięcia bramki (fasada)** — patrz ADR-0027,
+  sekcja „Rozważone i odrzucone”: zagraża autoplayowi i `AudioContext` na iOS.
+
+---
+
 ## Build i deploy
 
-`npm run build` → `dist/` (~9 kB JS + 3 kB CSS przed gzipem). Przy buildzie
+`npm run build` → `dist/` (**694 kB łącznie**: 38 kB JS / 12,8 kB po gzipie, 7,7 kB CSS,
+reszta to assety — po ADR-0027 zamiast 1327 kB). Przy buildzie
 `vite.config.ts` ustawia `base: '/game-video-clip/'` pod GitHub Pages — **zmień to,
 jeśli repozytorium nazywa się inaczej**, bo inaczej wyjdzie biała strona z 404 na assetach.
 
@@ -1201,12 +1308,11 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
   cele beatmapy nigdy się nie pojawią. Wymaga jednego ręcznego uruchomienia `npm run dev`.
 - **1-bitowa przezroczystość GIF-ów ekranu wyniku (ADR-0025)** — poświata wokół
   postaci jest w źródłowych PNG-ach miękka, a GIF potrafi tylko „jest/nie ma".
-  Skrajna klatka `score5.gif` została obejrzana na ciemnym tle (bez czarnego
+  Skrajna klatka `score5.png` została obejrzana na ciemnym tle (bez czarnego
   prostokąta i bez obwódki), ale **cały ekran wyniku na tle prawdziwego kadru wideo
   nie był weryfikowany w przeglądarce** — wymaga jednego ręcznego `npm run dev`.
-- **Obwódka GIF-a na krawędziach dłoni** — 1-bitowa przezroczystość `hand-idle.gif` /
-  `hand-hit.gif` może dać widoczną krawędź na tle konkretnego wideo. Niezweryfikowane
-  wizualnie.
+- ~~**Obwódka GIF-a na krawędziach dłoni**~~ — nieaktualne od ADR-0027: sprite'y są
+  PNG-ami z 8-bitową alfą, więc 1-bitowa maska GIF-a nie ma już jak zrobić krawędzi.
 - **Wzmocnienie głośności klapsa przez `GainNode` (ADR-0013, ADR-0017) jest
   niezweryfikowane w prawdziwej przeglądarce.** `jsdom` nie implementuje Web Audio
   API, więc `AudioContext` w testach jest **podstawiony** — pokryte jest to, że
@@ -1289,8 +1395,10 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
 |---|---|
 | zmienić momenty/ścieżkę/rozmiar celów | `src/data/beatmap.json` |
 | zmienić sposób interpolacji ścieżki (np. Catmull-Rom) | `src/engine/path.ts` |
-| podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ plik w `public/sprites/`) |
-| podmienić grafiki ekranu wyniku / zmienić progi procentowe | `src/sprites.ts` (`RESULT_IMAGES`) + pliki w `public/results/`; progi w `src/ui/result-image.ts` |
+| podmienić sprite / dodać wariant hit | `src/sprites.ts` (+ wpis w `TASKS` w `scripts/optimize-assets.mjs` i źródło w `images/`) |
+| podmienić grafiki ekranu wyniku / zmienić progi procentowe | `src/sprites.ts` (`RESULT_IMAGES`) + `TASKS` w `scripts/optimize-assets.mjs`; progi w `src/ui/result-image.ts` |
+| zmienić rozdzielczość albo liczbę kolorów assetu | `TASKS` w `scripts/optimize-assets.mjs` (ADR-0027), potem `node scripts/optimize-assets.mjs` |
+| zmienić moment pobrania grafiki wyniku | `RESULT_PREFETCH_LEAD_SEC` w `src/game.ts` (ADR-0027) |
 | podmienić dźwięk trafienia | `src/sprites.ts` (`HIT_SOUND_SRC`) + plik w `public/sounds/` |
 | zmienić rozmiar puli / logikę odtwarzania dźwięku | `src/ui/sound.ts` |
 | zmienić zasady trafiania/punktacji | `src/engine/engine.ts` |
@@ -1344,3 +1452,4 @@ Każda istotna decyzja ma ADR w `docs/decisions/`:
 | [0024](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) | Zegar treści kontra zegar reklamy — adapter nie wpuszcza czasu reklamy do silnika (zastępuje ADR-0022) |
 | [0025](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md) | Bezsłowny ekran wyniku: procent z całej beatmapy, grafika zamiast napisów, restart przez `seekTo(0)` |
 | [0026](docs/decisions/ADR-0026-telemetria-w-supabase.md) | Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu, keepalive cronem |
+| [0027](docs/decisions/ADR-0027-assety-png8-generowane-skryptem.md) | Assety jako PNG-8 generowane własnym skryptem, w rozdzielczości wyświetlania; jedna grafika wyniku zamiast sześciu |

@@ -15,12 +15,24 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#101014" />
     <link rel="manifest" href="manifest.webmanifest" />
-    <!-- Favikona: reka w stanie po trafieniu (public/sprites/hand-hit.gif),
-         wygenerowana proceduralnie przez scripts/make-favicon.mjs. -->
+    <!-- Favikona: reka w stanie po trafieniu, wygenerowana ze zrodla w images/
+         przez scripts/make-favicon.mjs (ADR-0027). -->
     <link rel="icon" type="image/png" href="favicon.png" />
     <!-- iOS ignoruje `icons` z manifestu przy dodawaniu do ekranu poczatkowego —
          bez tej linii robi ikone ze zrzutu strony. -->
     <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
+    <!-- Player YouTube jest tworzony dopiero przez bundle, wiec DNS + TLS do
+         youtube.com zaczynalyby sie kilkaset ms pozniej niz musza. preconnect
+         zdejmuje to z drogi krytycznej; googlevideo (strumien wideo) jest
+         wybierane dopiero przez playera, wiec tam wystarczy sam DNS. -->
+    <link rel="preconnect" href="https://www.youtube.com" />
+    <link rel="preconnect" href="https://i.ytimg.com" />
+    <link rel="dns-prefetch" href="https://googlevideo.com" />
+    <!-- Grafika bramki startowej to pierwsza rzecz, ktora widac. Bez tej linii
+         przegladarka odkrywa ja dopiero po wykonaniu bundla (render.ts ustawia
+         `src`); preload startuje pobranie razem z HTML-em. Sciezka wzglednie —
+         tak samo jak manifest i ikony, bo build siedzi w podsciezce. -->
+    <link rel="preload" as="image" href="sprites/start-manual.png" fetchpriority="high" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>

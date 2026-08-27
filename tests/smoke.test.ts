@@ -29,7 +29,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     mountGame(root, makeBeatmap([obj('o1', 10)], 20), clock, { now: clock.now });
 
     const image = root.querySelector<HTMLImageElement>('#gate-image')!;
-    expect(image.getAttribute('src')).toContain('sprites/start-manual.gif');
+    expect(image.getAttribute('src')).toContain('sprites/start-manual.png');
     // Grafika zawiera juz „tap to start", wiec osobnego napisu/podpowiedzi nie ma.
     expect(root.querySelector('.gate-hint')).toBeNull();
     expect(root.querySelector('#start')!.textContent!.trim()).toBe('');
@@ -400,7 +400,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(root.querySelector('#r-total')!.textContent).toBe('2');
     expect(root.querySelector('#r-percent')!.textContent).toBe('50%');
     expect(root.querySelector<HTMLImageElement>('#r-image')!.src).toMatch(
-      /results\/score2\.gif$/,
+      /results\/score2\.png$/,
     );
   });
 

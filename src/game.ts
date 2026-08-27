@@ -1,7 +1,8 @@
 import { Engine } from './engine/engine.js';
 import { createUi, type Ui } from './ui/render.js';
 import { createHitSound, type HitSound } from './ui/sound.js';
-import { HIT_SOUND_SRC, preloadResultImages } from './sprites.js';
+import { HIT_SOUND_SRC, preloadResultImage } from './sprites.js';
+import { resultImageSrc, resultPercent, shouldPrefetchResult } from './ui/result-image.js';
 import type { Beatmap, GameView, TimeSource } from './engine/types.js';
 
 export interface GameHandle {
@@ -13,6 +14,13 @@ export interface GameHandle {
   /** Jedna klatka: odczyt czasu -> aktualizacja stanu -> render. */
   frame(): void;
 }
+
+/**
+ * Ile sekund przed ekranem wyniku zaczynamy sciagac jego grafike (ADR-0027).
+ * Na tyle wczesnie, zeby plik zdazyl dojsc, i na tyle pozno, zeby wynik byl juz
+ * praktycznie ustalony — czyli zeby poszedl jeden plik zamiast szesciu.
+ */
+export const RESULT_PREFETCH_LEAD_SEC = 15;
 
 /**
  * Spina silnik z warstwa DOM. Nie uruchamia petli ani nie zna YouTube — dzieki
@@ -45,9 +53,6 @@ export function mountGame(
       // Wewnatrz gestu uzytkownika: `AudioContext` rodzi sie `suspended`
       // i tylko gest pozwala go wznowic (ADR-0017).
       sound.unlock();
-      // Grafiki ekranu wyniku dopiero teraz — przed startem nie moga
-      // konkurowac o pasmo z buforowaniem wideo (ADR-0025).
-      preloadResultImages();
       ui.hideGate();
       options.onStart?.();
     },
@@ -57,10 +62,25 @@ export function mountGame(
     },
   });
 
+  // Grafika ekranu wyniku: jedna, a nie szesc (ADR-0027). Kubelek liczymy z tego
+  // samego `resultPercent`, ktorego uzywa renderer, wiec pobrany plik to dokladnie
+  // ten, ktory zaraz zobaczy gracz. Bez stanu w rejestrze assetow — pamietamy tu,
+  // co juz poszlo, zeby `frame()` nie zamawial tego samego pliku 60 razy na sekunde.
+  let prefetchedResultSrc: string | null = null;
+
+  const prefetchResultImage = (view: GameView): void => {
+    if (!shouldPrefetchResult(view.timeSec, beatmap.endScreenAtSec, RESULT_PREFETCH_LEAD_SEC)) return;
+    const src = resultImageSrc(resultPercent(view.stats.hits, view.stats.total));
+    if (src === prefetchedResultSrc) return;
+    prefetchedResultSrc = src;
+    preloadResultImage(src);
+  };
+
   const frame = (): void => {
     engine.tick();
     const view = engine.getView();
     ui.render(view);
+    prefetchResultImage(view);
     options.onFrame?.(view);
   };
 

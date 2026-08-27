@@ -18,7 +18,7 @@ export type Sprite =
 const asset = (file: string) => `${import.meta.env.BASE_URL}sprites/${file}`;
 
 export const SPRITES: Record<string, Sprite> = {
-  hand: { kind: 'image', src: asset('hand-idle.gif'), hitSrc: asset('hand-hit.gif') },
+  hand: { kind: 'image', src: asset('hand-idle.png'), hitSrc: asset('hand-hit.png') },
 };
 
 export const SPRITE_KEYS = Object.keys(SPRITES);
@@ -49,14 +49,16 @@ const resultAsset = (file: string) => `${import.meta.env.BASE_URL}results/${file
  * 0 -> 0%, 1 -> 1-25%, 2 -> 26-50%, 3 -> 51-75%, 4 -> 76-99%, 5 -> 100%.
  * Kolejnosc jest kontraktem — `resultImageSrc` indeksuje ta tablice wprost.
  */
-export const RESULT_IMAGES = [0, 1, 2, 3, 4, 5].map((i) => resultAsset(`score${i}.gif`));
+export const RESULT_IMAGES = [0, 1, 2, 3, 4, 5].map((i) => resultAsset(`score${i}.png`));
 
 /**
- * Sciaga grafiki wyniku do cache. Wolane dopiero w `onStart` (nie przy montazu
- * UI): ~0,5 MB nie ma konkurowac z buforowaniem wideo przed startem, a przez
- * caly czas trwania klipu zdazy sie pobrac z duzym zapasem.
+ * Sciaga do cache JEDNA grafike wyniku. Wczesniej pobieranych bylo wszystkie
+ * szesc (~0,5 MB) mimo ze pokazywana jest dokladnie jedna — teraz `src/game.ts`
+ * wola to dopiero pod koniec klipu, dla aktualnego kubelka procentowego
+ * (ADR-0027). Wywolanie z tym samym `src` co poprzednio jest po stronie
+ * wolajacego, tutaj nie ma stanu.
  */
-export function preloadResultImages(): void {
+export function preloadResultImage(src: string): void {
   if (typeof Image === 'undefined') return;
-  for (const src of RESULT_IMAGES) new Image().src = src;
+  new Image().src = src;
 }
