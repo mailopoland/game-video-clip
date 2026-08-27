@@ -423,9 +423,13 @@ export function createUi(
           triggerStart();
           return;
         }
-        // Poza oknem widocznosci przycisku YouTube'a klik w srodek kadru nie
+        // Na pauzie YouTube zawsze rysuje duzy przycisk play na srodku kadru
+        // (bez wzgledu na okno widocznosci po ruszeniu odtwarzania) — proxy
+        // odzwierciedla to i startuje wideo. Poza pauza dziala tylko w oknie
+        // widocznosci i tylko pauzuje; poza oknem klik w srodek kadru nie
         // robi nic — dokladnie tak jak klik w kazde inne miejsce bez dloni.
-        if (ytProxyArmed) controls.pause();
+        if (lastFrozen) controls.play();
+        else if (ytProxyArmed) controls.pause();
       });
 
       // PLAY AGAIN nie potrzebuje zadnego nowego API silnika: przewiniecie do 0

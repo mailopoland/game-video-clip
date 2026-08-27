@@ -581,7 +581,7 @@ Dlatego potrzebne są dwa niezależne środki:
 | Środek | Co robi |
 |---|---|
 | `--player-overscan: max(24%, 120px)` na `.stage` | wypycha poza kadr pasek tytułu, avatar, udostępnianie, „More videos" i logo |
-| `.yt-button-proxy` | duży przycisk play/pauza **zostaje widoczny**, ale klik w niego obsługuje nasz transport — i tylko przez 5 s od ruszenia odtwarzania, wyłącznie jako pauza |
+| `.yt-button-proxy` | duży przycisk play/pauza **zostaje widoczny**, ale klik w niego obsługuje nasz transport — na pauzie zawsze startuje wideo, w trakcie odtwarzania pauzuje tylko przez 5 s od jego ruszenia |
 
 ### `--player-overscan` — player wyższy niż scena
 
@@ -620,20 +620,25 @@ sceną: wygląd jest YouTube'a, działanie nasze. Leży między `.shield`
 a `.overlay`, więc klik w dłoń zawsze z nim wygrywa, i jest `disabled` do
 `enableTransport`, tak jak reszta transportu.
 
-**Proxy działa tylko wtedy, gdy przycisk YouTube'a naprawdę jest na ekranie.**
-Ikona pauzy znika ok. 5 s po ruszeniu odtwarzania (`YT_BUTTON_VISIBLE_SEC`
-w `render.ts`), więc od tego momentu środek kadru jest zwykłym tłem: klik nie
-robi nic, dokładnie tak jak klik w każde inne miejsce bez dłoni. W oknie
-widoczności proxy działa **w jedną stronę** — tylko `pause()`, nigdy `play()`;
-wznowienie idzie przez pasek transportu. Okno liczy się w czasie **wideo** i
-otwiera się przy każdym przejściu z `frozen` w odtwarzanie (start gry, wznowienie
+**Na pauzie YouTube zawsze rysuje duży przycisk play** (poza stanem `PLAYING`),
+więc proxy tam zawsze działa: klik w środek kadru woła `controls.play()`,
+niezależnie od okna widoczności czy czasu od poprzedniego odtwarzania.
+
+**W trakcie odtwarzania proxy działa tylko przez chwilę.** Ikona pauzy znika
+ok. 5 s po ruszeniu odtwarzania (`YT_BUTTON_VISIBLE_SEC` w `render.ts`), więc
+od tego momentu środek kadru jest zwykłym tłem: klik nie robi nic, dokładnie
+tak jak klik w każde inne miejsce bez dłoni. W tym oknie proxy działa
+**w jedną stronę** — tylko `pause()`, nigdy `play()` (bo `play()` już
+obsługuje gałąź pauzy powyżej). Okno liczy się w czasie **wideo** i otwiera
+się przy każdym przejściu z `frozen` w odtwarzanie (start gry, wznowienie
 z paska), a nie raz na rozgrywkę.
 
 Zweryfikowane w przeglądarce (`elementFromPoint`): środek sceny trafia
 w `yt-button-proxy`, a każdy inny punkt kadru — w `shield`, czyli nadal nic nie
 dociera do iframe'a. **Koszt:** pudło dokładnie w środku kadru (obszar
 `--yt-button-size`) w pierwszych 5 s odtwarzania wstrzyma wideo zamiast
-policzyć się jako chybienie; później jest już zwykłym pudłem.
+policzyć się jako chybienie; później jest już zwykłym pudłem. Na pauzie nie ma
+tego kosztu, bo tam nie ma trwającej rozgrywki do przerwania.
 
 ### `.shield` — przezroczysta blokada wskaźnika
 
@@ -1228,9 +1233,11 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
   przestało — `--player-overscan: 0%` cofa to jedną linią.
 - **Duży przycisk play/pauza YouTube'a zostaje widoczny na środku kadru** —
   świadomie przyjęte, bo każdy sposób jego ukrycia ukrywa tam także wideo.
-  W zamian jest klikalny (`.yt-button-proxy`) przez 5 s od ruszenia odtwarzania
-  — tyle, ile widać ikonę. **Skutek uboczny:** pudło dokładnie w środku kadru
-  w tym oknie wstrzyma wideo zamiast policzyć się jako chybienie.
+  W zamian jest klikalny (`.yt-button-proxy`): na pauzie zawsze startuje wideo
+  (tam przycisk play jest widoczny bez ograniczenia czasowego), w trakcie
+  odtwarzania pauzuje tylko przez 5 s od jego ruszenia — tyle, ile widać
+  ikonę. **Skutek uboczny:** pudło dokładnie w środku kadru w tym oknie
+  wstrzyma wideo zamiast policzyć się jako chybienie.
 - **Geometria i animacje z ADR-0019 nie są pokryte testami** — `jsdom` nie liczy
   layoutu, nie animuje i nie renderuje prawdziwego iframe'a; pokryte są
   wyłącznie obecność i kolejność `.shield` oraz `.yt-button-proxy` w DOM
@@ -1238,7 +1245,8 @@ fail-uje przy kodzie ≠ 200, żeby awaria dawała maila zamiast ciszy.
   weryfikacji: (1) klik/tap gdziekolwiek na scenie nie wywołuje kontrolek
   YouTube ani nie pauzuje wideo; (2) **nie widać paska tytułu, „More videos" ani logo** (duży
   przycisk na środku zostaje — to świadoma decyzja); (2b) klik w ten przycisk
-  wstrzymuje i wznawia wideo; (3) scena + pasek transportu mieszczą się w viewport
+  wznawia wideo z pauzy zawsze, a w trakcie odtwarzania pauzuje tylko przez
+  pierwsze 5 s; (3) scena + pasek transportu mieszczą się w viewport
   na maksymalizowanym `.frame`.
 - **Widoczność ikon transportu na iOS wymaga weryfikacji na urządzeniu.** Glify
   Unicode (`❚❚`, `🕪`) rysowały się tam jako puste kwadraty; zastąpiono je inline

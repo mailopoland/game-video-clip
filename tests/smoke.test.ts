@@ -216,7 +216,7 @@ describe('smoke: render i wejscie dotykowe', () => {
     expect(proxy.disabled).toBe(false);
   });
 
-  it('klik w przezroczysty przycisk pauzuje przez 5 s od startu, potem nic nie robi', () => {
+  it('klik w przezroczysty przycisk startuje wideo na pauzie i pauzuje przez 5 s od startu, potem nic nie robi', () => {
     const clock = new FakeClock();
     const game = mountGame(root, makeBeatmap([obj('o1', 10)], 999), clock, { now: clock.now });
     const controls = {
@@ -231,11 +231,11 @@ describe('smoke: render i wejscie dotykowe', () => {
     game.ui.hideGate(); // za bramka startowa; pierwszy klik przed nia jest startem
     const proxy = root.querySelector<HTMLButtonElement>('#yt-button-proxy')!;
 
-    // Wideo stoi — duzego przycisku YouTube'a nie proxujemy do `play()`.
+    // Wideo stoi — YouTube rysuje tam swoj przycisk play, wiec proxy startuje wideo.
     clock.playing = false;
     game.frame();
     proxy.click();
-    expect(controls.play).not.toHaveBeenCalled();
+    expect(controls.play).toHaveBeenCalledTimes(1);
     expect(controls.pause).not.toHaveBeenCalled();
 
     // Ruszylo: przez pierwsze 5 s przycisk YouTube'a jest widoczny i pauzuje.
@@ -243,13 +243,13 @@ describe('smoke: render i wejscie dotykowe', () => {
     game.frame();
     proxy.click();
     expect(controls.pause).toHaveBeenCalledTimes(1);
-    expect(controls.play).not.toHaveBeenCalled();
+    expect(controls.play).toHaveBeenCalledTimes(1);
 
     // Po 5 s przycisk znika z kadru, wiec klik w srodek nic nie robi.
     playTo(clock, game.frame, 5.5);
     proxy.click();
     expect(controls.pause).toHaveBeenCalledTimes(1);
-    expect(controls.play).not.toHaveBeenCalled();
+    expect(controls.play).toHaveBeenCalledTimes(1);
   });
 
   it('okno pauzy odnawia sie po wznowieniu odtwarzania', () => {
