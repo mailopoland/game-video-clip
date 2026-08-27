@@ -1,0 +1,13 @@
+# Mood Brazil Slap Game — https://mailopoland.github.io/game-video-clip/
+#
+# UWAGA: roboty czytaja robots.txt WYLACZNIE z korzenia domeny, wiec dopoki
+# strona stoi w podsciezce GitHub Pages, ten plik lezy pod
+# /game-video-clip/robots.txt i jest ignorowany. Powstal celowo z wyprzedzeniem:
+# po podpieciu wlasnej domeny (docs/SEO.md, sekcja "Podmiana na domene") repo
+# serwuje sie z korzenia i plik zaczyna dzialac bez dodatkowej pracy.
+# Wtedy trzeba podmienic adres w linii Sitemap.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://mailopoland.github.io/game-video-clip/sitemap.xml

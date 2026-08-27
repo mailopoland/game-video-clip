@@ -76,7 +76,7 @@ snapshot z chwili zdarzenia. SQL (schemat, RLS wyłącznie na INSERT dla `anon`,
 pięć zapisanych zapytań) jest w `docs/SUPABASE.md`; keepalive to codzienny cron
 w `.github/workflows/supabase-keepalive.yml`, bo darmowy projekt Supabase
 pauzuje po 7 dniach bez zapytań.
-`npm test` — 280 testów, zielone.
+`npm test` — 293 testy, zielone.
 
 ## ⛔ Zanim cokolwiek zrobisz: przeczytaj README.md
 
@@ -139,7 +139,7 @@ src/
     telemetry.ts          # maszyna stanu piatki zdarzen (bez DOM, fetch, storage)
   ui/
     render.ts            # stan -> DOM (scena, obiekty, HUD, wynik)
-    result-image.ts      # czyste funkcje ekranu wyniku: procent i wybor grafiki
+    result-image.ts      # czyste funkcje ekranu wyniku: procent, wybor grafiki i jej alt
     youtube.ts           # IFrame API + adapter TimeSource
     sound.ts             # pula Audio na dzwiek trafienia (unlock + round-robin)
   dev/                   # tryb deweloperski — wycinany z buildu produkcyjnego (ADR-0016)
@@ -152,13 +152,18 @@ tests/
   fake-clock.ts          # wstrzykiwane źródło czasu + fabryki beatmap
   engine.test.ts  beatmap.test.ts  path.test.ts  smoke.test.ts  sound.test.ts
   playback-rate.test.ts  rdp.test.ts  dev-record.test.ts  dev-mode.test.ts
-  result-image.test.ts  telemetry.test.ts
+  result-image.test.ts  telemetry.test.ts  seo.test.ts
 public/
   results/               # scoreN.gif — grafiki ekranu wyniku (ADR-0025)
+  robots.txt             # dziala dopiero po podpieciu domeny (ADR-0027, docs/SEO.md)
+  sitemap.xml            # jeden URL, zglaszany w Search Console wprost
+  og-image.png           # 1200x630 podglad linku, generowany skryptem
   manifest.webmanifest   # PWA — jedyna droga do pelnego ekranu bez paskow Safari (iOS)
   icons/                 # ikony PWA, generowane przez scripts/make-icons.mjs
 scripts/
   make-icons.mjs         # proceduralny generator ikon PNG (node:zlib, zero zaleznosci)
+  make-og-image.mjs      # obrazek podgladu linku 1200x630 z hand-hit.gif (ADR-0027)
+  lib/gif-png.mjs        # wspolny dekoder GIF + enkoder PNG (favikona i og-image)
 docs/
   PLAN.md                # plan wdrożenia v1 + research ograniczeń YouTube API
   DEPLOY.md              # publikacja na GitHub Pages
@@ -235,3 +240,4 @@ Wymaga Node ≥ 20.17.
 - [ADR-0024 — Zegar treści kontra zegar reklamy](docs/decisions/ADR-0024-zegar-tresci-kontra-zegar-reklamy.md) — zastępuje ADR-0022
 - [ADR-0025 — Bezsłowny ekran wyniku, procent z całej beatmapy i restart przez seek](docs/decisions/ADR-0025-obrazkowy-ekran-wyniku-i-restart.md)
 - [ADR-0026 — Telemetria rozgrywki w Supabase: publiczny INSERT, odczyt tylko w panelu](docs/decisions/ADR-0026-telemetria-w-supabase.md)
+- [ADR-0027 — SEO wyłącznie w metadanych: zero treści w widocznym DOM](docs/decisions/ADR-0027-seo-tylko-w-metadanych.md)

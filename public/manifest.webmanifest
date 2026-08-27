@@ -1,6 +1,11 @@
 {
-  "name": "Click the target",
-  "short_name": "Click",
+  "id": ".",
+  "name": "Mood Brazil Slap Game",
+  "short_name": "Slap Game",
+  "description": "A free rhythm tap game played on the LIL NAAY - MOOD BRAZIL music video. Tap every hand you see.",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["games", "entertainment"],
   "start_url": ".",
   "scope": ".",
   "display": "fullscreen",

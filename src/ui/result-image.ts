@@ -30,3 +30,20 @@ export function resultImageSrc(percent: number): string {
   if (percent <= 75) return RESULT_IMAGES[3]!;
   return RESULT_IMAGES[4]!;
 }
+
+/**
+ * Kubelek procentowy -> `alt` grafiki wyniku (ADR-0027). GRANICE MUSZA BYC TE SAME
+ * co w `resultImageSrc` — inaczej opis dla czytnika ekranu i robota rozjechalby sie
+ * z obrazkiem. Tekst opisuje to, co widac na ekranie; nazwa utworu pada wylacznie
+ * w wariancie 100%, bo powtorzona w kazdym kubelku bylaby keyword stuffingiem.
+ */
+export function resultImageAlt(percent: number): string {
+  if (percent <= 0) return 'Score screen: no hands slapped in this run';
+  if (percent >= 100) {
+    return 'Score screen: perfect run - every hand in the Mood Brazil video slapped';
+  }
+  if (percent <= 25) return 'Score screen: a few hands slapped out of the whole video';
+  if (percent <= 50) return 'Score screen: about half of the hands slapped';
+  if (percent <= 75) return 'Score screen: most of the hands slapped';
+  return 'Score screen: almost every hand slapped';
+}

@@ -4,4 +4,6 @@
 declare module 'node:fs' {
   export function writeFileSync(path: string, data: string): void;
   export function renameSync(oldPath: string, newPath: string): void;
+  /** Uzywane przez `tests/seo.test.ts` — czyta index.html i pliki z public/. */
+  export function readFileSync(path: string, encoding: 'utf-8'): string;
 }

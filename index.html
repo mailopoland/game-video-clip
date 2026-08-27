@@ -1,17 +1,72 @@
 <!doctype html>
-<html lang="pl">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, viewport-fit=cover"
     />
-    <title>Music Video Slap Game</title>
+    <title>Mood Brazil Slap Game — LIL NAAY Rhythm Tap Game</title>
+
+    <!-- SEO (ADR-0027, docs/SEO.md). Strona jest w calosci renderowana z JS i nie ma
+         widocznego tekstu, wiec metadane, dane strukturalne i alt-y sa JEDYNA
+         powierzchnia dla wyszukiwarek. Zadna z tych tresci nie pojawia sie w grze.
+         URL-e absolutne sa wpisane wprost: Vite nie podmienia zmiennych w index.html,
+         a og:image musi byc absolutny. Podpiecie wlasnej domeny = podmiana 7 miejsc,
+         checklista w docs/SEO.md. -->
+    <meta
+      name="description"
+      content="Slap every hand that pops up on the LIL NAAY - MOOD BRAZIL music video. A free rhythm tap game in your browser - no download, no sign-up. One tap to start."
+    />
+    <meta
+      name="keywords"
+      content="mood brazil game, lil naay game, mood brazil slap game, music video slap game, rhythm tap game, browser game, clicking game, free online game, no download game"
+    />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <link rel="canonical" href="https://mailopoland.github.io/game-video-clip/" />
+
+    <!-- Open Graph: podglad linku na Facebooku, Messengerze, LinkedInie, Discordzie. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mood Brazil Slap Game" />
+    <meta property="og:title" content="Mood Brazil Slap Game — LIL NAAY" />
+    <meta
+      property="og:description"
+      content="Tap every hand that pops up on the LIL NAAY - MOOD BRAZIL video, score points and chase a perfect run. Free, in the browser, no download."
+    />
+    <meta property="og:url" content="https://mailopoland.github.io/game-video-clip/" />
+    <meta
+      property="og:image"
+      content="https://mailopoland.github.io/game-video-clip/og-image.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="A cartoon hand slapping a target on top of the Mood Brazil music video"
+    />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter/X. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Mood Brazil Slap Game — LIL NAAY" />
+    <meta
+      name="twitter:description"
+      content="A free rhythm tap game played on the LIL NAAY - MOOD BRAZIL music video. Slap every hand you see, chase 100%. No download, no sign-up."
+    />
+    <meta
+      name="twitter:image"
+      content="https://mailopoland.github.io/game-video-clip/og-image.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="A cartoon hand slapping a target on top of the Mood Brazil music video"
+    />
+
     <!-- iPhone nie ma Fullscreen API. Jedyny prawdziwy pelny ekran na iOS to
          uruchomienie z ekranu poczatkowego (ADR-0021) — daja go te linie.
          Sciezki wzgledne, bo build na GitHub Pages siedzi w podsciezce. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Click" />
+    <meta name="apple-mobile-web-app-title" content="Slap Game" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#101014" />
     <link rel="manifest" href="manifest.webmanifest" />
@@ -22,8 +77,49 @@
          bez tej linii robi ikone ze zrzutu strony. -->
     <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
     <link rel="stylesheet" href="/src/styles.css" />
+
+    <!-- Dane strukturalne. Bez aggregateRating/review — nie ma realnych ocen, a
+         zmyslone to falszywe dane strukturalne i ryzyko manualnej kary. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Mood Brazil Slap Game",
+        "alternateName": "Music Video Slap Game",
+        "url": "https://mailopoland.github.io/game-video-clip/",
+        "description": "A free rhythm tap game played on top of the LIL NAAY - MOOD BRAZIL music video. Hands appear in time with the track; tap each one before it disappears to score a point, then see your final score as a percentage of every hand in the run.",
+        "genre": ["Rhythm game", "Casual game", "Arcade game"],
+        "applicationCategory": "GameApplication",
+        "gamePlatform": "Web browser",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript. Works in any modern desktop or mobile browser.",
+        "playMode": "SinglePlayer",
+        "inLanguage": "en",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock"
+        },
+        "image": "https://mailopoland.github.io/game-video-clip/og-image.png",
+        "screenshot": "https://mailopoland.github.io/game-video-clip/og-image.png",
+        "isBasedOn": {
+          "@type": "MusicRecording",
+          "name": "Mood Brazil",
+          "byArtist": { "@type": "MusicGroup", "name": "LIL NAAY" }
+        }
+      }
+    </script>
   </head>
   <body>
+    <!-- Widoczne wylacznie przy wylaczonym JS, czyli nigdy dla gracza. Jeden
+         akapit zgodny z prawda — nie ukryty tekst pod robota (ADR-0027). -->
+    <noscript>
+      Mood Brazil Slap Game is a free rhythm game played on top of the LIL NAAY - MOOD
+      BRAZIL music video: hands pop up in time with the track and every one you tap in
+      time is a point. It runs entirely in the browser and needs JavaScript enabled.
+    </noscript>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
